@@ -22,6 +22,9 @@
           </div>
           {% if node.hover_exists %}
             {% if node.states %}
+            {% if node.states %}
+              {% set preview_state = 'icon' if 'icon' in node.states else node.states[0] %}
+            {% endif %}
               <img loading="lazy"
                 class="pointer-events-none absolute right-0 top-1/2 z-20 hidden h-24 w-24 -translate-y-1/2 rounded border bg-slate-50 p-1 pixelated group-hover:block"
                 src="{{ url_for('rsi_preview', sprite=node.path, state=preview_state, scale=2) }}"

@@ -38,15 +38,11 @@
 
 <div class="mb-4">
   <label class="text-sm text-slate-600">State:</label>
-  <select 
-    id="state-select"
+  <select id="state-select"
     class="rounded border border-slate-300 px-3 py-2 text-sm"
   >
-    <option value="icon">icon</option>
     {% for state in states %}
-      {% if state != 'icon' %}
-        <option value="{{ state }}">{{ state }}</option>
-      {% endif %}
+      <option value="{{ state }}">{{ state }}</option>
     {% endfor %}
   </select>
   <div class="mb-4">
@@ -91,7 +87,8 @@
 <div class="mb-4">
   <img 
     id="preview-img"
-src="{{ url_for('rsi_preview', sprite=sprite, state=states[0] if states else 'icon', direction=0) }}"    alt="{{ sprite }}:{{ states[0] if states else 'icon'}}"
+    src="{{ url_for('rsi_preview', sprite=sprite, state=states[0], direction=0) }}"
+    alt="{{ sprite }}:{{ states[0] if states else 'icon'}}"
     class="mx-auto pixelated rounded border border-slate-300 max-w-full"
   >
 </div>

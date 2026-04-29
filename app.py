@@ -479,7 +479,14 @@ def create_app() -> Flask:
         if not str(rsi_dir).endswith(".rsi"):
             abort(400)
 
-        states = list_rsi_states(rsi_dir) or ["icon"]
+        states = list_rsi_states(rsi_dir)
+
+        # Fallback: if no states found, try to infer from files
+        if not states:
+            states = [p.stem for p in rsi_dir.glob("*.png")]
+
+        # Still nothing? then empty list (don't fake "icon")
+        states = states or []
 
         meta_path = rsi_dir / "meta.json"
         meta = None
@@ -622,24 +629,45 @@ def create_app() -> Flask:
     @app.get("/sprite/preview")
     def sprite_preview():
         selected = selected_instance_or_400()
+
         sprite = request.args.get("sprite", "").strip()
-        state = request.args.get("state", "icon").strip()
+        state = request.args.get("state", "").strip()
         scale = int(request.args.get("scale", str(DEFAULT_THUMB_SCALE)))
+
         if scale < 1 or scale > 16:
             abort(400)
 
         textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
         sprite_dir = safe_join(textures_root, sprite)
-        image_path = safe_join(sprite_dir, f"{state}.png")
-        if not image_path.exists():
+
+        if not sprite_dir or not sprite_dir.exists():
             abort(404)
+
+        # Try requested state
+        image_path = safe_join(sprite_dir, f"{state}.png") if state else None
+
+        # Fallbacks
+        if not image_path or not image_path.exists():
+            pngs = list(sprite_dir.glob("*.png"))
+
+            if not pngs:
+                abort(404)
+
+            # Prefer icon if exists
+            icon = next((p for p in pngs if p.stem == "icon"), None)
+            image_path = icon or pngs[0]
 
         with Image.open(image_path) as im:
             im = im.convert("RGBA")
-            out = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            out = im.resize(
+                (im.width * scale, im.height * scale),
+                Image.Resampling.NEAREST
+            )
+
             buffer = io.BytesIO()
             out.save(buffer, format="PNG")
             buffer.seek(0)
+
             return send_file(buffer, mimetype="image/png")
 
     @app.get("/audio/play")
