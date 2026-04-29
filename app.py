@@ -448,6 +448,100 @@ def create_app() -> Flask:
             states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
         return jsonify(sorted(set(states)))
 
+    @app.route("/rsi")
+    def rsi_explorer():
+        selected = selected_instance_or_400()
+        textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+        if not textures_root.exists():
+            return render_template("rsi_explorer.html", rsi_tree=[], selected=selected)
+        rsi_tree = build_rsi_tree_recursive(
+            textures_root,
+            textures_root
+        )
+        print("RSI TREE SIZE:", len(rsi_tree))
+        return render_template("rsi_explorer.html", rsi_tree=rsi_tree, selected=selected)
+
+    @app.route("/rsi/view")
+    def rsi_view():
+        selected = selected_instance_or_400()
+
+        sprite = request.args.get("sprite", "").strip().replace("\\", "/")
+        if not sprite:
+            abort(400)
+
+        textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+        rsi_dir = safe_join(textures_root, sprite)
+
+        if not rsi_dir or not rsi_dir.exists() or not rsi_dir.is_dir():
+            abort(404)
+
+        # Optional: enforce .rsi
+        if not str(rsi_dir).endswith(".rsi"):
+            abort(400)
+
+        states = list_rsi_states(rsi_dir) or ["icon"]
+
+        meta_path = rsi_dir / "meta.json"
+        meta = None
+
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = None
+
+        return render_template(
+            "rsi_view.html",
+            selected=selected,
+            sprite=sprite,
+            states=states,
+            meta=meta
+        )
+        
+    @app.route("/rsi/preview")
+    def rsi_preview():
+        selected = selected_instance_or_400()
+
+        sprite = request.args.get("sprite", "").strip().replace("\\", "/")
+        state = request.args.get("state", "icon").strip()
+
+        try:
+            scale = int(request.args.get("scale", str(DEFAULT_THUMB_SCALE)))
+        except ValueError:
+            abort(400)
+
+        if scale < 1 or scale > 16:
+            abort(400)
+
+        textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+
+        rsi_dir = safe_join(textures_root, sprite)
+        if not rsi_dir or not rsi_dir.exists():
+            abort(404)
+
+        image_path = safe_join(rsi_dir, f"{state}.png")
+
+        # ✅ fallback if state doesn't exist
+        if not image_path or not image_path.exists():
+            pngs = list(rsi_dir.glob("*.png"))
+            if not pngs:
+                abort(404)
+            image_path = pngs[0]
+
+        with Image.open(image_path) as im:
+            im = im.convert("RGBA")
+            out = im.resize(
+                (im.width * scale, im.height * scale),
+                Image.Resampling.NEAREST
+            )
+
+            buffer = io.BytesIO()
+            out.save(buffer, format="PNG")
+            buffer.seek(0)
+
+            return send_file(buffer, mimetype="image/png")
+    
+
     @app.get("/api/crate-parent-suggest")
     def api_crate_parent_suggest():
         selected = selected_instance_or_400()
@@ -1667,6 +1761,37 @@ def load_jukebox_data(root_path: Path) -> tuple[list[dict[str, Any]], list[dict[
         })
 
     return jukebox_dirs, all_tracks
+
+
+def build_rsi_tree_recursive(textures_root: Path, base_path: Path) -> list[dict]:
+    items = []
+
+    for item in sorted(base_path.iterdir()):
+        rel_path = item.relative_to(textures_root)
+
+        if item.is_dir():
+            # 👉 Detect RSI folder
+            if item.suffix == ".rsi":
+                pngs = list(item.glob("*.png"))
+                states = [p.stem for p in pngs]
+
+                items.append({
+                    "type": "file",  # leaf node
+                    "name": item.name,
+                    "path": str(rel_path).replace("\\", "/"),
+                    "states": states,
+                    "hover_exists": len(states) > 0
+                })
+            else:
+                children = build_rsi_tree_recursive(textures_root, item)
+                if children:
+                    items.append({
+                        "type": "dir",
+                        "name": item.name,
+                        "children": children
+                    })
+
+    return items
 
 
 app = create_app()

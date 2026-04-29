@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ sprite }} | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold">{{ sprite }}</h1>
+    <p class="text-sm text-slate-600">{{ selected.name }}</p>
+  </div>
+  <div class="flex gap-2">
+    <a href="{{ url_for('rsi_explorer') }}" class="whitespace-nowrap rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back to Explorer</a>
+    <a 
+      href="{{ url_for('open_explorer', target='rsi', sprite=sprite) }}" 
+      class="whitespace-nowrap rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center disabled:opacity-50 disabled:cursor-not-allowed"
+      {% if not states or not states[0] %}disabled{% endif %}
+    >
+      Open in Explorer
+    </a>
+  </div>
+</div>
+
+<div class="mb-4 flex items-center gap-4">
+  <img 
+    src="{{ url_for('rsi_preview', sprite=sprite, state=states[0] if states else 'icon') }}" 
+    alt="{{ sprite }}:{{ states[0] if states else 'icon'}}"
+    class="h-32 w-32 pixelated rounded border border-slate-300"
+  >
+  <div>
+    {% if meta %}
+      <p class="text-xs text-slate-500">Version: {{ meta.version | default('N/A') }}</p>
+      <p class="text-xs text-slate-500">License: {{ meta.license | default('N/A') }}</p>
+      <p class="text-xs text-slate-500">Copyright: {{ meta.copyright | default('N/A') }}</p>
+      <p class="text-xs text-slate-500">Size: {{ meta.size.x if meta.size else 'N/A' }}x{{ meta.size.y if meta.size else 'N/A' }}</p>
+    {% else %}
+      <p class="text-xs text-slate-500">No metadata available</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="mb-4">
+  <label class="text-sm text-slate-600">State:</label>
+  <select 
+    id="state-select"
+    class="rounded border border-slate-300 px-3 py-2 text-sm"
+  >
+    <option value="icon">icon</option>
+    {% for state in states %}
+      {% if state != 'icon' %}
+        <option value="{{ state }}">{{ state }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+</div>
+
+<div class="mb-4">
+  <img 
+    id="preview-img"
+    src="{{ url_for('rsi_preview', sprite=sprite, state=states[0] if states else 'icon') }}" 
+    alt="{{ sprite }}:{{ states[0] if states else 'icon'}}"
+    class="mx-auto pixelated rounded border border-slate-300 max-w-full"
+  >
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+  const stateSelect = document.getElementById("state-select");
+  const previewImg = document.getElementById("preview-img");
+
+  if (!stateSelect || !previewImg) return;
+
+  const sprite = "{{ sprite }}";
+  const baseUrl = "{{ url_for('rsi_preview', sprite=sprite) }}";
+
+  stateSelect.value = "{{ states[0] if states else 'icon' }}";
+
+  function updatePreview() {
+    const state = stateSelect.value;
+    previewImg.src = `${baseUrl}&state=${state}`;
+  }
+
+  stateSelect.addEventListener("change", updatePreview);
+});
+</script>
+
+{% endblock %}

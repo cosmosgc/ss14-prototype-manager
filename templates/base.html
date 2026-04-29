@@ -27,6 +27,7 @@
         <div class="hidden sm:flex sm:flex-row gap-2 sm:gap-3">
           <a href="{{ url_for('prototypes') }}" class="text-sm text-sky-700 hover:underline">Prototypes</a>
           <a href="{{ url_for('id_search') }}" class="text-sm text-sky-700 hover:underline">ID Search</a>
+          <a href="{{ url_for('rsi_explorer') }}" class="text-sm text-sky-700 hover:underline">RSI Explorer</a>
           <a href="{{ url_for('custom_cargo_catalog') }}" class="text-sm text-sky-700 hover:underline">Cargo Catalog</a>
           <a href="{{ url_for('custom_files') }}" class="text-sm text-sky-700 hover:underline">Custom Files</a>
           <a href="{{ url_for('radio') }}" class="text-sm text-sky-700 hover:underline">Radio</a>
@@ -41,17 +42,18 @@
       </div>
     </div>
     
-    <!-- Mobile menu overlay -->
-    <div x-show="open" x-transition class="sm:hidden border-t border-slate-200 bg-white" x-cloak>
-      <div class="px-4 py-3 space-y-2">
-        <a href="{{ url_for('prototypes') }}" class="block text-sm text-sky-700 hover:underline">Prototypes</a>
-        <a href="{{ url_for('id_search') }}" class="block text-sm text-sky-700 hover:underline">ID Search</a>
-        <a href="{{ url_for('custom_cargo_catalog') }}" class="block text-sm text-sky-700 hover:underline">Cargo Catalog</a>
-        <a href="{{ url_for('custom_files') }}" class="block text-sm text-sky-700 hover:underline">Custom Files</a>
-        <a href="{{ url_for('radio') }}" class="block text-sm text-sky-700 hover:underline">Radio</a>
-        <a href="{{ url_for('options') }}" class="block text-sm text-sky-700 hover:underline">Options</a>
-      </div>
-    </div>
+     <!-- Mobile menu overlay -->
+     <div x-show="open" x-transition class="sm:hidden border-t border-slate-200 bg-white" x-cloak>
+       <div class="px-4 py-3 space-y-2">
+         <a href="{{ url_for('prototypes') }}" class="block text-sm text-sky-700 hover:underline">Prototypes</a>
+         <a href="{{ url_for('id_search') }}" class="block text-sm text-sky-700 hover:underline">ID Search</a>
+         <a href="{{ url_for('rsi_explorer') }}" class="block text-sm text-sky-700 hover:underline">RSI Explorer</a>
+         <a href="{{ url_for('custom_cargo_catalog') }}" class="block text-sm text-sky-700 hover:underline">Cargo Catalog</a>
+         <a href="{{ url_for('custom_files') }}" class="block text-sm text-sky-700 hover:underline">Custom Files</a>
+         <a href="{{ url_for('radio') }}" class="block text-sm text-sky-700 hover:underline">Radio</a>
+         <a href="{{ url_for('options') }}" class="block text-sm text-sky-700 hover:underline">Options</a>
+       </div>
+     </div>
   </nav>
   <main class="mx-auto max-w-7xl px-4 py-6 flex-1 overflow-y-auto">
     {% with messages = get_flashed_messages(with_categories=true) %}
