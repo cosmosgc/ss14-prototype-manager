@@ -92,6 +92,34 @@
     class="mx-auto pixelated rounded border border-slate-300 max-w-full"
   >
 </div>
+{% if meta and meta.states %}
+<div class="mb-4">
+  <label class="text-sm text-slate-600">States in meta:</label>
+  <ul class="text-xs font-mono text-slate-700">
+    {% for s in meta.states %}
+      <li>
+        {{ s.name }} 
+        (dirs: {{ s.directions }}, frames: {{ s.delays[0]|length if s.delays else 0 }})
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% if meta %}
+<div class="mb-4">
+  <details class="rounded border border-slate-300 bg-white">
+    <summary class="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+      View meta.json
+    </summary>
+
+    <div class="border-t border-slate-200 p-3 bg-slate-50 overflow-auto max-h-96">
+      <pre class="text-xs font-mono text-slate-800 whitespace-pre-wrap">
+{{ meta | tojson(indent=2) }}
+      </pre>
+    </div>
+  </details>
+</div>
+{% endif %}
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
