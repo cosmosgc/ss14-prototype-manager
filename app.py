@@ -8,6 +8,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 from flask import (
@@ -318,6 +319,8 @@ def create_app() -> Flask:
                 continue
             for item in extract_cargo_products(docs):
                 item["source_file"] = f"Catalog/Cargo/{rel}"
+                item["source_file_only"] = rel
+                item["crate_file"] = find_crate_file_by_entity_id(root / "Catalog" / "Fills" / "Crates", item.get("product", ""))
                 items.append(item)
         return render_template(
             "custom_cargo_catalog.html",
@@ -325,6 +328,151 @@ def create_app() -> Flask:
             custom_dir=custom_dir,
             items=sorted(items, key=lambda x: x.get("id", "").lower()),
         )
+
+    @app.route("/custom/cargo/form", methods=["GET", "POST"])
+    def custom_cargo_form():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            flash("Set a custom directory in Options first.", "error")
+            return redirect(url_for("options"))
+        root = custom_prototypes_root(selected, custom_dir)
+        cargo_file_rel = request.args.get("file", "").strip().replace("\\", "/")
+
+        form_data = default_cargo_form_data()
+        if cargo_file_rel:
+            preload = load_cargo_form_data(root, cargo_file_rel)
+            if preload:
+                form_data.update(preload)
+
+        if request.method == "POST":
+            form_data = parse_cargo_form_request(request)
+            compatible, reason = validate_crate_parent_compatibility(selected, form_data["crate_parent"])
+            if not compatible:
+                flash(f"Invalid crate parent: {reason}", "error")
+                return render_template(
+                    "custom_cargo_form.html",
+                    selected=selected,
+                    custom_dir=custom_dir,
+                    form_data=form_data,
+                    cargo_yaml_preview=render_cargo_yaml(form_data),
+                    crate_yaml_preview=render_crate_yaml(form_data),
+                )
+            cargo_yaml = render_cargo_yaml(form_data)
+            crate_yaml = render_crate_yaml(form_data)
+            if request.form.get("mode") == "preview":
+                return render_template(
+                    "custom_cargo_form.html",
+                    selected=selected,
+                    custom_dir=custom_dir,
+                    form_data=form_data,
+                    cargo_yaml_preview=cargo_yaml,
+                    crate_yaml_preview=crate_yaml,
+                )
+            cargo_target = safe_join(root / "Catalog" / "Cargo", form_data["cargo_file"])
+            crate_target = safe_join(root / "Catalog" / "Fills" / "Crates", form_data["crate_file"])
+            cargo_target.parent.mkdir(parents=True, exist_ok=True)
+            crate_target.parent.mkdir(parents=True, exist_ok=True)
+            with cargo_target.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(cargo_yaml)
+            with crate_target.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(crate_yaml)
+            flash("Cargo and crate YAML files saved.", "success")
+            return redirect(url_for("custom_cargo_catalog"))
+
+        return render_template(
+            "custom_cargo_form.html",
+            selected=selected,
+            custom_dir=custom_dir,
+            form_data=form_data,
+            cargo_yaml_preview=render_cargo_yaml(form_data),
+            crate_yaml_preview=render_crate_yaml(form_data),
+        )
+
+    @app.get("/api/id-suggest")
+    def api_id_suggest():
+        selected = selected_instance_or_400()
+        q = request.args.get("q", "").strip()
+        if not q:
+            return jsonify([])
+        rows = search_ids(selected["name"], q)[:30]
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            sprite, state = resolve_preview_for_row(selected, row["rel_path"], row["proto_id"])
+            out.append(
+                {
+                    "proto_id": row["proto_id"],
+                    "rel_path": row["rel_path"],
+                    "sprite": sprite,
+                    "state": state,
+                }
+            )
+        return jsonify(out)
+
+    @app.get("/api/rsi-suggest")
+    def api_rsi_suggest():
+        selected = selected_instance_or_400()
+        q = request.args.get("q", "").strip().lower()
+        if not q:
+            return jsonify([])
+        textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+        out: list[str] = []
+        if textures_root.exists():
+            for p in textures_root.rglob("*.rsi"):
+                rel = p.relative_to(textures_root).as_posix()
+                if q in rel.lower():
+                    out.append(rel)
+                    if len(out) >= 40:
+                        break
+        return jsonify(sorted(out))
+
+    @app.get("/api/rsi-states")
+    def api_rsi_states():
+        selected = selected_instance_or_400()
+        sprite = request.args.get("sprite", "").strip()
+        if not sprite:
+            return jsonify([])
+        textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+        rsi_dir = safe_join_or_none(textures_root, sprite)
+        if not rsi_dir or not rsi_dir.exists():
+            return jsonify([])
+        meta_path = rsi_dir / "meta.json"
+        states: list[str] = []
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                states = [s.get("name") for s in meta.get("states", []) if isinstance(s, dict) and s.get("name")]
+            except Exception:
+                states = []
+        if not states:
+            states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
+        return jsonify(sorted(set(states)))
+
+    @app.get("/api/crate-parent-suggest")
+    def api_crate_parent_suggest():
+        selected = selected_instance_or_400()
+        q = request.args.get("q", "").strip()
+        if not q:
+            return jsonify([])
+        candidates = search_ids(selected["name"], q)[:120]
+        out: list[dict[str, Any]] = []
+        for row in candidates:
+            proto_id = row["proto_id"]
+            ok, _ = validate_crate_parent_compatibility(selected, proto_id)
+            if not ok:
+                continue
+            sprite, state = resolve_preview_for_prototype_id(selected, proto_id)
+            out.append(
+                {
+                    "proto_id": proto_id,
+                    "rel_path": row["rel_path"],
+                    "sprite": sprite,
+                    "state": state,
+                }
+            )
+            if len(out) >= 30:
+                break
+        return jsonify(out)
 
     @app.get("/sprite/preview")
     def sprite_preview():
@@ -602,6 +750,219 @@ def collect_sprite_state_pairs(node: Any) -> list[dict[str, str]]:
             stack.extend(current)
     unique = {(p["sprite"], p["state"]) for p in pairs}
     return [{"sprite": s, "state": st} for s, st in sorted(unique)]
+
+
+def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
+    stack = [docs]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            sprite = current.get("sprite")
+            state = current.get("state")
+            if isinstance(sprite, str) and sprite.endswith(".rsi"):
+                return sprite, state if isinstance(state, str) and state else "icon"
+            sprites = current.get("sprites")
+            if isinstance(sprites, list):
+                for item in sprites:
+                    if isinstance(item, dict):
+                        s = item.get("sprite")
+                        st = item.get("state")
+                        if isinstance(s, str) and s.endswith(".rsi"):
+                            return s, st if isinstance(st, str) and st else "icon"
+            for v in current.values():
+                stack.append(v)
+        elif isinstance(current, list):
+            stack.extend(current)
+    return "", "icon"
+
+
+def resolve_preview_for_prototype_id(instance: dict[str, str], proto_id: str) -> tuple[str, str]:
+    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
+    if not rel:
+        return "", "icon"
+    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    try:
+        docs = load_yaml_documents(safe_join(proto_root, rel))
+    except Exception:
+        return "", "icon"
+    entity = find_entity_node_by_id(docs, proto_id)
+    if not entity:
+        return find_first_sprite_state_from_docs(docs)
+    return resolve_entity_sprite_state(instance, entity, set(), 0)
+
+
+def resolve_preview_for_row(instance: dict[str, str], rel_path: str, proto_id: str) -> tuple[str, str]:
+    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    try:
+        docs = load_yaml_documents(safe_join(proto_root, rel_path))
+    except Exception:
+        return resolve_preview_for_prototype_id(instance, proto_id)
+    entity = find_entity_node_by_id(docs, proto_id)
+    if entity:
+        return resolve_entity_sprite_state(instance, entity, set(), 0)
+    return resolve_preview_for_prototype_id(instance, proto_id)
+
+
+def find_entity_node_by_id(node: Any, proto_id: str) -> dict[str, Any] | None:
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if current.get("type") == "entity" and current.get("id") == proto_id:
+                return current
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return None
+
+
+def resolve_entity_sprite_state(
+    instance: dict[str, str], entity: dict[str, Any], visited: set[str], depth: int
+) -> tuple[str, str]:
+    if depth > 30:
+        return "", "icon"
+    local_sprite, local_state = extract_sprite_from_entity(entity)
+    forced_state = local_state if local_state and local_state != "icon" else ""
+    if local_sprite:
+        return adjust_state_to_existing(instance, local_sprite, local_state or "icon")
+
+    parent_val = entity.get("parent")
+    parent_ids: list[str] = []
+    if isinstance(parent_val, str):
+        parent_ids = [parent_val]
+    elif isinstance(parent_val, list):
+        parent_ids = [x for x in parent_val if isinstance(x, str)]
+
+    for parent_id in parent_ids:
+        if parent_id in visited:
+            continue
+        visited.add(parent_id)
+        parent_entity = load_entity_by_id(instance, parent_id)
+        if not parent_entity:
+            continue
+        parent_sprite, parent_state = resolve_entity_sprite_state(instance, parent_entity, visited, depth + 1)
+        if parent_sprite:
+            # If current entity overrides only state, apply it to inherited parent sprite.
+            if forced_state:
+                return adjust_state_to_existing(instance, parent_sprite, forced_state)
+            return parent_sprite, parent_state
+
+    return "", local_state or "icon"
+
+
+def extract_sprite_from_entity(entity: dict[str, Any]) -> tuple[str, str]:
+    state = "icon"
+    components = entity.get("components")
+    if isinstance(components, list):
+        # Prefer explicit Icon component on the entity itself for UI preview.
+        for comp in components:
+            if isinstance(comp, dict) and comp.get("type") == "Icon":
+                if isinstance(comp.get("state"), str):
+                    state = comp["state"]
+                if isinstance(comp.get("sprite"), str) and comp["sprite"].endswith(".rsi"):
+                    return comp["sprite"], state
+
+        for comp in components:
+            if isinstance(comp, dict) and comp.get("type") == "Sprite":
+                if isinstance(comp.get("state"), str):
+                    state = comp["state"]
+                if isinstance(comp.get("sprite"), str) and comp["sprite"].endswith(".rsi"):
+                    return comp["sprite"], state
+                sprites = comp.get("sprites")
+                if isinstance(sprites, list):
+                    for s in sprites:
+                        if isinstance(s, dict) and isinstance(s.get("sprite"), str):
+                            return s["sprite"], s.get("state", state) if isinstance(s.get("state"), str) else state
+    # Fallback generic keys
+    sprite = entity.get("sprite")
+    if isinstance(sprite, str) and sprite.endswith(".rsi"):
+        if isinstance(entity.get("state"), str):
+            state = entity["state"]
+        return sprite, state
+    sprites = entity.get("sprites")
+    if isinstance(sprites, list):
+        for s in sprites:
+            if isinstance(s, dict) and isinstance(s.get("sprite"), str):
+                return s["sprite"], s.get("state", state) if isinstance(s.get("state"), str) else state
+    return "", state
+
+
+def adjust_state_to_existing(instance: dict[str, str], sprite: str, preferred_state: str) -> tuple[str, str]:
+    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join_or_none(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return sprite, preferred_state
+    available = list_rsi_states(rsi_dir)
+    if not available:
+        return sprite, preferred_state
+    if preferred_state in available:
+        return sprite, preferred_state
+    if "icon" in available:
+        return sprite, "icon"
+    return sprite, available[0]
+
+
+def list_rsi_states(rsi_dir: Path) -> list[str]:
+    meta_path = rsi_dir / "meta.json"
+    states: list[str] = []
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            states = [s.get("name") for s in meta.get("states", []) if isinstance(s, dict) and s.get("name")]
+        except Exception:
+            states = []
+    if not states:
+        states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
+    return sorted(set(states))
+
+
+def load_entity_by_id(instance: dict[str, str], proto_id: str) -> dict[str, Any] | None:
+    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
+    if not rel:
+        return None
+    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    try:
+        docs = load_yaml_documents(safe_join(proto_root, rel))
+    except Exception:
+        return None
+    return find_entity_node_by_id(docs, proto_id)
+
+
+def validate_crate_parent_compatibility(instance: dict[str, str], parent_id: str) -> tuple[bool, str]:
+    if not parent_id:
+        return False, "crate_parent is empty."
+    allowed = {"CrateBaseSecure", "CrateGeneric", "CrateBaseWeldable"}
+    if parent_id in allowed:
+        return True, "ok"
+    entity = load_entity_by_id(instance, parent_id)
+    if not entity:
+        return False, f'"{parent_id}" was not found in scanned prototype IDs.'
+    if is_entity_descended_from(instance, entity, allowed, set(), 0):
+        return True, "ok"
+    return False, f'"{parent_id}" is not compatible. Expected parent chain to include one of: {", ".join(sorted(allowed))}.'
+
+
+def is_entity_descended_from(
+    instance: dict[str, str], entity: dict[str, Any], allowed: set[str], visited: set[str], depth: int
+) -> bool:
+    if depth > 40:
+        return False
+    parent_val = entity.get("parent")
+    parent_ids: list[str] = []
+    if isinstance(parent_val, str):
+        parent_ids = [parent_val]
+    elif isinstance(parent_val, list):
+        parent_ids = [x for x in parent_val if isinstance(x, str)]
+    for parent_id in parent_ids:
+        if parent_id in allowed:
+            return True
+        if parent_id in visited:
+            continue
+        visited.add(parent_id)
+        parent_entity = load_entity_by_id(instance, parent_id)
+        if parent_entity and is_entity_descended_from(instance, parent_entity, allowed, visited, depth + 1):
+            return True
+    return False
 
 
 def collect_prototype_like_refs(node: Any) -> list[dict[str, str]]:
@@ -1029,6 +1390,194 @@ def extract_cargo_products(docs: list[Any]) -> list[dict[str, Any]]:
         elif isinstance(current, list):
             stack.extend(current)
     return products
+
+
+def default_cargo_form_data() -> dict[str, Any]:
+    return {
+        "cargo_file": "cargo_new.yml",
+        "cargo_id": "",
+        "icon_sprite": "",
+        "icon_state": "icon",
+        "product_id": "",
+        "cost": 1000,
+        "category": "cargoproduct-category-name-emergency",
+        "group": "market",
+        "crate_file": "new.yml",
+        "crate_parent": "CrateCommandSecure",
+        "crate_id": "",
+        "crate_name": "",
+        "crate_description": "",
+        "entity_items": [],
+    }
+
+
+def parse_cargo_form_request(req: Any) -> dict[str, Any]:
+    raw_ids = req.form.getlist("entity_ids")
+    raw_amounts = req.form.getlist("entity_amounts")
+    entity_items: list[dict[str, Any]] = []
+    for i, raw_id in enumerate(raw_ids):
+        entity_id = raw_id.strip()
+        if not entity_id:
+            continue
+        raw_amount = raw_amounts[i] if i < len(raw_amounts) else "1"
+        try:
+            amount = max(1, int(raw_amount or "1"))
+        except ValueError:
+            amount = 1
+        entity_items.append({"id": entity_id, "amount": amount})
+    product_id = req.form.get("product_id", "").strip()
+    crate_id = req.form.get("crate_id", "").strip() or product_id
+    return {
+        "cargo_file": normalize_yaml_filename(req.form.get("cargo_file", "cargo_new.yml")),
+        "cargo_id": req.form.get("cargo_id", "").strip(),
+        "icon_sprite": req.form.get("icon_sprite", "").strip(),
+        "icon_state": req.form.get("icon_state", "icon").strip() or "icon",
+        "product_id": product_id,
+        "cost": int(req.form.get("cost", "0") or 0),
+        "category": req.form.get("category", "").strip(),
+        "group": req.form.get("group", "").strip(),
+        "crate_file": normalize_yaml_filename(req.form.get("crate_file", "new.yml")),
+        "crate_parent": req.form.get("crate_parent", "CrateCommandSecure").strip(),
+        "crate_id": crate_id,
+        "crate_name": req.form.get("crate_name", "").strip(),
+        "crate_description": req.form.get("crate_description", "").strip(),
+        "entity_items": entity_items,
+    }
+
+
+def normalize_yaml_filename(value: str) -> str:
+    clean = value.strip().replace("\\", "/").lstrip("/")
+    if not clean.lower().endswith((".yml", ".yaml")):
+        clean += ".yml"
+    return clean
+
+
+def render_cargo_yaml(data: dict[str, Any]) -> str:
+    return (
+        "- type: cargoProduct\n"
+        f"  id: {data['cargo_id']}\n"
+        "  icon:\n"
+        f"    sprite: {data['icon_sprite']}\n"
+        f"    state: {data['icon_state']}\n"
+        f"  product: {data['product_id']}\n"
+        f"  cost: {data['cost']}\n"
+        f"  category: {data['category']}\n"
+        f"  group: {data['group']}\n"
+    )
+
+
+def render_crate_yaml(data: dict[str, Any]) -> str:
+    children = "".join(
+        [f"        - id: {x['id']}\n          amount: {x['amount']}\n" for x in data["entity_items"]]
+    )
+    return (
+        "- type: entity\n"
+        f"  parent: {data['crate_parent']}\n"
+        f"  id: {data['crate_id']}\n"
+        f"  name: {data['crate_name']}\n"
+        f"  description: {data['crate_description']}\n"
+        "  components:\n"
+        "  - type: EntityTableContainerFill\n"
+        "    containers:\n"
+        "      entity_storage: !type:AllSelector\n"
+        "        children:\n"
+        f"{children}"
+    )
+
+
+def load_cargo_form_data(root: Path, cargo_file_rel: str) -> dict[str, Any] | None:
+    cargo_file = safe_join(root / "Catalog" / "Cargo", cargo_file_rel)
+    if not cargo_file.exists():
+        return None
+    try:
+        docs = load_yaml_documents(cargo_file)
+    except Exception:
+        return None
+    product = first_cargo_product(docs)
+    if not product:
+        return None
+    crate_file_rel = find_crate_file_by_entity_id(root / "Catalog" / "Fills" / "Crates", str(product.get("product", "")))
+    crate_data = load_crate_data(root, crate_file_rel) if crate_file_rel else {}
+    return {
+        "cargo_file": cargo_file_rel,
+        "cargo_id": str(product.get("id", "")),
+        "icon_sprite": str((product.get("icon") or {}).get("sprite", "")),
+        "icon_state": str((product.get("icon") or {}).get("state", "icon")),
+        "product_id": str(product.get("product", "")),
+        "cost": int(product.get("cost", 0) or 0),
+        "category": str(product.get("category", "")),
+        "group": str(product.get("group", "")),
+        "crate_file": crate_file_rel or "new.yml",
+        "crate_parent": crate_data.get("crate_parent", "CrateCommandSecure"),
+        "crate_id": crate_data.get("crate_id", str(product.get("product", ""))),
+        "crate_name": crate_data.get("crate_name", ""),
+        "crate_description": crate_data.get("crate_description", ""),
+        "entity_items": crate_data.get("entity_items", []),
+    }
+
+
+def first_cargo_product(docs: list[Any]) -> dict[str, Any] | None:
+    stack = [docs]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if current.get("type") == "cargoProduct":
+                return current
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return None
+
+
+def find_crate_file_by_entity_id(crate_root: Path, entity_id: str) -> str | None:
+    if not entity_id or not crate_root.exists():
+        return None
+    for rel in list_prototype_files(crate_root):
+        fp = safe_join(crate_root, rel)
+        try:
+            docs = load_yaml_documents(fp)
+        except Exception:
+            continue
+        if entity_id in collect_proto_ids(docs):
+            return rel
+    return None
+
+
+def load_crate_data(root: Path, crate_file_rel: str) -> dict[str, Any]:
+    fp = safe_join(root / "Catalog" / "Fills" / "Crates", crate_file_rel)
+    docs = load_yaml_documents(fp)
+    stack = [docs]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if current.get("type") == "entity":
+                entity_items: list[dict[str, Any]] = []
+                components = current.get("components", [])
+                if isinstance(components, list):
+                    for comp in components:
+                        if isinstance(comp, dict) and comp.get("type") == "EntityTableContainerFill":
+                            containers = comp.get("containers", {})
+                            storage = containers.get("entity_storage", {}) if isinstance(containers, dict) else {}
+                            children = storage.get("children", []) if isinstance(storage, dict) else []
+                            if isinstance(children, list):
+                                for child in children:
+                                    if isinstance(child, dict) and isinstance(child.get("id"), str):
+                                        try:
+                                            child_amount = int(child.get("amount", 1))
+                                        except Exception:
+                                            child_amount = 1
+                                        entity_items.append({"id": child["id"], "amount": max(1, child_amount)})
+                return {
+                    "crate_parent": str(current.get("parent", "CrateCommandSecure")),
+                    "crate_id": str(current.get("id", "")),
+                    "crate_name": str(current.get("name", "")),
+                    "crate_description": str(current.get("description", "")),
+                    "entity_items": entity_items,
+                }
+            stack.extend(current.values())
+        elif isinstance(current, list):
+            stack.extend(current)
+    return {}
 
 
 app = create_app()

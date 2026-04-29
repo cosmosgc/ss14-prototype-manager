@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Cargo Form | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Cargo Form Editor</h1>
+    <p class="text-sm text-slate-600">{{ selected.name }} - <span class="font-mono">Resources/Prototypes/{{ custom_dir }}</span></p>
+  </div>
+  <a href="{{ url_for('custom_cargo_catalog') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+</div>
+
+<form method="post" action="{{ url_for('custom_cargo_form', file=form_data.cargo_file) }}" x-data="cargoFormTools()" x-init="init()" class="grid gap-4 lg:grid-cols-2">
+  <section class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+    <h2 class="text-lg font-semibold">Cargo Product</h2>
+    <div><label class="block text-sm">Cargo file</label><input name="cargo_file" value="{{ form_data.cargo_file }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
+    <div><label class="block text-sm">Cargo id</label><input name="cargo_id" value="{{ form_data.cargo_id }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
+    <div>
+      <label class="block text-sm">Product (crate id)</label>
+      <input id="product_id" name="product_id" value="{{ form_data.product_id }}" @input="syncCrateId()" class="w-full rounded border px-3 py-2 text-sm font-mono">
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <div><label class="block text-sm">Cost</label><input name="cost" type="number" value="{{ form_data.cost }}" class="w-full rounded border px-3 py-2 text-sm"></div>
+      <div><label class="block text-sm">Group</label><input name="group" value="{{ form_data.group }}" class="w-full rounded border px-3 py-2 text-sm"></div>
+    </div>
+    <div><label class="block text-sm">Category</label><input name="category" value="{{ form_data.category }}" class="w-full rounded border px-3 py-2 text-sm"></div>
+
+    <div class="rounded border p-3">
+      <label class="block text-sm font-semibold">RSI Sprite (search)</label>
+      <input x-model="rsiQuery" @input.debounce.250ms="searchRsi()" type="text" placeholder="type to search .rsi" class="mt-1 w-full rounded border px-3 py-2 text-sm font-mono">
+      <div class="mt-2 max-h-32 overflow-auto rounded border bg-slate-50">
+        <template x-for="rsi in rsiResults" :key="rsi">
+          <button type="button" @click="pickRsi(rsi)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
+            <img loading="lazy"
+              :src="spriteThumb(rsi, 'icon')"
+              class="h-8 w-8 rounded border bg-white object-contain pixelated"
+              onerror="this.style.display='none'"
+            >
+            <span class="font-mono" x-text="rsi"></span>
+          </button>
+        </template>
+      </div>
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <input id="icon_sprite" name="icon_sprite" value="{{ form_data.icon_sprite }}" @change="loadRsiStates()" class="w-full rounded border px-3 py-2 text-sm font-mono">
+        <select id="icon_state" name="icon_state" @change="updateSpritePreview()" class="w-full rounded border px-3 py-2 text-sm font-mono">
+          <option value="{{ form_data.icon_state }}">{{ form_data.icon_state }}</option>
+        </select>
+      </div>
+      <div class="mt-2">
+        <img loading="lazy" x-show="spritePreviewUrl" :src="spritePreviewUrl" class="h-16 w-16 rounded border bg-slate-100 object-contain pixelated">
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+    <h2 class="text-lg font-semibold">Crate Entity</h2>
+    <div><label class="block text-sm">Crate file</label><input name="crate_file" value="{{ form_data.crate_file }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
+    <div class="rounded border p-3">
+      <label class="block text-sm font-semibold">Parent (crate-compatible, search)</label>
+      <input x-model="crateParentQuery" @input.debounce.250ms="searchCrateParents()" type="text" placeholder="search crate parent id..." class="mt-1 w-full rounded border px-3 py-2 text-sm font-mono">
+      <div class="mt-2 max-h-32 overflow-auto rounded border bg-slate-50">
+        <template x-for="item in crateParentResults" :key="item.proto_id + item.rel_path">
+          <button type="button" @click="pickCrateParent(item.proto_id)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
+            <img x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-8 w-8 rounded border bg-white object-contain pixelated">
+            <span class="font-mono" x-text="item.proto_id"></span>
+            <span class="text-slate-500">-</span>
+            <span class="font-mono text-[10px]" x-text="item.rel_path"></span>
+          </button>
+        </template>
+      </div>
+      <input id="crate_parent" name="crate_parent" value="{{ form_data.crate_parent }}" class="mt-2 w-full rounded border px-3 py-2 text-sm font-mono">
+    </div>
+    <div><label class="block text-sm">Crate id (synced)</label><input id="crate_id" name="crate_id" value="{{ form_data.crate_id }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
+    <div><label class="block text-sm">Name</label><input name="crate_name" value="{{ form_data.crate_name }}" class="w-full rounded border px-3 py-2 text-sm"></div>
+    <div><label class="block text-sm">Description</label><input name="crate_description" value="{{ form_data.crate_description }}" class="w-full rounded border px-3 py-2 text-sm"></div>
+
+    <div class="rounded border p-3">
+      <label class="block text-sm font-semibold">Entity Storage IDs (amount per item)</label>
+      <div class="mt-2 flex gap-2">
+        <input x-model="idQuery" @input.debounce.250ms="searchIds()" type="text" placeholder="search id..." class="w-full rounded border px-3 py-2 text-sm font-mono">
+        <button type="button" @click="addTypedId()" class="rounded border px-3 py-2 text-sm">Add</button>
+      </div>
+      <div class="mt-2 max-h-40 overflow-auto rounded border bg-slate-50">
+        <template x-for="item in idResults" :key="item.proto_id + item.rel_path">
+          <button type="button" @click="addEntityId(item.proto_id, 1)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
+            <img loading="lazy" x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-8 w-8 rounded border bg-white object-contain pixelated">
+            <span class="font-mono" x-text="item.proto_id"></span>
+            <span class="text-slate-500">-</span>
+            <span class="font-mono text-[10px]" x-text="item.rel_path"></span>
+          </button>
+        </template>
+      </div>
+
+      <div id="entity-list" class="mt-2 space-y-1">
+        {% for e in form_data.entity_items %}
+          <div class="flex items-center gap-2">
+            <input name="entity_ids" value="{{ e.id }}" class="w-full rounded border px-2 py-1 text-xs font-mono">
+            <input name="entity_amounts" type="number" min="1" value="{{ e.amount }}" class="w-24 rounded border px-2 py-1 text-xs">
+            <button type="button" class="rounded border px-2 py-1 text-xs" onclick="this.parentElement.remove()">X</button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+    <h2 class="text-lg font-semibold">Generated YAML Preview</h2>
+    <div class="mt-2 grid gap-3 lg:grid-cols-2">
+      <div>
+        <p class="mb-1 text-xs font-semibold">Catalog/Cargo</p>
+        <pre class="max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{ cargo_yaml_preview }}</pre>
+      </div>
+      <div>
+        <p class="mb-1 text-xs font-semibold">Catalog/Fills/Crates</p>
+        <pre class="max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{ crate_yaml_preview }}</pre>
+      </div>
+    </div>
+    <div class="mt-3 flex gap-2">
+      <button name="mode" value="preview" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Refresh Preview</button>
+      <button name="mode" value="save" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700">Save YAML Files</button>
+    </div>
+  </section>
+</form>
+
+<script>
+function cargoFormTools() {
+  return {
+    idQuery: "",
+    idResults: [],
+    rsiQuery: "",
+    rsiResults: [],
+    crateParentQuery: "",
+    crateParentResults: [],
+    spritePreviewUrl: "",
+    async init() {
+      this.syncCrateId();
+      await this.loadRsiStates();
+      this.updateSpritePreview();
+    },
+    syncCrateId() {
+      const product = document.getElementById("product_id");
+      const crate = document.getElementById("crate_id");
+      if (product && crate) crate.value = product.value;
+    },
+    spriteThumb(sprite, state) {
+      return `/sprite/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state || "icon")}&scale=2`;
+    },
+    updateSpritePreview() {
+      const sprite = document.getElementById("icon_sprite")?.value || "";
+      const state = document.getElementById("icon_state")?.value || "icon";
+      this.spritePreviewUrl = sprite ? this.spriteThumb(sprite, state) : "";
+    },
+    async loadRsiStates() {
+      const sprite = document.getElementById("icon_sprite")?.value || "";
+      const select = document.getElementById("icon_state");
+      if (!select) return;
+      if (!sprite) return;
+      const current = select.value || "icon";
+      const res = await fetch(`/api/rsi-states?sprite=${encodeURIComponent(sprite)}`);
+      const states = await res.json();
+      select.innerHTML = "";
+      const options = states.length ? states : ["icon"];
+      for (const st of options) {
+        const opt = document.createElement("option");
+        opt.value = st;
+        opt.textContent = st;
+        select.appendChild(opt);
+      }
+      select.value = options.includes(current) ? current : options[0];
+      this.updateSpritePreview();
+    },
+    async searchIds() {
+      if (!this.idQuery.trim()) { this.idResults = []; return; }
+      const res = await fetch(`/api/id-suggest?q=${encodeURIComponent(this.idQuery)}`);
+      this.idResults = await res.json();
+    },
+    async searchRsi() {
+      if (!this.rsiQuery.trim()) { this.rsiResults = []; return; }
+      const res = await fetch(`/api/rsi-suggest?q=${encodeURIComponent(this.rsiQuery)}`);
+      this.rsiResults = await res.json();
+    },
+    async searchCrateParents() {
+      if (!this.crateParentQuery.trim()) { this.crateParentResults = []; return; }
+      const res = await fetch(`/api/crate-parent-suggest?q=${encodeURIComponent(this.crateParentQuery)}`);
+      this.crateParentResults = await res.json();
+    },
+    addEntityId(value, amount) {
+      const list = document.getElementById("entity-list");
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-2";
+      row.innerHTML = `<input name="entity_ids" value="${value}" class="w-full rounded border px-2 py-1 text-xs font-mono"><input name="entity_amounts" type="number" min="1" value="${amount || 1}" class="w-24 rounded border px-2 py-1 text-xs"><button type="button" class="rounded border px-2 py-1 text-xs">X</button>`;
+      row.querySelector("button").onclick = () => row.remove();
+      list.appendChild(row);
+      this.idQuery = "";
+      this.idResults = [];
+    },
+    addTypedId() {
+      if (!this.idQuery.trim()) return;
+      this.addEntityId(this.idQuery.trim(), 1);
+    },
+    async pickRsi(rsi) {
+      document.getElementById("icon_sprite").value = rsi;
+      this.rsiQuery = rsi;
+      this.rsiResults = [];
+      await this.loadRsiStates();
+    },
+    pickCrateParent(value) {
+      const input = document.getElementById("crate_parent");
+      if (input) input.value = value;
+      this.crateParentQuery = value;
+      this.crateParentResults = [];
+    }
+  };
+}
+</script>
+{% endblock %}
