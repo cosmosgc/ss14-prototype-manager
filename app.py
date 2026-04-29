@@ -503,44 +503,95 @@ def create_app() -> Flask:
         selected = selected_instance_or_400()
 
         sprite = request.args.get("sprite", "").strip().replace("\\", "/")
-        state = request.args.get("state", "icon").strip()
-
-        try:
-            scale = int(request.args.get("scale", str(DEFAULT_THUMB_SCALE)))
-        except ValueError:
-            abort(400)
-
+        state_name = request.args.get("state", "icon").strip()
+        scale = int(request.args.get("scale", str(DEFAULT_THUMB_SCALE)))
+        direction = int(request.args.get("direction", "0"))
         if scale < 1 or scale > 16:
             abort(400)
 
         textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
-
         rsi_dir = safe_join(textures_root, sprite)
+
         if not rsi_dir or not rsi_dir.exists():
             abort(404)
 
-        image_path = safe_join(rsi_dir, f"{state}.png")
+        image_path = safe_join(rsi_dir, f"{state_name}.png")
+        meta_path = rsi_dir / "meta.json"
 
-        # ✅ fallback if state doesn't exist
         if not image_path or not image_path.exists():
-            pngs = list(rsi_dir.glob("*.png"))
-            if not pngs:
-                abort(404)
-            image_path = pngs[0]
+            abort(404)
+
+        # Load meta
+        meta = None
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        # Find state in meta
+        state_meta = None
+        if meta and "states" in meta:
+            for s in meta["states"]:
+                if s.get("name") == state_name:
+                    state_meta = s
+                    break
 
         with Image.open(image_path) as im:
             im = im.convert("RGBA")
-            out = im.resize(
-                (im.width * scale, im.height * scale),
-                Image.Resampling.NEAREST
-            )
+
+            # No animation → just return scaled image
+            if not state_meta or "delays" not in state_meta:
+                out = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+                buffer = io.BytesIO()
+                out.save(buffer, format="PNG")
+                buffer.seek(0)
+                return send_file(buffer, mimetype="image/png")
+
+            # --- ANIMATION ---
+            directions = state_meta.get("directions", 1)
+            delays = state_meta["delays"]
+
+            # Use direction 0 for now
+            frame_delays = delays[0]
+            frame_count = len(frame_delays)
+
+            frame_width = im.width // frame_count
+            frame_height = im.height // directions
+
+            frames = []
+
+            for i in range(frame_count):
+                frame = im.crop((
+                    i * frame_width,
+                    direction * frame_height,
+                    (i + 1) * frame_width,
+                    (direction + 1) * frame_height
+                ))
+
+                frame = frame.resize(
+                    (frame.width * scale, frame.height * scale),
+                    Image.Resampling.NEAREST
+                )
+
+                frames.append(frame)
+
+            # Convert delays to milliseconds
+            durations = [int(d * 1000) for d in frame_delays]
 
             buffer = io.BytesIO()
-            out.save(buffer, format="PNG")
-            buffer.seek(0)
+            frames[0].save(
+                buffer,
+                format="GIF",
+                save_all=True,
+                append_images=frames[1:],
+                duration=durations,
+                loop=0,
+                disposal=2
+            )
 
-            return send_file(buffer, mimetype="image/png")
-    
+            buffer.seek(0)
+            return send_file(buffer, mimetype="image/gif")
 
     @app.get("/api/crate-parent-suggest")
     def api_crate_parent_suggest():
