@@ -601,6 +601,17 @@ def create_app() -> Flask:
         selected = selected_instance_or_400()
         return jsonify(selected)
 
+    @app.get("/radio")
+    def radio():
+        selected = selected_instance_or_400()
+        jukebox_dirs, all_tracks = load_jukebox_data(Path(selected["root_path"]))
+        return render_template(
+            "radio.html",
+            selected=selected,
+            jukebox_dirs=jukebox_dirs,
+            all_tracks=all_tracks,
+        )
+
     return app
 
 
@@ -1578,6 +1589,84 @@ def load_crate_data(root: Path, crate_file_rel: str) -> dict[str, Any]:
         elif isinstance(current, list):
             stack.extend(current)
     return {}
+
+
+def load_jukebox_data(root_path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Load jukebox directories and their music tracks from Audio resources."""
+    audio_root = root_path / "Resources" / "Audio"
+    jukebox_dirs: list[dict[str, Any]] = []
+    all_tracks: list[dict[str, Any]] = []
+
+    if not audio_root.exists():
+        return jukebox_dirs, all_tracks
+
+    # Recursively find all "Jukebox" directories under Resources/Audio
+    for jukebox_dir in sorted(audio_root.rglob("Jukebox")):
+        if not jukebox_dir.is_dir():
+            continue
+
+        attr_file = jukebox_dir / "attributions.yml"
+        ogg_files = sorted([f.name for f in jukebox_dir.glob("*.ogg")])
+
+        if not attr_file.exists() and not ogg_files:
+            continue
+
+        # Load attribution data
+        attributions: list[dict[str, Any]] = []
+        if attr_file.exists():
+            try:
+                content = attr_file.read_text(encoding="utf-8")
+                attr_data = yaml.load(content, Loader=IgnoreUnknownTagLoader) or []
+                if isinstance(attr_data, list):
+                    attributions = attr_data
+                elif isinstance(attr_data, dict):
+                    attributions = [attr_data]
+            except Exception:
+                attributions = []
+
+        # Build tracks with attribution info
+        tracks: list[dict[str, Any]] = []
+        attr_by_file: dict[str, dict[str, Any]] = {}
+
+        # Index attributions by file
+        for attr in attributions:
+            if isinstance(attr, dict):
+                files = attr.get("files", [])
+                if isinstance(files, list):
+                    for fname in files:
+                        if isinstance(fname, str):
+                            attr_by_file[fname] = {
+                                "license": attr.get("license", "Unknown"),
+                                "copyright": attr.get("copyright", "Unknown"),
+                                "source": attr.get("source", "Unknown"),
+                            }
+
+        # Create track entries with relative path for display
+        rel_path = jukebox_dir.relative_to(audio_root).as_posix()
+        for i, ogg_file in enumerate(ogg_files):
+            attr_info = attr_by_file.get(ogg_file, {
+                "license": "Unknown",
+                "copyright": "Unknown",
+                "source": "Unknown",
+            })
+            tracks.append({
+                "id": f"{rel_path.replace('/', '_')}_{i}",
+                "filename": ogg_file,
+                "title": ogg_file.removesuffix(".ogg"),
+                "path": f"/{rel_path}/{ogg_file}",
+                "license": attr_info.get("license", "Unknown"),
+                "copyright": attr_info.get("copyright", "Unknown"),
+                "source": attr_info.get("source", "Unknown"),
+            })
+            all_tracks.append(tracks[-1])
+
+        jukebox_dirs.append({
+            "name": rel_path,
+            "track_count": len(tracks),
+            "tracks": tracks,
+        })
+
+    return jukebox_dirs, all_tracks
 
 
 app = create_app()

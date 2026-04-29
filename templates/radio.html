@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Radio | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div x-data="radioPlayer()" x-init="init()" class="space-y-6">
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold">Radio Player</h1>
+      <p class="text-sm text-slate-600">{{ selected.name }} - {{ jukebox_dirs|length }} jukebox(es)</p>
+    </div>
+    <a href="{{ url_for('index') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+  </div>
+
+  <!-- Main Player Container -->
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- Player Panel (Left Side) -->
+    <div class="lg:col-span-2 space-y-6">
+      <!-- Now Playing Card -->
+      <div class="rounded-lg border border-slate-200 bg-gradient-to-br from-slate-900 to-slate-800 p-8 text-white shadow-lg">
+        <!-- Album Art Placeholder -->
+        <div class="mb-6 flex items-center justify-center">
+          <div class="h-48 w-48 rounded-lg bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
+            <svg class="h-24 w-24 text-slate-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M18 3a1 1 0 00-1.196-.15l-10 6.5a1 1 0 000 1.7l10 6.5A1 1 0 0018 16V3z"></path>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Track Info -->
+        <div class="mb-6 text-center">
+          <h2 class="text-2xl font-bold mb-2" x-text="currentTrack.title || 'No track selected'"></h2>
+          <p class="text-sm text-slate-300" x-text="currentTrack.copyright || ''"></p>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mb-6">
+          <div class="mb-2 flex items-center justify-between text-xs text-slate-300">
+            <span x-text="formatTime(currentTime)">0:00</span>
+            <span x-text="formatTime(duration)">0:00</span>
+          </div>
+          <div class="relative h-2 rounded-full bg-slate-600 cursor-pointer" @click="seekTrack">
+            <div class="h-2 rounded-full bg-emerald-500 transition-all" :style="{ width: (currentTime / duration * 100 || 0) + '%' }"></div>
+          </div>
+        </div>
+
+        <!-- Player Controls -->
+        <div class="flex items-center justify-center gap-4 mb-6">
+          <!-- Previous -->
+          <button
+            @click="previousTrack"
+            class="rounded-full p-3 hover:bg-slate-700 transition-colors"
+            title="Previous track"
+          >
+            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06l-4.25 4.25a.75.75 0 010 1.06l4.25 4.25a.75.75 0 11-1.06 1.06L6.47 12l5.25-5.25a.75.75 0 011.06-.02z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+
+          <!-- Play/Pause -->
+          <button
+            @click="togglePlay"
+            class="rounded-full bg-emerald-500 p-4 hover:bg-emerald-600 transition-colors text-white"
+            title="Play/Pause"
+          >
+            <svg x-show="!isPlaying" class="h-8 w-8" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path>
+            </svg>
+            <svg x-show="isPlaying" class="h-8 w-8" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M6 3.5a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5m4 0a.5.5 0 0 1 .5.5v8a.5.5 0 0 1-1 0V4a.5.5 0 0 1 .5-.5"/>
+            </svg>
+          </button>
+
+          <!-- Next -->
+          <button
+            @click="nextTrack"
+            class="rounded-full p-3 hover:bg-slate-700 transition-colors"
+            title="Next track"
+          >
+            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06l4.25-4.25a.75.75 0 010-1.06L7.23 4.21a.75.75 0 011.06-1.06L13.53 10l-5.25 5.25a.75.75 0 01-1.06.02z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Secondary Controls -->
+        <div class="flex items-center justify-between pt-6 border-t border-slate-600">
+          <!-- Shuffle & Repeat -->
+          <div class="flex gap-2">
+            <button
+              @click="shuffle = !shuffle"
+              :class="{ 'bg-emerald-500 text-white': shuffle, 'hover:bg-slate-700 text-slate-300': !shuffle }"
+              class="rounded-full p-2 transition-colors"
+              title="Shuffle"
+            >
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M3 3a1 1 0 000 2h11a1 1 0 100-2H3zM3 7a1 1 0 000 2h5a1 1 0 000-2H3zM3 11a1 1 0 100 2h4a1 1 0 100-2H3zM13 16a1 1 0 102 0v-5.586l1.293 1.293a1 1 0 001.414-1.414l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 101.414 1.414L13 10.414V16z"></path>
+              </svg>
+            </button>
+            <button
+              @click="cycleRepeat"
+              :class="{
+                'bg-emerald-500 text-white': repeatMode !== 'none',
+                'hover:bg-slate-700 text-slate-300': repeatMode === 'none'
+              }"
+              class="rounded-full p-2 transition-colors relative"
+              title="Repeat"
+            >
+              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+              </svg>
+              <span x-show="repeatMode === 'one'" class="absolute bottom-0 right-0 h-2 w-2 bg-white rounded-full text-xs leading-none flex items-center justify-center" style="font-size: 0.6rem;">1</span>
+            </button>
+          </div>
+
+          <!-- Volume Control -->
+          <div class="flex items-center gap-2">
+            <svg class="h-5 w-5 text-slate-300" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071a1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.828 2.828a1 1 0 011.414 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243a1 1 0 01-1.414-1.414A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.829a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+            </svg>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              x-model.number="volume"
+              @input="updateVolume"
+              class="w-24 h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+            >
+          </div>
+        </div>
+      </div>
+
+      <!-- Attribution Info -->
+      <div x-show="currentTrack.id" class="rounded-lg border border-slate-200 bg-white p-4">
+        <h3 class="font-semibold text-slate-900 mb-3">Track Information</h3>
+        <div class="space-y-2 text-sm">
+          <div>
+            <span class="text-slate-600">License:</span>
+            <span class="text-slate-900 font-medium" x-text="currentTrack.license || 'Unknown'"></span>
+          </div>
+          <div>
+            <span class="text-slate-600">Source:</span>
+            <span class="text-slate-900 font-medium" x-text="currentTrack.source || 'Unknown'"></span>
+          </div>
+          <div>
+            <span class="text-slate-600">Copyright:</span>
+            <span class="text-slate-900 font-medium text-xs" x-text="currentTrack.copyright || 'Unknown'"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Playlist Panel (Right Side) -->
+    <div class="lg:col-span-1">
+      <div class="rounded-lg border border-slate-200 bg-white h-full flex flex-col">
+        <!-- Playlist Header -->
+        <div class="border-b border-slate-200 p-4 sticky top-0 bg-white rounded-t-lg">
+          <h3 class="font-semibold text-slate-900 mb-2">Playlist</h3>
+          <p class="text-xs text-slate-600" x-text="`${allTracks.length} tracks`"></p>
+        </div>
+
+        <!-- Playlist Tracks -->
+        <div class="overflow-y-auto flex-1">
+          <template x-for="track in allTracks" :key="track.id">
+            <button
+              @click="selectTrack(track)"
+              :class="{ 'bg-emerald-200 rounded-xl border-l-4 border-emerald-500': currentTrack.id === track.id }"
+              class="w-full text-left px-4 py-3 border-l-4 border-transparent hover:bg-slate-200 transition-colors"
+            >
+              <p class="text-sm font-medium text-slate-900 truncate" x-text="track.title"></p>
+              <p class="text-xs text-slate-600 truncate" x-text="track.filename"></p>
+            </button>
+          </template>
+        </div>
+
+        <!-- Empty State -->
+        <template x-if="allTracks.length === 0">
+          <div class="flex items-center justify-center h-full p-4 text-center">
+            <div>
+              <p class="text-sm text-slate-600">No audio tracks found</p>
+              <p class="text-xs text-slate-500 mt-1">Place OGG files in Resources/Audio/*Jukebox directories</p>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Player Element -->
+  <audio
+    x-ref="audioPlayer"
+    @timeupdate="updateTime"
+    @durationchange="updateDuration"
+    @ended="trackEnded"
+    @play="isPlaying = true"
+    @pause="isPlaying = false"
+    @loadedmetadata="updateDuration"
+  ></audio>
+</div>
+
+<script>
+function radioPlayer() {
+  return {
+    audioPlayer: null,
+    currentTrack: {},
+    currentTime: 0,
+    duration: 0,
+    isPlaying: false,
+    shuffle: false,
+    repeatMode: 'none', // 'none', 'all', 'one'
+    volume: 70,
+    allTracks: [],
+    playlistIndex: 0,
+
+    init() {
+      const tracks = {{ all_tracks|tojson }};
+      this.allTracks = tracks;
+      this.audioPlayer = this.$refs.audioPlayer;
+      
+      if (this.allTracks.length > 0) {
+        this.selectTrack(this.allTracks[0]);
+      }
+    },
+
+    selectTrack(track) {
+      this.currentTrack = track;
+      this.currentTime = 0;
+      this.playlistIndex = this.allTracks.indexOf(track);
+      
+      if (track.path && this.audioPlayer) {
+        this.audioPlayer.src = `{{ url_for('audio_play') }}?path=${encodeURIComponent(track.path.substring(1))}`;
+        this.audioPlayer.load();
+        this.play();
+      }
+    },
+
+    play() {
+      if (this.audioPlayer) {
+        this.audioPlayer.play().catch(e => console.log('Play error:', e));
+      }
+    },
+
+    pause() {
+      if (this.audioPlayer) {
+        this.audioPlayer.pause();
+      }
+    },
+
+    togglePlay() {
+      if (this.isPlaying) {
+        this.pause();
+      } else {
+        this.play();
+      }
+    },
+
+    nextTrack() {
+      if (this.allTracks.length === 0) return;
+      
+      let nextIndex;
+      if (this.shuffle) {
+        nextIndex = Math.floor(Math.random() * this.allTracks.length);
+      } else {
+        nextIndex = (this.playlistIndex + 1) % this.allTracks.length;
+      }
+      
+      this.selectTrack(this.allTracks[nextIndex]);
+    },
+
+    previousTrack() {
+      if (this.allTracks.length === 0) return;
+      
+      if (this.currentTime > 3) {
+        // If more than 3 seconds in, restart current track
+        this.currentTime = 0;
+        this.audioPlayer.currentTime = 0;
+      } else {
+        // Otherwise go to previous track
+        const prevIndex = (this.playlistIndex - 1 + this.allTracks.length) % this.allTracks.length;
+        this.selectTrack(this.allTracks[prevIndex]);
+      }
+    },
+
+    cycleRepeat() {
+      const modes = ['none', 'all', 'one'];
+      const currentIndex = modes.indexOf(this.repeatMode);
+      this.repeatMode = modes[(currentIndex + 1) % modes.length];
+    },
+
+    trackEnded() {
+      if (this.repeatMode === 'one') {
+        this.audioPlayer.currentTime = 0;
+        this.play();
+      } else {
+        this.nextTrack();
+      }
+    },
+
+    updateTime() {
+      this.currentTime = this.audioPlayer?.currentTime || 0;
+    },
+
+    updateDuration() {
+      this.duration = this.audioPlayer?.duration || 0;
+    },
+
+    seekTrack(event) {
+      if (!this.audioPlayer || !this.duration) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const percent = (event.clientX - rect.left) / rect.width;
+      this.audioPlayer.currentTime = percent * this.duration;
+    },
+
+    updateVolume() {
+      if (this.audioPlayer) {
+        this.audioPlayer.volume = this.volume / 100;
+      }
+    },
+
+    formatTime(seconds) {
+      if (!seconds || seconds !== seconds) return '0:00';
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    },
+  };
+}
+</script>
+{% endblock %}
