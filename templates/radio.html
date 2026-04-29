@@ -3,12 +3,12 @@
 {% block content %}
 <div x-data="radioPlayer()" x-init="init()" class="space-y-6">
   <!-- Header -->
-  <div class="flex items-center justify-between">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
     <div>
       <h1 class="text-2xl font-semibold">Radio Player</h1>
       <p class="text-sm text-slate-600">{{ selected.name }} - {{ jukebox_dirs|length }} jukebox(es)</p>
     </div>
-    <a href="{{ url_for('index') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+    <a href="{{ url_for('index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 
   <!-- Main Player Container -->

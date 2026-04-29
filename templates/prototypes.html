@@ -33,12 +33,12 @@
   </ul>
 {% endmacro %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between">
+<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
   <div>
     <h1 class="text-xl font-semibold">Prototype Tree</h1>
     <p class="text-sm text-slate-600">{{ selected.name }} - {{ selected.root_path }}</p>
   </div>
-  <a href="{{ url_for('index') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+  <a href="{{ url_for('index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
 </div>
 
 <div class="mb-4">

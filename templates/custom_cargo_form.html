@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Cargo Form | SS14 Prototype Manager{% endblock %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between">
+<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
   <div>
     <h1 class="text-xl font-semibold">Cargo Form Editor</h1>
     <p class="text-sm text-slate-600">{{ selected.name }} - <span class="font-mono">Resources/Prototypes/{{ custom_dir }}</span></p>
   </div>
-  <a href="{{ url_for('custom_cargo_catalog') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+  <a href="{{ url_for('custom_cargo_catalog') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
 </div>
 
 <form method="post" action="{{ url_for('custom_cargo_form', file=form_data.cargo_file) }}" x-data="cargoFormTools()" x-init="init()" class="grid gap-4 lg:grid-cols-2">
@@ -18,7 +18,7 @@
       <label class="block text-sm">Product (crate id)</label>
       <input id="product_id" name="product_id" value="{{ form_data.product_id }}" @input="syncCrateId()" class="w-full rounded border px-3 py-2 text-sm font-mono">
     </div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <div><label class="block text-sm">Cost</label><input name="cost" type="number" value="{{ form_data.cost }}" class="w-full rounded border px-3 py-2 text-sm"></div>
       <div><label class="block text-sm">Group</label><input name="group" value="{{ form_data.group }}" class="w-full rounded border px-3 py-2 text-sm"></div>
     </div>
@@ -39,7 +39,7 @@
           </button>
         </template>
       </div>
-      <div class="mt-2 grid grid-cols-2 gap-2">
+      <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
         <input id="icon_sprite" name="icon_sprite" value="{{ form_data.icon_sprite }}" @change="loadRsiStates()" class="w-full rounded border px-3 py-2 text-sm font-mono">
         <select id="icon_state" name="icon_state" @change="updateSpritePreview()" class="w-full rounded border px-3 py-2 text-sm font-mono">
           <option value="{{ form_data.icon_state }}">{{ form_data.icon_state }}</option>

@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 {% block title %}Cargo Catalog | SS14 Prototype Manager{% endblock %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between">
+<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
   <div>
     <h1 class="text-xl font-semibold">Cargo Catalog</h1>
     <p class="text-sm text-slate-600">Source: <span class="font-mono">Resources/Prototypes/{{ custom_dir }}/Catalog/Cargo</span></p>
   </div>
-  <div class="flex gap-2">
-    <a href="{{ url_for('custom_cargo_form') }}" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700">Create New Cargo</a>
-    <a href="{{ url_for('options') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+  <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+    <a href="{{ url_for('custom_cargo_form') }}" class="w-full sm:w-auto rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700 text-center">Create New Cargo</a>
+    <a href="{{ url_for('options') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 </div>
 
 <section class="rounded-xl border border-slate-200 bg-white p-4">
   <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
+    <table class="w-full min-w-[600px] sm:min-w-[800px] text-left text-sm">
       <thead class="border-b text-slate-500">
         <tr>
           <th class="py-2">Icon</th>

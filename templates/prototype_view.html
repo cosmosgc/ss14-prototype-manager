@@ -1,21 +1,21 @@
 {% extends "base.html" %}
 {% block title %}Prototype Detail | SS14 Prototype Manager{% endblock %}
 {% block content %}
-<div class="mb-4 flex items-center justify-between">
+<div class="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
   <div>
     <h1 class="text-xl font-semibold">Prototype Detail</h1>
     <p class="font-mono text-xs text-slate-600">{{ rel_file }}</p>
   </div>
-  <div class="flex gap-2">
+  <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
     <a
       href="{{ url_for('open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
-      class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+      class="w-full sm:w-auto rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 text-center"
     >Open YML in VS Code</a>
     <a
       href="{{ url_for('open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
-      class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+      class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center"
     >Open YML in Explorer</a>
-    <a href="{{ url_for('prototypes') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+    <a href="{{ url_for('prototypes') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 </div>
 
