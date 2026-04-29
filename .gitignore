@@ -1,8 +1,9 @@
 .venv/
+data/
+data/instances.json
 node_modules/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env.local
-data/

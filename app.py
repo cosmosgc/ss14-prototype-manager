@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import sqlite3
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -39,7 +40,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-INSTANCES_FILE = Path(os.getenv("INSTANCES_FILE", str(DATA_DIR / "instances.json")))
+DB_PATH = Path(os.getenv("SQLITE_PATH", str(DATA_DIR / "app.db")))
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
 DEFAULT_THUMB_SCALE = int(os.getenv("DEFAULT_THUMB_SCALE", "4"))
 
@@ -64,7 +65,7 @@ IgnoreUnknownTagLoader.add_multi_constructor("!", _construct_unknown)
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
-    ensure_instances_file_exists()
+    init_db()
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
@@ -96,8 +97,7 @@ def create_app() -> Flask:
             flash("Instance name already exists.", "error")
             return redirect(url_for("index"))
 
-        instances.append({"name": name, "root_path": str(Path(root))})
-        save_instances(instances)
+        save_instance(name, str(Path(root)))
         session["selected_instance"] = name
         flash("Instance added.", "success")
         return redirect(url_for("index"))
@@ -113,11 +113,8 @@ def create_app() -> Flask:
 
     @app.post("/instances/<name>/delete")
     def delete_instance(name: str):
-        instances = load_instances()
-        filtered = [i for i in instances if i["name"] != name]
-        if len(filtered) == len(instances):
+        if not delete_instance_db(name):
             abort(404)
-        save_instances(filtered)
         if session.get("selected_instance") == name:
             session.pop("selected_instance", None)
         flash(f"Deleted instance: {name}", "success")
@@ -156,7 +153,9 @@ def create_app() -> Flask:
             if not ok:
                 flash(f"YAML parse error: {error}", "error")
             else:
-                file_path.write_text(new_content, encoding="utf-8")
+                normalized = new_content.replace("\r\n", "\n").replace("\r", "\n")
+                with file_path.open("w", encoding="utf-8", newline="\n") as f:
+                    f.write(normalized)
                 flash("Prototype saved.", "success")
             return redirect(url_for("prototype_view", file=rel_file))
 
@@ -168,7 +167,7 @@ def create_app() -> Flask:
         prototype_refs = collect_prototype_like_refs(docs)
         sprite_cards = build_sprite_cards(Path(selected["root_path"]), sprite_refs, sprite_state_pairs)
         audio_cards = build_audio_cards(Path(selected["root_path"]), audio_refs)
-        prototype_ref_cards = build_prototype_ref_cards(prototype_refs)
+        prototype_ref_cards = build_prototype_ref_cards(selected["name"], prototype_refs)
         _, parse_error = validate_yaml_text(raw_text)
 
         return render_template(
@@ -189,13 +188,143 @@ def create_app() -> Flask:
         proto_id = request.args.get("id", "").strip()
         if not proto_id:
             abort(400, "Missing id.")
-        proto_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
-        index = build_prototype_index(proto_root)
-        files = index["id_to_files"].get(proto_id, [])
+        files = find_prototype_paths_by_id(selected["name"], proto_id)
         if not files:
             flash(f"Prototype id not found: {proto_id}", "error")
             return redirect(url_for("prototypes", q=proto_id))
         return redirect(url_for("prototype_view", file=files[0]))
+
+    @app.route("/options", methods=["GET", "POST"])
+    def options():
+        selected = selected_instance_or_400()
+        if request.method == "POST":
+            action = request.form.get("action", "scan_ids")
+            if action == "save_custom_dir":
+                custom_dir = request.form.get("custom_dir", "").strip().strip("/\\")
+                set_instance_custom_dir(selected["name"], custom_dir)
+                flash("Custom directory saved.", "success")
+            else:
+                count = scan_instance_ids(selected)
+                flash(f"Scanned and saved {count} prototype IDs.", "success")
+            return redirect(url_for("options"))
+        stats = get_instance_stats(selected["name"])
+        custom_dir = get_instance_custom_dir(selected["name"])
+        return render_template("options.html", selected=selected, stats=stats, custom_dir=custom_dir)
+
+    @app.get("/id-search")
+    def id_search():
+        selected = selected_instance_or_400()
+        query = request.args.get("q", "").strip()
+        rows = search_ids(selected["name"], query) if query else []
+        return render_template("id_search.html", selected=selected, query=query, rows=rows)
+
+    @app.get("/custom/files")
+    def custom_files():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            flash("Set a custom directory in Options first.", "error")
+            return redirect(url_for("options"))
+        root = custom_prototypes_root(selected, custom_dir)
+        files = list_prototype_files(root) if root.exists() else []
+        return render_template("custom_files.html", selected=selected, custom_dir=custom_dir, files=files)
+
+    @app.post("/custom/files/create")
+    def custom_file_create():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            return redirect(url_for("options"))
+        rel_path = request.form.get("rel_path", "").strip().replace("\\", "/")
+        if not rel_path:
+            flash("Path is required.", "error")
+            return redirect(url_for("custom_files"))
+        root = custom_prototypes_root(selected, custom_dir)
+        file_path = safe_join(root, rel_path)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        if file_path.exists():
+            flash("File already exists.", "error")
+            return redirect(url_for("custom_files"))
+        with file_path.open("w", encoding="utf-8", newline="\n") as f:
+            f.write("")
+        flash("File created.", "success")
+        return redirect(url_for("custom_file_edit", file=rel_path))
+
+    @app.route("/custom/files/edit", methods=["GET", "POST"])
+    def custom_file_edit():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            return redirect(url_for("options"))
+        rel_path = request.args.get("file", "").strip().replace("\\", "/")
+        if not rel_path:
+            abort(400)
+        root = custom_prototypes_root(selected, custom_dir)
+        file_path = safe_join(root, rel_path)
+        if request.method == "POST":
+            content = request.form.get("content", "")
+            normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            with file_path.open("w", encoding="utf-8", newline="\n") as f:
+                f.write(normalized)
+            flash("Custom file saved.", "success")
+            return redirect(url_for("custom_file_edit", file=rel_path))
+        content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
+        parse_ok, parse_error = validate_yaml_text(content) if content.strip() else (True, None)
+        return render_template(
+            "custom_file_edit.html",
+            selected=selected,
+            custom_dir=custom_dir,
+            rel_path=rel_path,
+            content=content,
+            parse_ok=parse_ok,
+            parse_error=parse_error,
+        )
+
+    @app.post("/custom/files/delete")
+    def custom_file_delete():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            return redirect(url_for("options"))
+        rel_path = request.form.get("rel_path", "").strip().replace("\\", "/")
+        if not rel_path:
+            abort(400)
+        root = custom_prototypes_root(selected, custom_dir)
+        file_path = safe_join(root, rel_path)
+        if file_path.exists() and file_path.is_file():
+            file_path.unlink()
+            flash("File deleted.", "success")
+        else:
+            flash("File not found.", "error")
+        return redirect(url_for("custom_files"))
+
+    @app.get("/custom/cargo")
+    def custom_cargo_catalog():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"])
+        if not custom_dir:
+            flash("Set a custom directory in Options first.", "error")
+            return redirect(url_for("options"))
+        root = custom_prototypes_root(selected, custom_dir)
+        cargo_root = root / "Catalog" / "Cargo"
+        files = list_prototype_files(cargo_root) if cargo_root.exists() else []
+        items: list[dict[str, Any]] = []
+        for rel in files:
+            fp = safe_join(cargo_root, rel)
+            try:
+                docs = load_yaml_documents(fp)
+            except Exception:
+                continue
+            for item in extract_cargo_products(docs):
+                item["source_file"] = f"Catalog/Cargo/{rel}"
+                items.append(item)
+        return render_template(
+            "custom_cargo_catalog.html",
+            selected=selected,
+            custom_dir=custom_dir,
+            items=sorted(items, key=lambda x: x.get("id", "").lower()),
+        )
 
     @app.get("/sprite/preview")
     def sprite_preview():
@@ -328,26 +457,50 @@ def create_app() -> Flask:
 
 
 def load_instances() -> list[dict[str, str]]:
-    ensure_instances_file_exists()
-    try:
-        data = json.loads(INSTANCES_FILE.read_text(encoding="utf-8"))
-        if isinstance(data, list):
-            return [i for i in data if isinstance(i, dict) and "name" in i and "root_path" in i]
-    except json.JSONDecodeError:
-        pass
-    return []
+    with get_db() as conn:
+        rows = conn.execute("SELECT name, root_path FROM instances ORDER BY name").fetchall()
+    return [{"name": r["name"], "root_path": r["root_path"]} for r in rows]
 
 
-def ensure_instances_file_exists() -> None:
-    if INSTANCES_FILE.exists():
-        return
-    INSTANCES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    INSTANCES_FILE.write_text("[]", encoding="utf-8")
+def get_db() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def save_instances(instances: list[dict[str, str]]) -> None:
-    INSTANCES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    INSTANCES_FILE.write_text(json.dumps(instances, indent=2), encoding="utf-8")
+def init_db() -> None:
+    with get_db() as conn:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS instances (name TEXT PRIMARY KEY, root_path TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS prototype_ids ("
+            "instance_name TEXT NOT NULL, proto_id TEXT NOT NULL, rel_path TEXT NOT NULL, "
+            "PRIMARY KEY (instance_name, proto_id, rel_path))"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS instance_scan ("
+            "instance_name TEXT PRIMARY KEY, scanned_at TEXT NOT NULL, id_count INTEGER NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS instance_settings ("
+            "instance_name TEXT PRIMARY KEY, custom_dir TEXT NOT NULL DEFAULT '')"
+        )
+
+
+def save_instance(name: str, root_path: str) -> None:
+    with get_db() as conn:
+        conn.execute("INSERT INTO instances (name, root_path) VALUES (?, ?)", (name, root_path))
+
+
+def delete_instance_db(name: str) -> bool:
+    with get_db() as conn:
+        cur = conn.execute("DELETE FROM instances WHERE name = ?", (name,))
+        conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (name,))
+        conn.execute("DELETE FROM instance_scan WHERE instance_name = ?", (name,))
+        conn.execute("DELETE FROM instance_settings WHERE instance_name = ?", (name,))
+        return cur.rowcount > 0
 
 
 def get_instance_by_name(name: str | None, instances: list[dict[str, str]]) -> dict[str, str] | None:
@@ -743,17 +896,139 @@ def add_related_prototypes(
 
 
 def build_prototype_ref_cards(
-    refs: list[dict[str, str]]
+    instance_name: str, refs: list[dict[str, str]]
 ) -> list[dict[str, Any]]:
     cards: list[dict[str, Any]] = []
     for ref in refs:
+        direct_file = find_first_prototype_path_by_id(instance_name, ref["id"])
         cards.append(
             {
                 "key": ref["key"],
                 "id": ref["id"],
+                "direct_file": direct_file,
             }
         )
     return cards
+
+
+def scan_instance_ids(instance: dict[str, str]) -> int:
+    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    files = list_prototype_files(proto_root)
+    records: list[tuple[str, str, str]] = []
+    for rel_file in files:
+        file_path = safe_join(proto_root, rel_file)
+        try:
+            docs = load_yaml_documents(file_path)
+        except Exception:
+            continue
+        for proto_id in collect_proto_ids(docs):
+            records.append((instance["name"], proto_id, rel_file))
+    unique_records = list({(a, b, c) for a, b, c in records})
+    with get_db() as conn:
+        conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (instance["name"],))
+        if unique_records:
+            conn.executemany(
+                "INSERT INTO prototype_ids (instance_name, proto_id, rel_path) VALUES (?, ?, ?)",
+                unique_records,
+            )
+        conn.execute(
+            "INSERT INTO instance_scan (instance_name, scanned_at, id_count) VALUES (?, datetime('now'), ?) "
+            "ON CONFLICT(instance_name) DO UPDATE SET scanned_at=excluded.scanned_at, id_count=excluded.id_count",
+            (instance["name"], len(unique_records)),
+        )
+    return len(unique_records)
+
+
+def get_instance_stats(instance_name: str) -> dict[str, Any]:
+    with get_db() as conn:
+        count_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM prototype_ids WHERE instance_name = ?", (instance_name,)
+        ).fetchone()
+        scan_row = conn.execute(
+            "SELECT scanned_at, id_count FROM instance_scan WHERE instance_name = ?", (instance_name,)
+        ).fetchone()
+    return {
+        "id_count": int(count_row["c"]) if count_row else 0,
+        "last_scan": scan_row["scanned_at"] if scan_row else None,
+        "last_scan_count": int(scan_row["id_count"]) if scan_row else 0,
+    }
+
+
+def search_ids(instance_name: str, query: str) -> list[dict[str, str]]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT proto_id, rel_path FROM prototype_ids "
+            "WHERE instance_name = ? AND proto_id LIKE ? ORDER BY proto_id LIMIT 200",
+            (instance_name, f"%{query}%"),
+        ).fetchall()
+    return [{"proto_id": r["proto_id"], "rel_path": r["rel_path"]} for r in rows]
+
+
+def find_prototype_paths_by_id(instance_name: str, proto_id: str) -> list[str]:
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id = ? ORDER BY rel_path",
+            (instance_name, proto_id),
+        ).fetchall()
+    return [r["rel_path"] for r in rows]
+
+
+def find_first_prototype_path_by_id(instance_name: str, proto_id: str) -> str | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id = ? ORDER BY rel_path LIMIT 1",
+            (instance_name, proto_id),
+        ).fetchone()
+    return row["rel_path"] if row else None
+
+
+def get_instance_custom_dir(instance_name: str) -> str:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT custom_dir FROM instance_settings WHERE instance_name = ?",
+            (instance_name,),
+        ).fetchone()
+    return row["custom_dir"] if row else ""
+
+
+def set_instance_custom_dir(instance_name: str, custom_dir: str) -> None:
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO instance_settings (instance_name, custom_dir) VALUES (?, ?) "
+            "ON CONFLICT(instance_name) DO UPDATE SET custom_dir=excluded.custom_dir",
+            (instance_name, custom_dir),
+        )
+
+
+def custom_prototypes_root(instance: dict[str, str], custom_dir: str) -> Path:
+    prototypes_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    return safe_join(prototypes_root, custom_dir)
+
+
+def extract_cargo_products(docs: list[Any]) -> list[dict[str, Any]]:
+    products: list[dict[str, Any]] = []
+    stack = [docs]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            if current.get("type") == "cargoProduct":
+                icon = current.get("icon") if isinstance(current.get("icon"), dict) else {}
+                products.append(
+                    {
+                        "id": str(current.get("id", "")),
+                        "product": str(current.get("product", "")),
+                        "cost": current.get("cost"),
+                        "category": str(current.get("category", "")),
+                        "group": str(current.get("group", "")),
+                        "icon_sprite": str(icon.get("sprite", "")),
+                        "icon_state": str(icon.get("state", "icon")),
+                    }
+                )
+            for value in current.values():
+                stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(current)
+    return products
 
 
 app = create_app()

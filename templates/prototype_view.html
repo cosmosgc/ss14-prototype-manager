@@ -131,6 +131,9 @@
           <div class="rounded border p-2 text-xs">
             <p><span class="font-semibold">{{ p.key }}</span>: <span class="font-mono">{{ p.id }}</span></p>
             <div class="mt-1 flex flex-wrap gap-2">
+              {% if p.direct_file %}
+                <a href="{{ url_for('prototype_view', file=p.direct_file) }}" class="rounded bg-sky-600 px-2 py-1 text-white hover:bg-sky-700">Open YML</a>
+              {% endif %}
               <a href="{{ url_for('prototype_by_id', id=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Resolve by ID</a>
               <a href="{{ url_for('prototypes', q=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Search</a>
             </div>

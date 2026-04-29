@@ -28,7 +28,7 @@ It supports **multiple SS14 instances**, so you can switch projects without chan
 
 ## 🚀 Features
 
-- Multi-instance management (`data/instances.json`)
+- Multi-instance management (SQLite)
 - Collapsible prototype tree view
 - Hover sprite preview in tree
 - Prototype YAML editor with:
@@ -78,7 +78,7 @@ prototype manager/
 ├─ static/
 │  ├─ src/input.css
 │  └─ dist/output.css
-├─ data/instances.json
+├─ data/app.db
 ├─ requirements.txt
 ├─ package.json
 ├─ .env
@@ -133,7 +133,7 @@ FLASK_DEBUG=true
 FLASK_RUN_HOST=0.0.0.0
 FLASK_RUN_PORT=5000
 SECRET_KEY=change-this-secret
-INSTANCES_FILE=./data/instances.json
+SQLITE_PATH=./data/app.db
 DEFAULT_THUMB_SCALE=4
 ```
 

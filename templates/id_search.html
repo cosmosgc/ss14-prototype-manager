@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}ID Search | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Search Prototype IDs</h1>
+    <p class="text-sm text-slate-600">{{ selected.name }}</p>
+  </div>
+  <a href="{{ url_for('index') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+</div>
+
+<form method="get" action="{{ url_for('id_search') }}" class="mb-4">
+  <input name="q" value="{{ query }}" placeholder="Type prototype id..." class="w-full rounded border border-slate-300 px-3 py-2 text-sm">
+</form>
+
+<section class="rounded-xl border border-slate-200 bg-white p-4">
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead class="border-b text-slate-500">
+        <tr>
+          <th class="py-2">ID</th>
+          <th class="py-2">Path</th>
+          <th class="py-2">Open</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="border-b">
+          <td class="py-2 font-mono text-xs">{{ row.proto_id }}</td>
+          <td class="py-2 font-mono text-xs">{{ row.rel_path }}</td>
+          <td class="py-2"><a href="{{ url_for('prototype_view', file=row.rel_path) }}" class="rounded bg-sky-600 px-2 py-1 text-white hover:bg-sky-700">View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="py-3 text-slate-500">No results.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
