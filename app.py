@@ -64,6 +64,7 @@ IgnoreUnknownTagLoader.add_multi_constructor("!", _construct_unknown)
 def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = SECRET_KEY
+    ensure_instances_file_exists()
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
@@ -327,10 +328,7 @@ def create_app() -> Flask:
 
 
 def load_instances() -> list[dict[str, str]]:
-    if not INSTANCES_FILE.exists():
-        INSTANCES_FILE.parent.mkdir(parents=True, exist_ok=True)
-        INSTANCES_FILE.write_text("[]", encoding="utf-8")
-        return []
+    ensure_instances_file_exists()
     try:
         data = json.loads(INSTANCES_FILE.read_text(encoding="utf-8"))
         if isinstance(data, list):
@@ -338,6 +336,13 @@ def load_instances() -> list[dict[str, str]]:
     except json.JSONDecodeError:
         pass
     return []
+
+
+def ensure_instances_file_exists() -> None:
+    if INSTANCES_FILE.exists():
+        return
+    INSTANCES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    INSTANCES_FILE.write_text("[]", encoding="utf-8")
 
 
 def save_instances(instances: list[dict[str, str]]) -> None:
