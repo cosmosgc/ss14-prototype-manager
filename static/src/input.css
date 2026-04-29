@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@source "../../templates/**/*.html";
+@source "../../app.py";
+
+.pixelated {
+  image-rendering: pixelated;
+}

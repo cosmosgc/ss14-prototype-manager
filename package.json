@@ -1,0 +1,13 @@
+{
+  "name": "ss14-prototype-manager",
+  "private": true,
+  "version": "0.1.0",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.6",
+    "tailwindcss": "^4.1.6"
+  },
+  "scripts": {
+    "build:css": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css",
+    "watch:css": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css --watch"
+  }
+}

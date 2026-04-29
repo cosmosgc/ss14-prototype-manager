@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}SS14 Prototype Manager{% endblock %}</title>
+  <link href="{{ url_for('static', filename='dist/output.css') }}" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+  <style>[x-cloak]{display:none!important;}</style>
+</head>
+<body class="min-h-screen bg-slate-100 text-slate-900">
+  <nav class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+      <a href="{{ url_for('index') }}" class="text-lg font-bold tracking-tight">SS14 Prototype Manager</a>
+      <div class="text-sm text-slate-600">
+        Instances: {{ instances_count }}
+        {% if selected_instance_name %}
+          <span class="ml-3 rounded bg-emerald-100 px-2 py-1 text-emerald-800">Selected: {{ selected_instance_name }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+  <main class="mx-auto max-w-7xl px-4 py-6">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-4 space-y-2">
+          {% for category, message in messages %}
+            <div class="rounded border px-3 py-2 text-sm {{ 'border-red-300 bg-red-50 text-red-700' if category == 'error' else 'border-emerald-300 bg-emerald-50 text-emerald-700' }}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

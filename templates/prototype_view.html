@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}Prototype Detail | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Prototype Detail</h1>
+    <p class="font-mono text-xs text-slate-600">{{ rel_file }}</p>
+  </div>
+  <div class="flex gap-2">
+    <a
+      href="{{ url_for('open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
+      class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700"
+    >Open YML in VS Code</a>
+    <a
+      href="{{ url_for('open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
+      class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50"
+    >Open YML in Explorer</a>
+    <a href="{{ url_for('prototypes') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+  </div>
+</div>
+
+{% if parse_error %}
+  <div class="mb-4 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+    YAML parse error: {{ parse_error }}
+  </div>
+{% endif %}
+
+<div x-data="spriteModal()" @keydown.window="onKeydown($event)">
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+    <h2 class="mb-2 text-lg font-semibold">Edit YAML</h2>
+    <div x-data="yamlEditor()">
+      <div class="mb-2 flex flex-wrap gap-2">
+        <button type="button" @click="indentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Indent +2</button>
+        <button type="button" @click="outdentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Outdent -2</button>
+      </div>
+      <form method="post" action="{{ url_for('prototype_view', file=rel_file) }}">
+        <div class="flex overflow-hidden rounded border border-slate-300 bg-slate-50">
+          <pre x-ref="gutter" class="w-14 select-none overflow-hidden border-r border-slate-200 bg-slate-100 p-3 text-right font-mono text-xs text-slate-500"></pre>
+          <textarea
+            x-ref="editor"
+            @input="syncGutter()"
+            @scroll="syncScroll()"
+            @keydown.tab.prevent="tabIndent($event)"
+            name="content"
+            class="min-h-[60vh] w-full resize-y bg-slate-50 p-3 font-mono text-xs text-slate-900"
+          >{{ raw_text }}</textarea>
+        </div>
+        <button class="mt-3 rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700">Save</button>
+      </form>
+    </div>
+  </section>
+
+  <aside class="space-y-4">
+    <section x-data="{ open: true }" class="rounded-xl border border-slate-200 bg-white p-4">
+      <button @click="open = !open" class="flex w-full items-center justify-between">
+        <h3 class="font-semibold">RSI Sprites</h3>
+        <span class="text-xs text-slate-500" x-text="open ? 'Hide' : 'Show'"></span>
+      </button>
+      <div x-show="open" class="mt-3 space-y-4">
+        {% for s in sprite_cards %}
+          <div class="rounded border p-2">
+            <p class="font-mono text-xs">{{ s.sprite }}</p>
+            <p class="text-xs {{ 'text-emerald-700' if s.exists else 'text-rose-700' }}">
+              {{ 'RSI Found' if s.exists else 'RSI Missing' }}
+            </p>
+            <a
+              href="{{ url_for('open_explorer', target='rsi', sprite=s.sprite, back=request.full_path) }}"
+              class="mt-1 inline-block rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50"
+            >Open RSI Folder</a>
+            {% if s.png_states %}
+              <div class="mt-2 grid grid-cols-2 gap-2">
+                {% for st in s.png_states %}
+                  <div class="rounded border p-1">
+                    <img
+                      @click='openGallery({{ s.png_states | tojson }}, {{ s.sprite | tojson }}, {{ st | tojson }})'
+                      class="h-16 w-16 rounded bg-slate-100 object-contain pixelated"
+                      src="{{ url_for('sprite_preview', sprite=s.sprite, state=st, scale=2) }}"
+                      alt="{{ s.sprite }}:{{ st }}"
+                    >
+                    <p class="truncate text-[10px] text-slate-600">{{ st }}</p>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if s.preferred_state %}
+              <p class="mt-2 text-[10px] text-slate-500">YAML state: {{ s.preferred_state }}</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="text-sm text-slate-500">No sprite references detected.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section x-data="{ open: true }" class="rounded-xl border border-slate-200 bg-white p-4">
+      <button @click="open = !open" class="flex w-full items-center justify-between">
+        <h3 class="font-semibold">Audio Paths</h3>
+        <span class="text-xs text-slate-500" x-text="open ? 'Hide' : 'Show'"></span>
+      </button>
+      <div x-show="open" class="mt-3 space-y-2">
+        {% for a in audio_cards %}
+          <div class="rounded border p-2">
+            <p class="font-mono text-xs">{{ a.source_path }}</p>
+            <p class="mb-2 text-xs {{ 'text-emerald-700' if a.exists else 'text-rose-700' }}">
+              {{ 'Found' if a.exists else 'Missing' }}
+            </p>
+            <a
+              href="{{ url_for('open_explorer', target='audio', path=a.relative, back=request.full_path) }}"
+              class="mb-2 inline-block rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50"
+            >Open Audio in Explorer</a>
+            {% if a.exists %}
+              <audio controls preload="none" class="w-full">
+                <source src="{{ url_for('audio_play', path=a.relative) }}">
+              </audio>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="text-sm text-slate-500">No audio references detected.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section x-data="{ open: false }" class="rounded-xl border border-slate-200 bg-white p-4">
+      <button @click="open = !open" class="flex w-full items-center justify-between">
+        <h3 class="font-semibold">Prototype Links</h3>
+        <span class="text-xs text-slate-500" x-text="open ? 'Hide' : 'Show'"></span>
+      </button>
+      <div x-show="open" class="mt-3 space-y-2">
+        {% for p in prototype_ref_cards %}
+          <div class="rounded border p-2 text-xs">
+            <p><span class="font-semibold">{{ p.key }}</span>: <span class="font-mono">{{ p.id }}</span></p>
+            <div class="mt-1 flex flex-wrap gap-2">
+              <a href="{{ url_for('prototype_by_id', id=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Resolve by ID</a>
+              <a href="{{ url_for('prototypes', q=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Search</a>
+            </div>
+          </div>
+        {% else %}
+          <p class="text-sm text-slate-500">No prototype-like references detected.</p>
+        {% endfor %}
+      </div>
+    </section>
+  </aside>
+</div>
+
+<div
+  x-cloak
+  x-show="isOpen"
+  x-transition
+  class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-2 sm:p-4"
+  @click.self="close()"
+>
+  <div class="relative flex h-[95vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
+    <div class="flex items-center justify-between border-b border-slate-700 px-3 py-2 sm:px-4">
+      <div class="min-w-0 text-xs text-slate-300 sm:text-sm">
+        <p class="truncate font-mono" x-text="currentSprite"></p>
+        <p class="mt-0.5 text-slate-400">
+          <span x-text="currentState"></span>
+          <span class="mx-2">•</span>
+          <span x-text="(index + 1) + ' / ' + states.length"></span>
+        </p>
+      </div>
+      <button @click="close()" class="rounded-lg border border-slate-600 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-700">Close (Esc)</button>
+    </div>
+
+    <div class="relative flex flex-1 items-center justify-center px-2 py-3 sm:px-4">
+      <button @click="prev()" class="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-slate-600 bg-slate-800/90 px-3 py-2 text-slate-100 hover:bg-slate-700 sm:left-4">←</button>
+      <img
+        class="h-auto w-auto max-h-[60vh] max-w-[82vw] rounded-xl border border-slate-700 bg-slate-800 p-2 pixelated sm:max-h-[65vh] sm:max-w-[84vw]"
+        :src="currentImageUrl()"
+        :alt="currentSprite + ':' + currentState"
+      >
+      <button @click="next()" class="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-slate-600 bg-slate-800/90 px-3 py-2 text-slate-100 hover:bg-slate-700 sm:right-4">→</button>
+    </div>
+
+    <div class="border-t border-slate-700 p-2 sm:p-3">
+      <div class="flex gap-2 overflow-x-auto">
+        <template x-for="(state, i) in states" :key="state">
+          <button
+            @click="index = i; currentState = states[index]"
+            class="shrink-0 rounded-lg border p-1"
+            :class="i === index ? 'border-sky-400 bg-slate-700' : 'border-slate-600 bg-slate-800 hover:bg-slate-700'"
+          >
+            <img
+              class="h-12 w-12 object-contain pixelated sm:h-14 sm:w-14"
+              :src="thumbnailUrl(state)"
+              :alt="state"
+            >
+            <p class="mt-1 max-w-16 truncate text-[10px] text-slate-300" x-text="state"></p>
+          </button>
+        </template>
+      </div>
+      <p class="mt-2 text-center text-[11px] text-slate-400">Shortcuts: Left/Right to switch, Esc to close</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+function yamlEditor() {
+  return {
+    init() {
+      this.syncGutter();
+    },
+    syncGutter() {
+      const editor = this.$refs.editor;
+      const gutter = this.$refs.gutter;
+      const lines = editor.value.split("\n").length;
+      let text = "";
+      for (let i = 1; i <= lines; i++) {
+        text += i + "\n";
+      }
+      gutter.textContent = text;
+      this.syncScroll();
+    },
+    syncScroll() {
+      this.$refs.gutter.scrollTop = this.$refs.editor.scrollTop;
+    },
+    tabIndent(evt) {
+      const editor = this.$refs.editor;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const value = editor.value;
+      if (start === end) {
+        editor.value = value.slice(0, start) + "  " + value.slice(end);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+      } else {
+        this.indentSelection();
+      }
+      this.syncGutter();
+    },
+    indentSelection() {
+      this.modifySelection("indent");
+    },
+    outdentSelection() {
+      this.modifySelection("outdent");
+    },
+    modifySelection(mode) {
+      const editor = this.$refs.editor;
+      const value = editor.value;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const lineEndIdx = value.indexOf("\n", end);
+      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+      const block = value.slice(lineStart, lineEnd);
+      const lines = block.split("\n");
+      const updated = lines.map((line) => {
+        if (mode === "indent") return "  " + line;
+        if (line.startsWith("  ")) return line.slice(2);
+        if (line.startsWith("\t")) return line.slice(1);
+        return line;
+      }).join("\n");
+      editor.value = value.slice(0, lineStart) + updated + value.slice(lineEnd);
+      editor.selectionStart = lineStart;
+      editor.selectionEnd = lineStart + updated.length;
+      this.syncGutter();
+    }
+  };
+}
+
+function spriteModal() {
+  return {
+    isOpen: false,
+    states: [],
+    index: 0,
+    currentSprite: "",
+    currentState: "",
+    openGallery(states, sprite, initialState) {
+      if (!states || states.length === 0) return;
+      this.states = states;
+      this.currentSprite = sprite;
+      const found = states.indexOf(initialState);
+      this.index = found >= 0 ? found : 0;
+      this.currentState = this.states[this.index];
+      this.isOpen = true;
+    },
+    close() {
+      this.isOpen = false;
+    },
+    prev() {
+      if (!this.states.length) return;
+      this.index = (this.index - 1 + this.states.length) % this.states.length;
+      this.currentState = this.states[this.index];
+    },
+    next() {
+      if (!this.states.length) return;
+      this.index = (this.index + 1) % this.states.length;
+      this.currentState = this.states[this.index];
+    },
+    currentImageUrl() {
+      if (!this.currentSprite || !this.currentState) return "";
+      const sprite = encodeURIComponent(this.currentSprite);
+      const state = encodeURIComponent(this.currentState);
+      return `/sprite/preview?sprite=${sprite}&state=${state}&scale=8`;
+    },
+    thumbnailUrl(state) {
+      if (!this.currentSprite || !state) return "";
+      const sprite = encodeURIComponent(this.currentSprite);
+      const st = encodeURIComponent(state);
+      return `/sprite/preview?sprite=${sprite}&state=${st}&scale=2`;
+    },
+    onKeydown(evt) {
+      if (!this.isOpen) return;
+      if (evt.key === "Escape") this.close();
+      if (evt.key === "ArrowLeft") this.prev();
+      if (evt.key === "ArrowRight") this.next();
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Prototypes | SS14 Prototype Manager{% endblock %}
+{% macro render_tree(nodes, depth=0) %}
+  <ul class="{{ 'ml-4 border-l border-slate-200 pl-3' if depth > 0 else '' }} space-y-1">
+    {% for node in nodes %}
+      {% if node.type == 'dir' %}
+        <li x-data="{ open: false }">
+          <button @click="open = !open" class="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <span x-text="open ? '▾' : '▸'" class="text-xs"></span>
+            <span>{{ node.name }}</span>
+          </button>
+          <div x-show="open" x-transition>
+            {{ render_tree(node.children, depth + 1) }}
+          </div>
+        </li>
+      {% else %}
+        <li class="group relative flex items-center justify-between rounded px-2 py-1 hover:bg-slate-100">
+          <div class="min-w-0">
+            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('prototype_view', file=node.path) }}">{{ node.name }}</a>
+            <p class="truncate font-mono text-[10px] text-slate-500">{{ node.path }}</p>
+          </div>
+          {% if node.hover_exists %}
+            <img
+              class="pointer-events-none absolute right-0 top-1/2 z-20 hidden h-16 w-16 -translate-y-1/2 rounded border bg-slate-50 p-1 pixelated group-hover:block"
+              src="{{ url_for('sprite_preview', sprite=node.hover_sprite, state=node.hover_state, scale=2) }}"
+              alt="{{ node.hover_sprite }}:{{ node.hover_state }}"
+            >
+          {% endif %}
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+{% endmacro %}
+{% block content %}
+<div class="mb-4 flex items-center justify-between">
+  <div>
+    <h1 class="text-xl font-semibold">Prototype Tree</h1>
+    <p class="text-sm text-slate-600">{{ selected.name }} - {{ selected.root_path }}</p>
+  </div>
+  <a href="{{ url_for('index') }}" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Back</a>
+</div>
+
+<form class="mb-4" method="get" action="{{ url_for('prototypes') }}">
+  <input
+    name="q"
+    value="{{ query }}"
+    placeholder="Filter by file path..."
+    class="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+  >
+</form>
+
+<section class="rounded-xl border border-slate-200 bg-white p-4">
+  {{ render_tree(tree) }}
+</section>
+{% endblock %}
