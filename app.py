@@ -25,6 +25,11 @@ from flask import (
 )
 from PIL import Image
 import yaml
+from pydub import AudioSegment
+from mutagen.mp3 import MP3
+from mutagen.oggvorbis import OggVorbis
+from mutagen.id3 import ID3
+import tempfile
 
 
 load_dotenv()
@@ -784,9 +789,123 @@ def create_app() -> Flask:
             jukebox_dirs=jukebox_dirs,
             all_tracks=all_tracks,
         )
+    
+    @app.route("/jukebox")
+    def jukebox_manager():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"]) or ""
 
+        root = Path(selected["root_path"])
+
+        audio_root = root / "Resources" / "Audio" / custom_dir / "Jukebox"
+        catalog_path = root / "Resources" / "Prototypes" / custom_dir / "Catalog" / "Jukebox" / "Standard.yml"
+        attr_path = audio_root / "attributions.yml"
+
+        jukebox_dirs, all_tracks = load_jukebox_data_custom(root, custom_dir)
+
+        return render_template(
+            "jukebox.html",
+            selected=selected,
+            audio_root=audio_root,
+            catalog_path=catalog_path,
+            attr_path=attr_path,
+            jukebox_dirs=jukebox_dirs,
+            tracks=all_tracks
+        )
+
+    @app.post("/jukebox/add")
+    def jukebox_add():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"]) or ""
+
+        root = Path(selected["root_path"])
+
+        audio_root = root / "Resources" / "Audio" / custom_dir / "Jukebox"
+        catalog_path = root / "Resources" / "Prototypes" / custom_dir / "Catalog" / "Jukebox" / "Standard.yml"
+
+        audio_root.mkdir(parents=True, exist_ok=True)
+
+        yaml_data = load_yaml_file(catalog_path)
+
+        files = request.files.getlist("files")
+
+        for file in files:
+            filename = file.filename
+            if not filename:
+                continue
+
+            ext = filename.lower().split(".")[-1]
+            base_name = Path(filename).stem
+            output_filename = f"{base_name}.ogg"
+            output_path = audio_root / output_filename
+
+            # --- save or convert ---
+            if ext == "ogg":
+                file.save(output_path)
+            else:
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
+                        file.save(tmp.name)
+                        tmp_path = Path(tmp.name)
+
+                    audio = AudioSegment.from_file(tmp_path)
+                    audio = audio.set_channels(1)
+                    audio.export(output_path, format="ogg")
+
+                    if ext == "mp3":
+                        copy_metadata(tmp_path, output_path)
+
+                    tmp_path.unlink(missing_ok=True)
+
+                except Exception as e:
+                    print(f"Failed to convert {filename}: {e}")
+                    continue
+
+            # --- add to YAML ---
+            entry = build_jukebox_entry(output_filename, custom_dir)
+
+            # avoid duplicates
+            if not any(e.get("id") == entry["id"] for e in yaml_data):
+                yaml_data.append(entry)
+
+        save_yaml_file(catalog_path, yaml_data)
+
+        return redirect(url_for("jukebox_manager"))
+
+    @app.post("/jukebox/remove")
+    def jukebox_remove():
+        selected = selected_instance_or_400()
+        custom_dir = get_instance_custom_dir(selected["name"]) or ""
+
+        root = Path(selected["root_path"])
+
+        audio_root = root / "Resources" / "Audio" / custom_dir / "Jukebox"
+        catalog_path = root / "Resources" / "Prototypes" / custom_dir / "Catalog" / "Jukebox" / "Standard.yml"
+
+        filename = request.form.get("filename")
+        if not filename:
+            return redirect(url_for("jukebox_manager"))
+
+        # --- remove audio file ---
+        file_path = audio_root / filename
+        if file_path.exists():
+            file_path.unlink()
+
+        # --- remove from YAML ---
+        yaml_data = load_yaml_file(catalog_path)
+
+        def matches(entry):
+            path = entry.get("path", {}).get("path", "")
+            return filename in path
+
+        yaml_data = [e for e in yaml_data if not matches(e)]
+
+        save_yaml_file(catalog_path, yaml_data)
+
+        return redirect(url_for("jukebox_manager"))
+
+    
     return app
-
 
 def load_instances() -> list[dict[str, str]]:
     with get_db() as conn:
@@ -1763,6 +1882,119 @@ def load_crate_data(root: Path, crate_file_rel: str) -> dict[str, Any]:
             stack.extend(current)
     return {}
 
+def copy_metadata(mp3_path: Path, ogg_path: Path):
+    try:
+        mp3_meta = MP3(mp3_path, ID3=ID3)
+        ogg_meta = OggVorbis(ogg_path)
+
+        for tag in mp3_meta:
+            if tag in ["TIT2", "TPE1", "TALB"]:
+                ogg_meta[tag] = mp3_meta[tag].text[0]
+
+        ogg_meta.save()
+    except Exception:
+        pass
+
+def load_jukebox_data_custom(root_path: Path, custom_dir: str) -> tuple[list[dict], list[dict]]:
+    """Load jukebox data ONLY from a specific custom_dir."""
+    audio_root = root_path / "Resources" / "Audio"
+
+    if custom_dir:
+        audio_root = audio_root / custom_dir
+
+    jukebox_dirs: list[dict] = []
+    all_tracks: list[dict] = []
+
+    if not audio_root.exists():
+        return jukebox_dirs, all_tracks
+
+    for jukebox_dir in sorted(audio_root.rglob("Jukebox")):
+        if not jukebox_dir.is_dir():
+            continue
+
+        attr_file = jukebox_dir / "attributions.yml"
+        ogg_files = sorted([f.name for f in jukebox_dir.glob("*.ogg")])
+
+        if not attr_file.exists() and not ogg_files:
+            continue
+
+        # --- Load attribution ---
+        attributions: list[dict] = []
+        if attr_file.exists():
+            try:
+                content = attr_file.read_text(encoding="utf-8")
+                attr_data = yaml.safe_load(content) or []
+                if isinstance(attr_data, list):
+                    attributions = attr_data
+                elif isinstance(attr_data, dict):
+                    attributions = [attr_data]
+            except Exception:
+                pass
+
+        # --- Index attribution by file ---
+        attr_by_file: dict[str, dict] = {}
+        for attr in attributions:
+            if isinstance(attr, dict):
+                for fname in attr.get("files", []):
+                    if isinstance(fname, str):
+                        attr_by_file[fname] = {
+                            "license": attr.get("license", "Unknown"),
+                            "copyright": attr.get("copyright", "Unknown"),
+                            "source": attr.get("source", "Unknown"),
+                        }
+
+        tracks: list[dict] = []
+
+        # Path relative to Audio root (keeps compatibility with your URLs)
+        rel_path = jukebox_dir.relative_to(root_path / "Resources" / "Audio").as_posix()
+
+        for i, ogg_file in enumerate(ogg_files):
+            attr_info = attr_by_file.get(ogg_file, {})
+
+            track = {
+                "id": f"{rel_path.replace('/', '_')}_{i}",
+                "filename": ogg_file,
+                "title": ogg_file.removesuffix(".ogg"),
+                "path": f"/{rel_path}/{ogg_file}",  # important: same format as before
+                "license": attr_info.get("license", "Unknown"),
+                "copyright": attr_info.get("copyright", "Unknown"),
+                "source": attr_info.get("source", "Unknown"),
+            }
+
+            tracks.append(track)
+            all_tracks.append(track)
+
+        jukebox_dirs.append({
+            "name": rel_path,
+            "track_count": len(tracks),
+            "tracks": tracks,
+        })
+
+    return jukebox_dirs, all_tracks
+
+def load_yaml_file(path: Path):
+    if path.exists():
+        with path.open("r", encoding="utf-8") as f:
+            return yaml.safe_load(f) or []
+    return []
+
+def save_yaml_file(path: Path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        yaml.safe_dump(data, f, sort_keys=False, allow_unicode=True)
+
+
+def build_jukebox_entry(filename: str, custom_dir: str):
+    stem = Path(filename).stem
+
+    return {
+        "type": "jukebox",
+        "id": stem.replace(" ", "_"),
+        "name": stem.replace("_", " "),
+        "path": {
+            "path": f"/Audio/{custom_dir}/Jukebox/{filename}" if custom_dir else f"/Audio/Jukebox/{filename}"
+        }
+    }
 
 def load_jukebox_data(root_path: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load jukebox directories and their music tracks from Audio resources."""
