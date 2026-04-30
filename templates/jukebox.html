@@ -10,7 +10,7 @@
     <p class="text-sm text-slate-500">{{ selected.name }}</p>
   </div>
 
-  <a href="{{ url_for('index') }}"
+  <a href="{{ url_for('instance.index') }}"
      class="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 transition">
     ← Back
   </a>
@@ -20,7 +20,7 @@
 <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
   <h2 class="text-sm font-semibold text-slate-700 mb-3">Upload Audio</h2>
 
-  <form action="{{ url_for('jukebox_add') }}" method="post" enctype="multipart/form-data"
+  <form action="{{ url_for('media.jukebox_add') }}" method="post" enctype="multipart/form-data"
         class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
 
     <input type="file" name="files" multiple
@@ -69,11 +69,11 @@
 
           <!-- AUDIO -->
           <audio controls class="h-8">
-            <source src="{{ url_for('audio_play', path=track.path.lstrip('/')) }}" type="audio/ogg">
+            <source src="{{ url_for('audio.audio_play', path=track.path.lstrip('/')) }}" type="audio/ogg">
           </audio>
 
           <!-- DELETE -->
-          <form method="post" action="{{ url_for('jukebox_remove') }}">
+          <form method="post" action="{{ url_for('media.jukebox_remove') }}">
             <input type="hidden" name="filename" value="{{ track.filename }}">
             <button
               class="inline-flex items-center justify-center rounded-lg border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition opacity-70 group-hover:opacity-100">

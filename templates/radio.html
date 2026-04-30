@@ -8,7 +8,7 @@
       <h1 class="text-2xl font-semibold">Radio Player</h1>
       <p class="text-sm text-slate-600">{{ selected.name }} - {{ jukebox_dirs|length }} jukebox(es)</p>
     </div>
-    <a href="{{ url_for('index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+    <a href="{{ url_for('instance.index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 
   <!-- Main Player Container -->
@@ -227,7 +227,7 @@ function radioPlayer() {
       this.playlistIndex = this.allTracks.indexOf(track);
       
       if (track.path && this.audioPlayer) {
-        this.audioPlayer.src = `{{ url_for('audio_play') }}?path=${encodeURIComponent(track.path.substring(1))}`;
+        this.audioPlayer.src = `{{ url_for('audio.audio_play') }}?path=${encodeURIComponent(track.path.substring(1))}`;
         this.audioPlayer.load();
         this.play();
       }

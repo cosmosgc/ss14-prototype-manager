@@ -13,7 +13,7 @@
   <nav class="border-b border-slate-200 bg-white" x-data="{ open: false }">
     <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
       <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        <a href="{{ url_for('index') }}" class="text-lg font-bold tracking-tight">SS14 Prototype Manager</a>
+        <a href="{{ url_for('instance.index') }}" class="text-lg font-bold tracking-tight">SS14 Prototype Manager</a>
         
         <!-- Mobile hamburger button -->
         <button @click="open = !open" class="sm:hidden p-1 rounded hover:bg-slate-100">
@@ -25,14 +25,14 @@
 
         <!-- Navigation links -->
         <div class="hidden sm:flex sm:flex-row gap-2 sm:gap-3">
-          <a href="{{ url_for('prototypes') }}" class="text-sm text-sky-700 hover:underline">Prototypes</a>
-          <a href="{{ url_for('id_search') }}" class="text-sm text-sky-700 hover:underline">ID Search</a>
-          <a href="{{ url_for('rsi_explorer') }}" class="text-sm text-sky-700 hover:underline">RSI Explorer</a>
-          <a href="{{ url_for('custom_cargo_catalog') }}" class="text-sm text-sky-700 hover:underline">Cargo Catalog</a>
-          <a href="{{ url_for('custom_files') }}" class="text-sm text-sky-700 hover:underline">Custom Files</a>
-          <a href="{{ url_for('radio') }}" class="text-sm text-sky-700 hover:underline">Radio</a>
-          <a href="{{ url_for('jukebox_manager') }}" class="text-sm text-sky-700 hover:underline">Jukebox</a>
-          <a href="{{ url_for('options') }}" class="text-sm text-sky-700 hover:underline">Options</a>
+          <a href="{{ url_for('prototype.prototypes') }}" class="text-sm text-sky-700 hover:underline">Prototypes</a>
+          <a href="{{ url_for('instance.id_search') }}" class="text-sm text-sky-700 hover:underline">ID Search</a>
+          <a href="{{ url_for('rsi.rsi_explorer') }}" class="text-sm text-sky-700 hover:underline">RSI Explorer</a>
+          <a href="{{ url_for('custom.custom_cargo_catalog') }}" class="text-sm text-sky-700 hover:underline">Cargo Catalog</a>
+          <a href="{{ url_for('custom.custom_files') }}" class="text-sm text-sky-700 hover:underline">Custom Files</a>
+          <a href="{{ url_for('media.radio') }}" class="text-sm text-sky-700 hover:underline">Radio</a>
+          <a href="{{ url_for('media.jukebox_manager') }}" class="text-sm text-sky-700 hover:underline">Jukebox</a>
+          <a href="{{ url_for('instance.options') }}" class="text-sm text-sky-700 hover:underline">Options</a>
         </div>
       </div>
       <div class="text-sm text-slate-600">
@@ -46,14 +46,14 @@
      <!-- Mobile menu overlay -->
      <div x-show="open" x-transition class="sm:hidden border-t border-slate-200 bg-white" x-cloak>
        <div class="px-4 py-3 space-y-2">
-         <a href="{{ url_for('prototypes') }}" class="block text-sm text-sky-700 hover:underline">Prototypes</a>
-         <a href="{{ url_for('id_search') }}" class="block text-sm text-sky-700 hover:underline">ID Search</a>
-         <a href="{{ url_for('rsi_explorer') }}" class="block text-sm text-sky-700 hover:underline">RSI Explorer</a>
-         <a href="{{ url_for('custom_cargo_catalog') }}" class="block text-sm text-sky-700 hover:underline">Cargo Catalog</a>
-         <a href="{{ url_for('custom_files') }}" class="block text-sm text-sky-700 hover:underline">Custom Files</a>
-         <a href="{{ url_for('radio') }}" class="block text-sm text-sky-700 hover:underline">Radio</a>
-         <a href="{{ url_for('jukebox_manager') }}" class="block text-sm text-sky-700 hover:underline">Jukebox</a>
-         <a href="{{ url_for('options') }}" class="block text-sm text-sky-700 hover:underline">Options</a>
+          <a href="{{ url_for('prototype.prototypes') }}" class="text-sm text-sky-700 hover:underline">Prototypes</a>
+          <a href="{{ url_for('instance.id_search') }}" class="text-sm text-sky-700 hover:underline">ID Search</a>
+          <a href="{{ url_for('rsi.rsi_explorer') }}" class="text-sm text-sky-700 hover:underline">RSI Explorer</a>
+          <a href="{{ url_for('custom.custom_cargo_catalog') }}" class="text-sm text-sky-700 hover:underline">Cargo Catalog</a>
+          <a href="{{ url_for('custom.custom_files') }}" class="text-sm text-sky-700 hover:underline">Custom Files</a>
+          <a href="{{ url_for('media.radio') }}" class="text-sm text-sky-700 hover:underline">Radio</a>
+          <a href="{{ url_for('media.jukebox_manager') }}" class="text-sm text-sky-700 hover:underline">Jukebox</a>
+          <a href="{{ url_for('instance.options') }}" class="text-sm text-sky-700 hover:underline">Options</a>
        </div>
      </div>
   </nav>
