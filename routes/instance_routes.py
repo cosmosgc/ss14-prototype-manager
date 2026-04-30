@@ -58,19 +58,33 @@ def delete_instance(name: str):
 @instance_bp.route("/options", methods=["GET", "POST"])
 def options():
     selected = main_app.selected_instance_or_400()
+
     if request.method == "POST":
-        action = request.form.get("action", "scan_ids")
+        action = request.form.get("action")
+
         if action == "save_custom_dir":
             custom_dir = request.form.get("custom_dir", "").strip().strip("/\\")
             main_app.set_instance_custom_dir(selected["name"], custom_dir)
             flash("Custom directory saved.", "success")
-        else:
-            count = main_app.scan_instance_ids(selected)
-            flash(f"Scanned and saved {count} prototype IDs.", "success")
+
+        elif action == "scan_ids":
+            count = main_app.scan_instance_ids(
+                selected["name"],
+                selected["root_path"]
+            )
+            flash(f"Scanned and saved {count} prototype entries.", "success")
+
         return redirect(url_for("instance.options"))
+
     stats = main_app.get_instance_stats(selected["name"])
     custom_dir = main_app.get_instance_custom_dir(selected["name"])
-    return render_template("options.html", selected=selected, stats=stats, custom_dir=custom_dir)
+
+    return render_template(
+        "options.html",
+        selected=selected,
+        stats=stats,
+        custom_dir=custom_dir
+    )
 
 
 @instance_bp.get("/id-search")
