@@ -126,12 +126,18 @@ def create_app() -> Flask:
             abort(404)
         if session.get("selected_instance") == name:
             session.pop("selected_instance", None)
-        flash(f"Deleted instance: {name}", "success")
-        return redirect(url_for("index"))
+    flash(f"Deleted instance: {name}", "success")
+    return redirect(url_for("index"))
 
     # Register blueprints for modular routing
     from routes import register_blueprints
     register_blueprints(app)
+
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        import traceback
+        traceback.print_exc()
+        return "Internal Server Error", 500
 
     return app
 
@@ -150,22 +156,61 @@ def get_db() -> sqlite3.Connection:
 
 def init_db() -> None:
     with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS instances (name TEXT PRIMARY KEY, root_path TEXT NOT NULL)"
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS instances (
+            name TEXT PRIMARY KEY,
+            root_path TEXT NOT NULL
         )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS prototype_ids ("
-            "instance_name TEXT NOT NULL, proto_id TEXT NOT NULL, rel_path TEXT NOT NULL, "
-            "PRIMARY KEY (instance_name, proto_id, rel_path))"
+        """)
+
+        # 🔹 Main prototype table (now WITH type)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prototype_ids (
+            instance_name TEXT NOT NULL,
+            proto_id TEXT NOT NULL,
+            proto_type TEXT NOT NULL,
+            rel_path TEXT NOT NULL,
+            PRIMARY KEY (instance_name, proto_id)
         )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS instance_scan ("
-            "instance_name TEXT PRIMARY KEY, scanned_at TEXT NOT NULL, id_count INTEGER NOT NULL)"
+        """)
+
+        # 🔹 Component entries (each "type: X" inside components)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prototype_components (
+            instance_name TEXT NOT NULL,
+            proto_id TEXT NOT NULL,
+            component_type TEXT NOT NULL,
+            data TEXT, -- JSON blob for flexibility
+            PRIMARY KEY (instance_name, proto_id, component_type)
         )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS instance_settings ("
-            "instance_name TEXT PRIMARY KEY, custom_dir TEXT NOT NULL DEFAULT '')"
+        """)
+
+        # 🔹 Optional: extracted known fields (indexed)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prototype_component_fields (
+            instance_name TEXT NOT NULL,
+            proto_id TEXT NOT NULL,
+            component_type TEXT NOT NULL,
+            field_name TEXT NOT NULL,
+            field_value TEXT,
+            PRIMARY KEY (instance_name, proto_id, component_type, field_name)
         )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS instance_scan (
+            instance_name TEXT PRIMARY KEY,
+            scanned_at TEXT NOT NULL,
+            id_count INTEGER NOT NULL
+        )
+        """)
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS instance_settings (
+            instance_name TEXT PRIMARY KEY,
+            custom_dir TEXT NOT NULL DEFAULT ''
+        )
+        """)
 
 
 def save_instance(name: str, root_path: str) -> None:
@@ -223,12 +268,17 @@ def list_prototype_files(proto_root: Path) -> list[str]:
 
 def load_yaml_documents(file_path: Path) -> list[Any]:
     text = file_path.read_text(encoding="utf-8")
+
+    # 🔥 Fix invalid YAML: replace tabs with spaces
+    text = text.replace("\t", "    ")
+
     docs = list(yaml.load_all(text, Loader=IgnoreUnknownTagLoader))
     return docs
 
 
 def validate_yaml_text(text: str) -> tuple[bool, str | None]:
     try:
+        text = text.replace("\t", "    ")
         list(yaml.load_all(text, Loader=IgnoreUnknownTagLoader))
         return True, None
     except yaml.YAMLError as exc:
@@ -772,6 +822,22 @@ def collect_proto_ids(node: Any) -> list[str]:
             stack.extend(current)
     return sorted(set(ids))
 
+def extract_prototypes(node):
+    """Yield dicts that look like prototypes."""
+    stack = [node]
+
+    while stack:
+        current = stack.pop()
+
+        if isinstance(current, dict):
+            if "id" in current and "type" in current:
+                yield current
+
+            for v in current.values():
+                stack.append(v)
+
+        elif isinstance(current, list):
+            stack.extend(current)
 
 def add_related_prototypes(
     sprite_cards: list[dict[str, Any]],
@@ -801,49 +867,223 @@ def build_prototype_ref_cards(
             }
         )
     return cards
+    
 
 
-def scan_instance_ids(instance: dict[str, str]) -> int:
-    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
-    files = list_prototype_files(proto_root)
-    records: list[tuple[str, str, str]] = []
-    for rel_file in files:
-        file_path = safe_join(proto_root, rel_file)
-        try:
-            docs = load_yaml_documents(file_path)
-        except Exception:
-            continue
-        for proto_id in collect_proto_ids(docs):
-            records.append((instance["name"], proto_id, rel_file))
-    unique_records = list({(a, b, c) for a, b, c in records})
+# 🔹 Loader that ignores unknown YAML tags (SS14 safe)
+class IgnoreTagsLoader(yaml.SafeLoader):
+    pass
+
+
+def _ignore_unknown(loader, tag_suffix, node):
+    if isinstance(node, yaml.ScalarNode):
+        return loader.construct_scalar(node)
+    if isinstance(node, yaml.SequenceNode):
+        return loader.construct_sequence(node)
+    if isinstance(node, yaml.MappingNode):
+        return loader.construct_mapping(node)
+    return None
+
+
+IgnoreTagsLoader.add_multi_constructor("", _ignore_unknown)
+
+
+def extract_prototypes(node):
+    """Recursively find all dicts with id + type."""
+    stack = [node]
+
+    while stack:
+        current = stack.pop()
+
+        if isinstance(current, dict):
+            if "id" in current and "type" in current:
+                yield current
+
+            for v in current.values():
+                stack.append(v)
+
+        elif isinstance(current, list):
+            stack.extend(current)
+
+
+def scan_instance_ids(instance_name: str, root_path: str):
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
+    print("Scanning:", proto_root, proto_root.exists())
+
     with get_db() as conn:
-        conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (instance["name"],))
-        if unique_records:
-            conn.executemany(
-                "INSERT INTO prototype_ids (instance_name, proto_id, rel_path) VALUES (?, ?, ?)",
-                unique_records,
-            )
-        conn.execute(
-            "INSERT INTO instance_scan (instance_name, scanned_at, id_count) VALUES (?, datetime('now'), ?) "
-            "ON CONFLICT(instance_name) DO UPDATE SET scanned_at=excluded.scanned_at, id_count=excluded.id_count",
-            (instance["name"], len(unique_records)),
-        )
-    return len(unique_records)
+        conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (instance_name,))
+        conn.execute("DELETE FROM prototype_components WHERE instance_name = ?", (instance_name,))
+        conn.execute("DELETE FROM prototype_component_fields WHERE instance_name = ?", (instance_name,))
+
+        count = 0
+        seen = set()  # prevent duplicates like old version
+
+        for path in proto_root.rglob("*.yml"):
+            rel_path = path.relative_to(proto_root).as_posix()
+
+            try:
+                text = path.read_text(encoding="utf-8")
+                text = text.replace("\t", "    ")
+                docs = list(yaml.load_all(text, Loader=IgnoreTagsLoader))
+            except Exception as e:
+                print("YAML error:", path, e)
+                continue
+
+            for doc in docs:
+                stack = [doc]
+
+                while stack:
+                    current = stack.pop()
+
+                    if isinstance(current, dict):
+                        proto_id = current.get("id")
+
+                        if isinstance(proto_id, str):
+                            # Try to get type, fallback if missing
+                            proto_type = current.get("type") or "unknown"
+
+                            key = (instance_name, proto_id)
+
+                            if key not in seen:
+                                seen.add(key)
+
+                                conn.execute("""
+                                    INSERT OR REPLACE INTO prototype_ids
+                                    (instance_name, proto_id, proto_type, rel_path)
+                                    VALUES (?, ?, ?, ?)
+                                """, (instance_name, proto_id, proto_type, rel_path))
+
+                                count += 1
+
+                            # 🔹 Components (only if it's a real prototype-like object)
+                            components = current.get("components")
+                            if isinstance(components, list):
+                                for comp in components:
+                                    if not isinstance(comp, dict):
+                                        continue
+
+                                    comp_type = comp.get("type")
+                                    if not comp_type:
+                                        continue
+
+                                    conn.execute("""
+                                        INSERT OR REPLACE INTO prototype_components
+                                        (instance_name, proto_id, component_type, data)
+                                        VALUES (?, ?, ?, ?)
+                                    """, (
+                                        instance_name,
+                                        proto_id,
+                                        comp_type,
+                                        json.dumps(comp)
+                                    ))
+
+                                    for key_name, value in comp.items():
+                                        if key_name == "type":
+                                            continue
+
+                                        if isinstance(value, (str, int, float, bool)):
+                                            conn.execute("""
+                                                INSERT OR REPLACE INTO prototype_component_fields
+                                                (instance_name, proto_id, component_type, field_name, field_value)
+                                                VALUES (?, ?, ?, ?, ?)
+                                            """, (
+                                                instance_name,
+                                                proto_id,
+                                                comp_type,
+                                                key_name,
+                                                str(value)
+                                            ))
+
+                                        if comp_type == "CartridgeAmmo" and key_name == "proto":
+                                            conn.execute("""
+                                                INSERT OR REPLACE INTO prototype_component_fields
+                                                (instance_name, proto_id, component_type, field_name, field_value)
+                                                VALUES (?, ?, ?, 'proto_fk', ?)
+                                            """, (
+                                                instance_name,
+                                                proto_id,
+                                                comp_type,
+                                                value
+                                            ))
+
+                        # continue traversal
+                        for v in current.values():
+                            stack.append(v)
+
+                    elif isinstance(current, list):
+                        stack.extend(current)
+
+        conn.execute("""
+            INSERT OR REPLACE INTO instance_scan
+            (instance_name, scanned_at, id_count)
+            VALUES (?, datetime('now'), ?)
+        """, (instance_name, count))
+
+    return count
 
 
-def get_instance_stats(instance_name: str) -> dict[str, Any]:
+def get_instance_stats(instance_name: str) -> dict:
     with get_db() as conn:
-        count_row = conn.execute(
-            "SELECT COUNT(*) AS c FROM prototype_ids WHERE instance_name = ?", (instance_name,)
-        ).fetchone()
-        scan_row = conn.execute(
-            "SELECT scanned_at, id_count FROM instance_scan WHERE instance_name = ?", (instance_name,)
-        ).fetchone()
-    return {
-        "id_count": int(count_row["c"]) if count_row else 0,
-        "last_scan": scan_row["scanned_at"] if scan_row else None,
-        "last_scan_count": int(scan_row["id_count"]) if scan_row else 0,
-    }
+        cur = conn.cursor()
+
+        # Total rows (includes duplicates across files)
+        cur.execute("""
+            SELECT COUNT(*) FROM prototype_ids
+            WHERE instance_name = ?
+        """, (instance_name,))
+        total_rows = cur.fetchone()[0]
+
+        # Unique IDs
+        cur.execute("""
+            SELECT COUNT(DISTINCT proto_id) FROM prototype_ids
+            WHERE instance_name = ?
+        """, (instance_name,))
+        unique_ids = cur.fetchone()[0]
+
+        # Components
+        cur.execute("""
+            SELECT COUNT(*) FROM prototype_components
+            WHERE instance_name = ?
+        """, (instance_name,))
+        component_count = cur.fetchone()[0]
+
+        # Fields
+        cur.execute("""
+            SELECT COUNT(*) FROM prototype_component_fields
+            WHERE instance_name = ?
+        """, (instance_name,))
+        field_count = cur.fetchone()[0]
+
+        # Type breakdown
+        cur.execute("""
+            SELECT proto_type, COUNT(*) 
+            FROM prototype_ids
+            WHERE instance_name = ?
+            GROUP BY proto_type
+            ORDER BY COUNT(*) DESC
+        """, (instance_name,))
+        types = cur.fetchall()
+
+        # Last scan
+        cur.execute("""
+            SELECT scanned_at, id_count
+            FROM instance_scan
+            WHERE instance_name = ?
+        """, (instance_name,))
+        row = cur.fetchone()
+
+        last_scan = row[0] if row else None
+        last_scan_count = row[1] if row else 0
+
+        return {
+            "id_count": total_rows,
+            "unique_ids": unique_ids,
+            "component_count": component_count,
+            "field_count": field_count,
+            "types": types,
+            "last_scan": last_scan,
+            "last_scan_count": last_scan_count,
+        }
 
 
 def search_ids(instance_name: str, query: str) -> list[dict[str, str]]:
@@ -1349,13 +1589,24 @@ def create_app() -> Flask:
     from routes import register_blueprints
     register_blueprints(app)
 
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        import traceback
+        traceback.print_exc()
+        return "Internal Server Error", 500
+
     return app
 
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(
-        host=os.getenv("FLASK_RUN_HOST", "127.0.0.1"),
-        port=int(os.getenv("FLASK_RUN_PORT", "5000")),
-        debug=_env_bool("FLASK_DEBUG", True),
-    )
+    try:
+        app.run(
+            host=os.getenv("FLASK_RUN_HOST", "127.0.0.1"),
+            port=int(os.getenv("FLASK_RUN_PORT", "5000")),
+            debug=_env_bool("FLASK_DEBUG", True),
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        input("Press Enter to exit...")
