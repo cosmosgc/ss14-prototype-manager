@@ -1,125 +1,253 @@
 {% extends "base.html" %}
 {% block title %}Cargo Form | SS14 Prototype Manager{% endblock %}
 {% block content %}
-<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-  <div>
-    <h1 class="text-xl font-semibold">Cargo Form Editor</h1>
-    <p class="text-sm text-slate-600">{{ selected.name }} - <span class="font-mono">Resources/Prototypes/{{ custom_dir }}</span></p>
-  </div>
-  <a href="{{ url_for('custom_cargo_catalog') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
-</div>
-
-<form method="post" action="{{ url_for('custom_cargo_form', file=form_data.cargo_file) }}" x-data="cargoFormTools()" x-init="init()" class="grid gap-4 lg:grid-cols-2">
-  <section class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-    <h2 class="text-lg font-semibold">Cargo Product</h2>
-    <div><label class="block text-sm">Cargo file</label><input name="cargo_file" value="{{ form_data.cargo_file }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
-    <div><label class="block text-sm">Cargo id</label><input name="cargo_id" value="{{ form_data.cargo_id }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
-    <div>
-      <label class="block text-sm">Product (crate id)</label>
-      <input id="product_id" name="product_id" value="{{ form_data.product_id }}" @input="syncCrateId()" class="w-full rounded border px-3 py-2 text-sm font-mono">
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+      <div class="space-y-2">
+        <h1 class="text-3xl font-bold text-slate-900">Cargo Form Editor</h1>
+        <p class="text-slate-600 font-medium">{{ selected.name }} <span class="text-slate-500">- Resources/Prototypes/{{ custom_dir }}</span></p>
+      </div>
+      <a href="{{ url_for('custom_cargo_catalog') }}" class="inline-flex items-center px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400 transition-all duration-200 shadow-sm">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        Back to Catalog
+      </a>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-      <div><label class="block text-sm">Cost</label><input name="cost" type="number" value="{{ form_data.cost }}" class="w-full rounded border px-3 py-2 text-sm"></div>
-      <div><label class="block text-sm">Group</label><input name="group" value="{{ form_data.group }}" class="w-full rounded border px-3 py-2 text-sm"></div>
-    </div>
-    <div><label class="block text-sm">Category</label><input name="category" value="{{ form_data.category }}" class="w-full rounded border px-3 py-2 text-sm"></div>
 
-    <div class="rounded border p-3">
-      <label class="block text-sm font-semibold">RSI Sprite (search)</label>
-      <input x-model="rsiQuery" @input.debounce.250ms="searchRsi()" type="text" placeholder="type to search .rsi" class="mt-1 w-full rounded border px-3 py-2 text-sm font-mono">
-      <div class="mt-2 max-h-32 overflow-auto rounded border bg-slate-50">
+<form method="post" @submit.prevent="if(validateAll()) $el.submit()" action="{{ url_for('custom_cargo_form', file=form_data.cargo_file) }}" x-data="cargoFormTools()" x-init="init()" class="grid gap-8 lg:grid-cols-2">
+  <section class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-6">
+    <div class="flex items-center space-x-3">
+      <div class="flex-shrink-0">
+        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900">Cargo Product</h2>
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Cargo File</label>
+      <input name="cargo_file" value="{{ form_data.cargo_file }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="e.g., cargo.yml">
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Cargo ID</label>
+      <input name="cargo_id" @input="cargo_id.value = formatId($event.target.value); validateAll()" value="{{ form_data.cargo_id }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="e.g., cargo_id">
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Product (Crate ID)</label>
+      <input id="product_id" name="product_id" value="{{ form_data.product_id }}" @input="syncCrateId()" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="e.g., crate_id">
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-700">Cost</label>
+        <input name="cost" type="number" value="{{ form_data.cost }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="0">
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm font-medium text-slate-700">Group</label>
+        <input name="group" value="{{ form_data.group }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="e.g., group_name">
+      </div>
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Category</label>
+      <input name="category" value="{{ form_data.category }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="e.g., category_name">
+    </div>
+
+    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <div class="flex items-center space-x-2 mb-3">
+        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+        </svg>
+        <label class="text-sm font-semibold text-slate-700">RSI Sprite (Search)</label>
+      </div>
+      <input x-model="rsiQuery" @input.debounce.250ms="searchRsi()" type="text" placeholder="Type to search .rsi files..." class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200">
+      <div class="mt-2 flex items-center justify-center" x-show="isLoadingRsi">
+        <svg class="animate-spin h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <div class="mt-3 max-h-40 overflow-auto rounded-lg border bg-white shadow-inner" x-show="rsiResults.length > 0">
         <template x-for="rsi in rsiResults" :key="rsi">
-          <button type="button" @click="pickRsi(rsi)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
+          <button type="button" @click="pickRsi(rsi)" class="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors duration-150 last:border-b-0">
             <img loading="lazy"
               :src="spriteThumb(rsi, 'icon')"
-              class="h-8 w-8 rounded border bg-white object-contain pixelated"
+              class="h-10 w-10 rounded-lg border bg-white object-contain pixelated shadow-sm"
               onerror="this.style.display='none'"
             >
-            <span class="font-mono" x-text="rsi"></span>
+            <span class="font-mono text-slate-700" x-text="rsi"></span>
           </button>
         </template>
       </div>
-      <div class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <input id="icon_sprite" name="icon_sprite" value="{{ form_data.icon_sprite }}" @change="loadRsiStates()" class="w-full rounded border px-3 py-2 text-sm font-mono">
-        <select id="icon_state" name="icon_state" @change="updateSpritePreview()" class="w-full rounded border px-3 py-2 text-sm font-mono">
-          <option value="{{ form_data.icon_state }}">{{ form_data.icon_state }}</option>
+      <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input id="icon_sprite" name="icon_sprite" value="{{ form_data.icon_sprite }}" @change="loadRsiStates()" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200" placeholder="Selected sprite">
+        <select id="icon_state" name="icon_state" @change="updateSpritePreview()" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all duration-200">
+          <option value="{{ form_data.icon_state }}" x-text="form_data.icon_state || 'Select state'"></option>
         </select>
       </div>
-      <div class="mt-2">
-        <img loading="lazy" x-show="spritePreviewUrl" :src="spritePreviewUrl" class="h-16 w-16 rounded border bg-slate-100 object-contain pixelated">
+      <div class="mt-4 flex justify-center">
+        <img loading="lazy" x-show="spritePreviewUrl" :src="spritePreviewUrl" class="h-20 w-20 rounded-xl border-2 border-slate-200 bg-slate-100 object-contain pixelated shadow-md">
       </div>
     </div>
   </section>
 
-  <section class="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-    <h2 class="text-lg font-semibold">Crate Entity</h2>
-    <div><label class="block text-sm">Crate file</label><input name="crate_file" value="{{ form_data.crate_file }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
-    <div class="rounded border p-3">
-      <label class="block text-sm font-semibold">Parent (crate-compatible, search)</label>
-      <input x-model="crateParentQuery" @input.debounce.250ms="searchCrateParents()" type="text" placeholder="search crate parent id..." class="mt-1 w-full rounded border px-3 py-2 text-sm font-mono">
-      <div class="mt-2 max-h-32 overflow-auto rounded border bg-slate-50">
-        <template x-for="item in crateParentResults" :key="item.proto_id + item.rel_path">
-          <button type="button" @click="pickCrateParent(item.proto_id)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
-            <img x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-8 w-8 rounded border bg-white object-contain pixelated">
-            <span class="font-mono" x-text="item.proto_id"></span>
-            <span class="text-slate-500">-</span>
-            <span class="font-mono text-[10px]" x-text="item.rel_path"></span>
-          </button>
-        </template>
+  <section class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-6">
+    <div class="flex items-center space-x-3">
+      <div class="flex-shrink-0">
+        <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+        </svg>
       </div>
-      <input id="crate_parent" name="crate_parent" value="{{ form_data.crate_parent }}" class="mt-2 w-full rounded border px-3 py-2 text-sm font-mono">
+      <h2 class="text-xl font-bold text-slate-900">Crate Entity</h2>
     </div>
-    <div><label class="block text-sm">Crate id (synced)</label><input id="crate_id" name="crate_id" value="{{ form_data.crate_id }}" class="w-full rounded border px-3 py-2 text-sm font-mono"></div>
-    <div><label class="block text-sm">Name</label><input name="crate_name" value="{{ form_data.crate_name }}" class="w-full rounded border px-3 py-2 text-sm"></div>
-    <div><label class="block text-sm">Description</label><input name="crate_description" value="{{ form_data.crate_description }}" class="w-full rounded border px-3 py-2 text-sm"></div>
-
-    <div class="rounded border p-3">
-      <label class="block text-sm font-semibold">Entity Storage IDs (amount per item)</label>
-      <div class="mt-2 flex gap-2">
-        <input x-model="idQuery" @input.debounce.250ms="searchIds()" type="text" placeholder="search id..." class="w-full rounded border px-3 py-2 text-sm font-mono">
-        <button type="button" @click="addTypedId()" class="rounded border px-3 py-2 text-sm">Add</button>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Crate File</label>
+      <input name="crate_file" value="{{ form_data.crate_file }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200" placeholder="e.g., crate.yml">
+    </div>
+    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <div class="flex items-center space-x-2 mb-3">
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <label class="text-sm font-semibold text-slate-700">Parent (Crate-compatible, Search)</label>
       </div>
-      <div class="mt-2 max-h-40 overflow-auto rounded border bg-slate-50">
+      <input x-model="crateParentQuery" @input.debounce.250ms="searchCrateParents()" type="text" placeholder="Search crate parent ID..." class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200">
+      <div class="mt-2 flex items-center justify-center" x-show="isLoadingParents">
+        <svg class="animate-spin h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <div class="mt-3 max-h-40 overflow-auto rounded-lg border bg-white shadow-inner" x-show="crateParentResults.length > 0">
+        <template x-for="item in crateParentResults" :key="item.proto_id + item.rel_path">
+          <button type="button" @click="pickCrateParent(item.proto_id)" class="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors duration-150 last:border-b-0">
+            <img x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-10 w-10 rounded-lg border bg-white object-contain pixelated shadow-sm">
+            <span class="font-mono text-slate-700" x-text="item.proto_id"></span>
+            <span class="text-slate-400">-</span>
+            <span class="font-mono text-xs text-slate-500" x-text="item.rel_path"></span>
+          </button>
+        </template>
+      </div>
+      <input id="crate_parent" name="crate_parent" value="{{ form_data.crate_parent }}" class="mt-3 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200" placeholder="Selected parent">
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Crate ID (Synced)</label>
+      <input id="crate_id" name="crate_id" value="{{ form_data.crate_id }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200" placeholder="Auto-synced from product ID">
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Name</label>
+      <input name="crate_name" value="{{ form_data.crate_name }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200" placeholder="Crate display name">
+    </div>
+    <div class="space-y-2">
+      <label class="block text-sm font-medium text-slate-700">Description</label>
+      <input name="crate_description" value="{{ form_data.crate_description }}" class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200" placeholder="Crate description">
+    </div>
+
+    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+      <div class="flex items-center space-x-2 mb-3">
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+        </svg>
+        <label class="text-sm font-semibold text-slate-700">Entity Storage IDs (Amount per Item)</label>
+      </div>
+      <div class="flex gap-3">
+        <input x-model="idQuery" @input.debounce.250ms="searchIds()" type="text" placeholder="Search entity ID..." class="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm font-mono bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 transition-all duration-200">
+        <button type="button" @click="addTypedId()" class="px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors duration-200 font-medium text-sm">Add</button>
+      </div>
+      <div class="mt-2 flex items-center justify-center" x-show="isLoadingIds">
+        <svg class="animate-spin h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <div class="mt-3 max-h-48 overflow-auto rounded-lg border bg-white shadow-inner" x-show="idResults.length > 0">
         <template x-for="item in idResults" :key="item.proto_id + item.rel_path">
-          <button type="button" @click="addEntityId(item.proto_id, 1)" class="flex w-full items-center gap-2 border-b px-2 py-1 text-left text-xs hover:bg-slate-100">
-            <img loading="lazy" x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-8 w-8 rounded border bg-white object-contain pixelated">
-            <span class="font-mono" x-text="item.proto_id"></span>
-            <span class="text-slate-500">-</span>
-            <span class="font-mono text-[10px]" x-text="item.rel_path"></span>
+          <button type="button" @click="addEntityId(item.proto_id, 1)" class="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-3 text-left text-sm hover:bg-slate-50 transition-colors duration-150 last:border-b-0">
+            <img loading="lazy" x-show="item.sprite" :src="spriteThumb(item.sprite, item.state)" class="h-10 w-10 rounded-lg border bg-white object-contain pixelated shadow-sm">
+            <span class="font-mono text-slate-700" x-text="item.proto_id"></span>
+            <span class="text-slate-400">-</span>
+            <span class="font-mono text-xs text-slate-500" x-text="item.rel_path"></span>
           </button>
         </template>
       </div>
 
-      <div id="entity-list" class="mt-2 space-y-1">
+      <div id="entity-list" class="mt-4 space-y-2">
         {% for e in form_data.entity_items %}
-          <div class="flex items-center gap-2">
-            <input name="entity_ids" value="{{ e.id }}" class="w-full rounded border px-2 py-1 text-xs font-mono">
-            <input name="entity_amounts" type="number" min="1" value="{{ e.amount }}" class="w-24 rounded border px-2 py-1 text-xs">
-            <button type="button" class="rounded border px-2 py-1 text-xs" onclick="this.parentElement.remove()">X</button>
+          <div class="flex items-center gap-3 bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
+            <input name="entity_ids" value="{{ e.id }}" class="flex-1 rounded border border-slate-300 px-3 py-2 text-sm font-mono bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200">
+            <input name="entity_amounts" type="number" min="1" value="{{ e.amount }}" class="w-20 rounded border border-slate-300 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200">
+            <button type="button" class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors duration-200" onclick="this.parentElement.remove()">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
           </div>
         {% endfor %}
       </div>
     </div>
   </section>
 
-  <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
-    <h2 class="text-lg font-semibold">Generated YAML Preview</h2>
-    <div class="mt-2 grid gap-3 lg:grid-cols-2">
-      <div>
-        <p class="mb-1 text-xs font-semibold">Catalog/Cargo</p>
-        <pre class="max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{ cargo_yaml_preview }}</pre>
-      </div>
-      <div>
-        <p class="mb-1 text-xs font-semibold">Catalog/Fills/Crates</p>
-        <pre class="max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100">{{ crate_yaml_preview }}</pre>
+  <section class="bg-slate-100 rounded-xl p-4 lg:col-span-2">
+    <div class="flex items-center justify-between">
+      <h3 class="text-lg font-semibold text-slate-800">Form Actions</h3>
+      <div class="flex gap-3">
+        <button type="button" @click="clearForm()" class="inline-flex items-center px-4 py-2 border border-red-300 rounded-lg text-sm font-medium text-red-700 bg-white hover:bg-red-50 hover:border-red-400 transition-all duration-200 shadow-sm">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          Clear Form
+        </button>
+        <button type="button" @click="exportData()" class="inline-flex items-center px-4 py-2 border border-blue-300 rounded-lg text-sm font-medium text-blue-700 bg-white hover:bg-blue-50 hover:border-blue-400 transition-all duration-200 shadow-sm">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+          Export Data
+        </button>
       </div>
     </div>
-    <div class="mt-3 flex gap-2">
-      <button name="mode" value="preview" class="rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Refresh Preview</button>
-      <button name="mode" value="save" class="rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700">Save YAML Files</button>
+  </section>
+
+  <section class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 lg:col-span-2">
+    <div class="flex items-center space-x-3 mb-6">
+      <div class="flex-shrink-0">
+        <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-slate-900">Generated YAML Preview</h2>
+    </div>
+    <div class="grid gap-6 lg:grid-cols-2">
+      <div class="space-y-3">
+        <p class="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-2 rounded-lg">Catalog/Cargo</p>
+        <pre class="max-h-96 overflow-auto rounded-xl bg-slate-900 p-4 text-sm text-green-300 font-mono shadow-inner border border-slate-700">{{ cargo_yaml_preview }}</pre>
+      </div>
+      <div class="space-y-3">
+        <p class="text-sm font-semibold text-slate-700 bg-slate-100 px-3 py-2 rounded-lg">Catalog/Fills/Crates</p>
+        <pre class="max-h-96 overflow-auto rounded-xl bg-slate-900 p-4 text-sm text-green-300 font-mono shadow-inner border border-slate-700">{{ crate_yaml_preview }}</pre>
+      </div>
+    </div>
+    <div class="mt-6 flex gap-4 justify-end">
+      <button name="mode" value="preview" @click="refreshPreview()" :disabled="isRefreshingPreview" class="inline-flex items-center px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 hover:border-slate-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm">
+        <svg x-show="!isRefreshingPreview" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        <svg x-show="isRefreshingPreview" class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span x-text="isRefreshingPreview ? 'Refreshing...' : 'Refresh Preview'"></span>
+      </button>
+      <button name="mode" value="save" class="inline-flex items-center px-6 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-lg text-sm font-medium text-white hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-lg">
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+        </svg>
+        Save YAML Files
+      </button>
     </div>
   </section>
 </form>
+  </div>
+</div>
 
 <script>
 function cargoFormTools() {
@@ -131,6 +259,13 @@ function cargoFormTools() {
     crateParentQuery: "",
     crateParentResults: [],
     spritePreviewUrl: "",
+    isLoadingIds: false,
+    isLoadingRsi: false,
+    isLoadingParents: false,
+    isRefreshingPreview: false,
+    idController: null,
+    rsiController: null,
+    parentController: null,
     async init() {
       this.syncCrateId();
       await this.loadRsiStates();
@@ -139,7 +274,12 @@ function cargoFormTools() {
     syncCrateId() {
       const product = document.getElementById("product_id");
       const crate = document.getElementById("crate_id");
-      if (product && crate) crate.value = product.value;
+
+      if (product && crate) {
+        crate.value = product.value.replace(/\s+/g, "_");
+      }
+
+      this.validateAll();
     },
     spriteThumb(sprite, state) {
       return `/sprite/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state || "icon")}&scale=2`;
@@ -169,47 +309,182 @@ function cargoFormTools() {
       this.updateSpritePreview();
     },
     async searchIds() {
-      if (!this.idQuery.trim()) { this.idResults = []; return; }
-      const res = await fetch(`/api/id-suggest?q=${encodeURIComponent(this.idQuery)}`);
-      this.idResults = await res.json();
+      if (!this.idQuery.trim()) { this.idResults = []; this.isLoadingIds = false; return; }
+      if (this.idController) this.idController.abort();
+      this.idController = new AbortController();
+      this.isLoadingIds = true;
+      try {
+        const res = await fetch(`/api/id-suggest?q=${encodeURIComponent(this.idQuery)}`, { signal: this.idController.signal });
+        this.idResults = await res.json();
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error searching IDs:', error);
+          this.idResults = [];
+        }
+      } finally {
+        this.isLoadingIds = false;
+        this.idController = null;
+      }
     },
     async searchRsi() {
-      if (!this.rsiQuery.trim()) { this.rsiResults = []; return; }
-      const res = await fetch(`/api/rsi-suggest?q=${encodeURIComponent(this.rsiQuery)}`);
-      this.rsiResults = await res.json();
+      if (!this.rsiQuery.trim()) { this.rsiResults = []; this.isLoadingRsi = false; return; }
+      if (this.rsiController) this.rsiController.abort();
+      this.rsiController = new AbortController();
+      this.isLoadingRsi = true;
+      try {
+        const res = await fetch(`/api/rsi-suggest?q=${encodeURIComponent(this.rsiQuery)}`, { signal: this.rsiController.signal });
+        this.rsiResults = await res.json();
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error searching RSI:', error);
+          this.rsiResults = [];
+        }
+      } finally {
+        this.isLoadingRsi = false;
+        this.rsiController = null;
+      }
     },
     async searchCrateParents() {
-      if (!this.crateParentQuery.trim()) { this.crateParentResults = []; return; }
-      const res = await fetch(`/api/crate-parent-suggest?q=${encodeURIComponent(this.crateParentQuery)}`);
-      this.crateParentResults = await res.json();
+      if (!this.crateParentQuery.trim()) { this.crateParentResults = []; this.isLoadingParents = false; return; }
+      if (this.parentController) this.parentController.abort();
+      this.parentController = new AbortController();
+      this.isLoadingParents = true;
+      try {
+        const res = await fetch(`/api/crate-parent-suggest?q=${encodeURIComponent(this.crateParentQuery)}`, { signal: this.parentController.signal });
+        this.crateParentResults = await res.json();
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error searching crate parents:', error);
+          this.crateParentResults = [];
+        }
+      } finally {
+        this.isLoadingParents = false;
+        this.parentController = null;
+      }
+    },
+    async refreshPreview() {
+      this.isRefreshingPreview = true;
+      try {
+        // Submit form with preview mode
+        const form = document.querySelector('form');
+        const formData = new FormData(form);
+        formData.set('mode', 'preview');
+
+        const res = await fetch(form.action, {
+          method: 'POST',
+          body: formData
+        });
+
+        if (res.ok) {
+          // Reload the page to show updated preview
+          window.location.reload();
+        } else {
+          alert('Failed to refresh preview. Please check your inputs.');
+        }
+      } catch (error) {
+        console.error('Error refreshing preview:', error);
+        alert('An error occurred while refreshing the preview.');
+      } finally {
+        this.isRefreshingPreview = false;
+      }
     },
     addEntityId(value, amount) {
       const list = document.getElementById("entity-list");
       const row = document.createElement("div");
-      row.className = "flex items-center gap-2";
-      row.innerHTML = `<input name="entity_ids" value="${value}" class="w-full rounded border px-2 py-1 text-xs font-mono"><input name="entity_amounts" type="number" min="1" value="${amount || 1}" class="w-24 rounded border px-2 py-1 text-xs"><button type="button" class="rounded border px-2 py-1 text-xs">X</button>`;
+      row.className = "flex items-center gap-3 bg-white rounded-lg p-3 border border-slate-200 shadow-sm";
+      row.innerHTML = `<input name="entity_ids" value="${value}" class="flex-1 rounded border border-slate-300 px-3 py-2 text-sm font-mono bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200"><input name="entity_amounts" type="number" min="1" value="${amount || 1}" class="w-20 rounded border border-slate-300 px-3 py-2 text-sm bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200"><button type="button" class="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors duration-200"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>`;
       row.querySelector("button").onclick = () => row.remove();
       list.appendChild(row);
       this.idQuery = "";
       this.idResults = [];
+      this.validateAll();
+    },
+    clearForm() {
+      if (confirm('Are you sure you want to clear all form data? This cannot be undone.')) {
+        if (this.idController) this.idController.abort();
+        if (this.rsiController) this.rsiController.abort();
+        if (this.parentController) this.parentController.abort();
+        document.querySelector('form').reset();
+        document.getElementById("entity-list").innerHTML = "";
+        this.idResults = [];
+        this.rsiResults = [];
+        this.crateParentResults = [];
+        this.spritePreviewUrl = "";
+        this.idQuery = "";
+        this.rsiQuery = "";
+        this.crateParentQuery = "";
+        this.isLoadingIds = false;
+        this.isLoadingRsi = false;
+        this.isLoadingParents = false;
+        this.validateAll();
+      }
+    },
+    exportData() {
+      const formData = new FormData(document.querySelector('form'));
+      const data = Object.fromEntries(formData.entries());
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cargo_form_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
     },
     addTypedId() {
       if (!this.idQuery.trim()) return;
       this.addEntityId(this.idQuery.trim(), 1);
     },
     async pickRsi(rsi) {
+      if (this.rsiController) this.rsiController.abort();
       document.getElementById("icon_sprite").value = rsi;
       this.rsiQuery = rsi;
       this.rsiResults = [];
       await this.loadRsiStates();
     },
     pickCrateParent(value) {
+      if (this.parentController) this.parentController.abort();
       const input = document.getElementById("crate_parent");
       if (input) input.value = value;
       this.crateParentQuery = value;
       this.crateParentResults = [];
-    }
+    },
+    isValidId(value) {
+      return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(value);
+    },
+    isValidYml(value) {
+      return value.endsWith(".yml");
+    },
+    validateField(el, valid) {
+      if (!el) return;
+      el.classList.toggle("border-red-500", !valid);
+      el.classList.toggle("bg-red-50", !valid);
+    },
+    validateAll() {
+      const cargoId = document.querySelector('[name="cargo_id"]');
+      const crateId = document.getElementById("crate_id");
+      const cargoFile = document.querySelector('[name="cargo_file"]');
+      const crateFile = document.querySelector('[name="crate_file"]');
+
+      const validCargoId = this.isValidId(cargoId.value);
+      const validCrateId = this.isValidId(crateId.value);
+      const validCargoFile = this.isValidYml(cargoFile.value);
+      const validCrateFile = this.isValidYml(crateFile.value);
+
+      this.validateField(cargoId, validCargoId);
+      this.validateField(crateId, validCrateId);
+      this.validateField(cargoFile, validCargoFile);
+      this.validateField(crateFile, validCrateFile);
+
+      return validCargoId && validCrateId && validCargoFile && validCrateFile;
+    },
+    formatId(value) {
+      return value
+        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9_-]/g, "")
+        .replace(/^[^a-zA-Z]+/, "");
+    },
   };
 }
+
 </script>
 {% endblock %}
