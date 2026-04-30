@@ -7,7 +7,7 @@ def register_blueprints(app):
     """Automatically discover and register blueprints in this package."""
 
     package_name = __name__  # "routes"
-    
+
     for _, module_name, _ in pkgutil.iter_modules(__path__):
         module = importlib.import_module(f"{package_name}.{module_name}")
 
@@ -16,4 +16,7 @@ def register_blueprints(app):
             attr = getattr(module, attr_name)
 
             if isinstance(attr, Blueprint):
-                app.register_blueprint(attr)
+                app.register_blueprint(
+                    attr,
+                    url_prefix=attr.url_prefix or "",
+                )

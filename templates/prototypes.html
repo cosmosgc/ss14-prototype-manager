@@ -17,13 +17,13 @@
       {% else %}
         <li data-file-node data-file-path="{{ node.path | lower }}" class="group relative flex items-center justify-between rounded px-2 py-1 hover:bg-slate-100">
           <div class="min-w-0">
-            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('prototype_view', file=node.path) }}">{{ node.name }}</a>
+            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('prototype.prototype_view', file=node.path) }}">{{ node.name }}</a>
             <p class="truncate font-mono text-[10px] text-slate-500">{{ node.path }}</p>
           </div>
           {% if node.hover_exists %}
             <img loading="lazy"
               class="pointer-events-none absolute right-0 top-1/2 z-20 hidden h-16 w-16 -translate-y-1/2 rounded border bg-slate-50 p-1 pixelated group-hover:block"
-              src="{{ url_for('sprite_preview', sprite=node.hover_sprite, state=node.hover_state, scale=2) }}"
+              src="{{ url_for('api.sprite_preview', sprite=node.hover_sprite, state=node.hover_state, scale=2) }}"
               alt="{{ node.hover_sprite }}:{{ node.hover_state }}"
             >
           {% endif %}
@@ -38,7 +38,7 @@
     <h1 class="text-xl font-semibold">Prototype Tree</h1>
     <p class="text-sm text-slate-600">{{ selected.name }} - {{ selected.root_path }}</p>
   </div>
-  <a href="{{ url_for('index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+  <a href="{{ url_for('instance.index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
 </div>
 
 <div class="mb-4">

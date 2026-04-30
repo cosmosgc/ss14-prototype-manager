@@ -17,7 +17,7 @@
       {% else %}
         <li data-file-node data-file-path="{{ node.path | lower }}" class="group relative flex items-center justify-between rounded px-2 py-1 hover:bg-slate-100">
           <div class="min-w-0">
-            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('rsi_view', sprite=node.path) }}">{{ node.name }}</a>
+            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('rsi.rsi_view', sprite=node.path) }}">{{ node.name }}</a>
             <p class="truncate font-mono text-[10px] text-slate-500">{{ node.path }}</p>
           </div>
           {% if node.hover_exists %}
@@ -27,7 +27,7 @@
             {% endif %}
               <img loading="lazy"
                 class="pointer-events-none absolute right-0 top-1/2 z-20 hidden h-24 w-24 -translate-y-1/2 rounded border bg-slate-50 p-1 pixelated group-hover:block"
-                src="{{ url_for('rsi_preview', sprite=node.path, state=preview_state, scale=2) }}"
+                src="{{ url_for('rsi.rsi_preview', sprite=node.path, state=preview_state, scale=2) }}"
                 alt="{{ node.path }}:{{ node.states[0] }}"
               >
             {% endif %}
@@ -43,7 +43,7 @@
     <h1 class="text-xl font-semibold">RSI Explorer</h1>
     <p class="text-sm text-slate-600">{{ selected.name }}</p>
   </div>
-  <a href="{{ url_for('index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+  <a href="{{ url_for('instance.index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
 </div>
 
 <div class="mb-4">

@@ -8,14 +8,14 @@
   </div>
   <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
     <a
-      href="{{ url_for('open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
+      href="{{ url_for('api.open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
       class="w-full sm:w-auto rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 text-center"
     >Open YML in VS Code</a>
     <a
-      href="{{ url_for('open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
+      href="{{ url_for('api.open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
       class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center"
     >Open YML in Explorer</a>
-    <a href="{{ url_for('prototypes') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+    <a href="{{ url_for('prototype.prototypes') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 </div>
 
@@ -34,7 +34,7 @@
         <button type="button" @click="indentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Indent +2</button>
         <button type="button" @click="outdentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Outdent -2</button>
       </div>
-      <form method="post" action="{{ url_for('prototype_view', file=rel_file) }}">
+      <form method="post" action="{{ url_for('prototype.prototype_view', file=rel_file) }}">
         <div class="flex overflow-hidden rounded border border-slate-300 bg-slate-50">
           <pre x-ref="gutter" class="w-14 select-none overflow-hidden border-r border-slate-200 bg-slate-100 p-3 text-right font-mono text-xs text-slate-500"></pre>
           <textarea
@@ -65,7 +65,7 @@
               {{ 'RSI Found' if s.exists else 'RSI Missing' }}
             </p>
             <a
-              href="{{ url_for('open_explorer', target='rsi', sprite=s.sprite, back=request.full_path) }}"
+              href="{{ url_for('api.open_explorer', target='rsi', sprite=s.sprite, back=request.full_path) }}"
               class="mt-1 inline-block rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50"
             >Open RSI Folder</a>
             {% if s.png_states %}
@@ -75,7 +75,7 @@
                     <img
                       @click='openGallery({{ s.png_states | tojson }}, {{ s.sprite | tojson }}, {{ st | tojson }})'
                       class="h-16 w-16 rounded bg-slate-100 object-contain pixelated"
-                      src="{{ url_for('sprite_preview', sprite=s.sprite, state=st, scale=2) }}"
+                      src="{{ url_for('api.sprite_preview', sprite=s.sprite, state=st, scale=2) }}"
                       alt="{{ s.sprite }}:{{ st }}"
                     >
                     <p class="truncate text-[10px] text-slate-600">{{ st }}</p>
@@ -106,12 +106,12 @@
               {{ 'Found' if a.exists else 'Missing' }}
             </p>
             <a
-              href="{{ url_for('open_explorer', target='audio', path=a.relative, back=request.full_path) }}"
+              href="{{ url_for('api.open_explorer', target='audio', path=a.relative, back=request.full_path) }}"
               class="mb-2 inline-block rounded border border-slate-300 px-2 py-1 text-[11px] hover:bg-slate-50"
             >Open Audio in Explorer</a>
             {% if a.exists %}
               <audio controls preload="none" class="w-full">
-                <source src="{{ url_for('audio_play', path=a.relative) }}">
+                <source src="{{ url_for('audio.audio_play', path=a.relative) }}">
               </audio>
             {% endif %}
           </div>
@@ -132,10 +132,10 @@
             <p><span class="font-semibold">{{ p.key }}</span>: <span class="font-mono">{{ p.id }}</span></p>
             <div class="mt-1 flex flex-wrap gap-2">
               {% if p.direct_file %}
-                <a href="{{ url_for('prototype_view', file=p.direct_file) }}" class="rounded bg-sky-600 px-2 py-1 text-white hover:bg-sky-700">Open YML</a>
+                <a href="{{ url_for('prototype.prototype_view', file=p.direct_file) }}" class="rounded bg-sky-600 px-2 py-1 text-white hover:bg-sky-700">Open YML</a>
               {% endif %}
-              <a href="{{ url_for('prototype_by_id', id=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Resolve by ID</a>
-              <a href="{{ url_for('prototypes', q=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Search</a>
+              <a href="{{ url_for('prototype.prototype_by_id', proto_id=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Resolve by ID</a>
+              <a href="{{ url_for('prototype.prototypes', q=p.id) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">Search</a>
             </div>
           </div>
         {% else %}

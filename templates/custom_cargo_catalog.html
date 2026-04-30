@@ -7,8 +7,8 @@
     <p class="text-sm text-slate-600">Source: <span class="font-mono">Resources/Prototypes/{{ custom_dir }}/Catalog/Cargo</span></p>
   </div>
   <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-    <a href="{{ url_for('custom_cargo_form') }}" class="w-full sm:w-auto rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700 text-center">Create New Cargo</a>
-    <a href="{{ url_for('options') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+    <a href="{{ url_for('custom.custom_cargo_form') }}" class="w-full sm:w-auto rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700 text-center">Create New Cargo</a>
+    <a href="{{ url_for('instance.options') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
   </div>
 </div>
 
@@ -33,7 +33,7 @@
           <td class="py-2">
             {% if item.icon_sprite %}
               <img class="h-10 w-10 rounded border bg-slate-100 object-contain pixelated"
-                   src="{{ url_for('sprite_preview', sprite=item.icon_sprite, state=item.icon_state or 'icon', scale=2) }}"
+                   src="{{ url_for('api.sprite_preview', sprite=item.icon_sprite, state=item.icon_state or 'icon', scale=2) }}"
                    alt="{{ item.icon_sprite }}:{{ item.icon_state }}">
             {% endif %}
           </td>
@@ -43,12 +43,12 @@
           <td class="py-2 text-xs">{{ item.category }}</td>
           <td class="py-2 text-xs">{{ item.group }}</td>
           <td class="py-2">
-            <a href="{{ url_for('custom_file_edit', file=item.source_file) }}" class="font-mono text-xs text-sky-700 hover:underline">{{ item.source_file }}</a>
+            <a href="{{ url_for('custom.custom_file_edit', file=item.source_file) }}" class="font-mono text-xs text-sky-700 hover:underline">{{ item.source_file }}</a>
           </td>
           <td class="py-2">
             <div class="flex gap-2">
-              <a href="{{ url_for('custom_cargo_form', file=item.source_file_only) }}" class="rounded bg-indigo-600 px-2 py-1 text-white hover:bg-indigo-700">Form</a>
-              <a href="{{ url_for('custom_file_edit', file=item.source_file) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">YML</a>
+              <a href="{{ url_for('custom.custom_cargo_form', file=item.source_file_only) }}" class="rounded bg-indigo-600 px-2 py-1 text-white hover:bg-indigo-700">Form</a>
+              <a href="{{ url_for('custom.custom_file_edit', file=item.source_file) }}" class="rounded border border-slate-300 px-2 py-1 hover:bg-slate-50">YML</a>
             </div>
           </td>
         </tr>

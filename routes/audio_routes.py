@@ -1,107 +1,93 @@
-from flask import Blueprint, abort, jsonify, request
-
-import app as main_app
-from routes._helpers import _selected_instance_or_400
+from flask import Blueprint, abort, jsonify, render_template, request, url_for, send_file
 from pathlib import Path
 
-audio_bp = Blueprint("audio", __name__)
+from app import (
+    selected_instance_or_400, safe_join, DEFAULT_THUMB_SCALE, Image, io, send_file,
+)
 
-safe_join_or_none = main_app.safe_join_or_none
-
-
-@audio_bp.get("/api/id-suggest")
-def api_id_suggest():
-    from app import search_ids, resolve_preview_for_row
-    
-    selected = _selected_instance_or_400()
-    q = request.args.get("q", "").strip()
-    if not q:
-        return jsonify([])
-
-    rows = search_ids(selected["name"], q)[:30]
-    out = []
-
-    for row in rows:
-        sprite, state = resolve_preview_for_row(selected, row["rel_path"], row["proto_id"])
-        out.append({
-            "proto_id": row["proto_id"],
-            "rel_path": row["rel_path"],
-            "sprite": sprite,
-            "state": state,
-        })
-
-    return jsonify(out)
+audio_bp = Blueprint("audio", __name__, url_prefix="/audio")
 
 
-@audio_bp.get("/api/rsi-suggest")
-def api_rsi_suggest():
-    selected = _selected_instance_or_400()
-    q = request.args.get("q", "").strip().lower()
+@audio_bp.route("/")
+def audio_explorer():
+    from app import session
 
-    if not q:
-        return jsonify([])
+    selected = selected_instance_or_400()
+    audio_root = Path(selected["root_path"]) / "Resources" / "Audio"
+    if not audio_root.exists():
+        return render_template("audio_explorer.html", audio_files=[], selected=selected)
 
-    textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
-    out = []
+    files = []
+    for root, dirs, filenames in sorted(audio_root.walk()):
+        for filename in sorted(filenames):
+            full_path = Path(root) / filename
+            rel_path = full_path.relative_to(audio_root).as_posix()
+            files.append({
+                "path": f"/Audio/{rel_path}",
+                "name": filename,
+                "size": full_path.stat().st_size if full_path.exists() else 0,
+            })
 
-    if textures_root.exists():
-        for p in textures_root.rglob("*.rsi"):
-            rel = p.relative_to(textures_root).as_posix()
-            if q in rel.lower():
-                out.append(rel)
-                if len(out) >= 40:
-                    break
-
-    return jsonify(sorted(out))
-
-
-@audio_bp.get("/api/rsi-states")
-def api_rsi_states():
-    from app import json
-
-    selected = _selected_instance_or_400()
-    sprite = request.args.get("sprite", "").strip()
-
-    if not sprite:
-        return jsonify([])
-
-    textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
-    rsi_dir = safe_join_or_none(textures_root, sprite)
-
-    if not rsi_dir or not rsi_dir.exists():
-        return jsonify([])
-
-    meta_path = rsi_dir / "meta.json"
-    states = []
-
-    if meta_path.exists():
-        try:
-            with open(meta_path, encoding="utf-8") as f:
-                meta = json.load(f)
-            states = [s.get("name") for s in meta.get("states", []) if isinstance(s, dict) and s.get("name")]
-        except Exception:
-            states = []
-
-    if not states:
-        states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
-
-    return jsonify(sorted(set(states)))
+    return render_template("audio_explorer.html", audio_files=files, selected=selected)
 
 
-@audio_bp.get("/audio/play")
+@audio_bp.route("/play")
 def audio_play():
-    from app import send_file, safe_join
+    from app import session
 
-    selected = _selected_instance_or_400()
+    selected = selected_instance_or_400()
     rel = request.args.get("path", "").strip()
-
     if not rel:
+        abort(400)
+    audio_root = Path(selected["root_path"]) / "Resources" / "Audio"
+    file_path = safe_join(audio_root, rel)
+    if not file_path.exists():
+        abort(404)
+    return send_file(file_path)
+
+
+@audio_bp.route("/preview")
+def audio_preview():
+    from app import session
+
+    selected = selected_instance_or_400()
+    path = request.args.get("path", "").strip()
+    if not path:
         abort(400)
 
     audio_root = Path(selected["root_path"]) / "Resources" / "Audio"
-    file_path = safe_join(audio_root, rel)
+    file_path = safe_join(audio_root, path)
 
-    if not file_path.exists():
+    if not file_path or not file_path.exists():
         abort(404)
 
     return send_file(file_path)
+
+
+@audio_bp.route("/api/suggest")
+def api_audio_suggest():
+    from app import session
+
+    selected = selected_instance_or_400()
+    q = request.args.get("q", "").strip().lower()
+    if not q:
+        return jsonify([])
+    audio_root = Path(selected["root_path"]) / "Resources" / "Audio"
+    out = []
+    if audio_root.exists():
+        for p in audio_root.rglob("*"):
+            if p.suffix.lower() in {".ogg", ".mp3"}:
+                rel = p.relative_to(audio_root).as_posix()
+                if q in rel.lower():
+                    out.append(rel)
+                    if len(out) >= 40:
+                        break
+    return jsonify(sorted(out))
+
+
+def safe_join_or_none(base: Path, relative: str):
+    from app import safe_join as _safe_join
+    try:
+        return _safe_join(base, relative)
+    except Exception:
+        return None
