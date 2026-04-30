@@ -67,7 +67,7 @@ def options():
         else:
             count = main_app.scan_instance_ids(selected)
             flash(f"Scanned and saved {count} prototype IDs.", "success")
-        return redirect(url_for("options"))
+        return redirect(url_for("instance.options"))
     stats = main_app.get_instance_stats(selected["name"])
     custom_dir = main_app.get_instance_custom_dir(selected["name"])
     return render_template("options.html", selected=selected, stats=stats, custom_dir=custom_dir)
