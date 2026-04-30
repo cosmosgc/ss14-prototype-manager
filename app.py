@@ -22,7 +22,10 @@ from flask import (
     send_file,
     session,
     url_for,
+    Blueprint,
 )
+
+from routes import register_blueprints
 from PIL import Image
 import yaml
 from pydub import AudioSegment
@@ -2105,9 +2108,19 @@ def build_rsi_tree_recursive(textures_root: Path, base_path: Path) -> list[dict]
     return items
 
 
-app = create_app()
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.secret_key = SECRET_KEY
+    init_db()
+    
+    # Register blueprints for modular routing
+    register_blueprints(app)
+    
+    return app
+
 
 if __name__ == "__main__":
+    app = create_app()
     app.run(
         host=os.getenv("FLASK_RUN_HOST", "127.0.0.1"),
         port=int(os.getenv("FLASK_RUN_PORT", "5000")),
