@@ -17,6 +17,19 @@ if %errorlevel% neq 0 (
   exit /b %errorlevel%
 )
 
+echo Building CSS and JS...
+call npm run build
+if %errorlevel% neq 0 (
+  echo Build failed with error code %errorlevel%
+  pause
+  exit /b %errorlevel%
+)
+
+echo Done! Output in static/dist/ (CSS + JS)
+pause
+  exit /b %errorlevel%
+)
+
 echo Building CSS with Tailwind...
 call npm run build:css
 if %errorlevel% neq 0 (

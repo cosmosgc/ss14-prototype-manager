@@ -1,10 +1,36 @@
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from pathlib import Path
+import base64
+import zlib
+import struct
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
-    build_tree, load_yaml_documents, validate_yaml_text,
+    build_tree, load_yaml_documents, validate_yaml_text, get_db,
 )
+
+CHUNK_SIZE = 16  # SS14 map chunks are 16x16 tiles
+
+def decode_tile_data(encoded_str):
+    """Decode SS14's base64+zlib compressed tile data into a 16x16 grid of tile IDs."""
+    try:
+        decoded = base64.b64decode(encoded_str)
+        decompressed = zlib.decompress(decoded)
+        grid = []
+        for y in range(CHUNK_SIZE):
+            row = []
+            for x in range(CHUNK_SIZE):
+                offset = (y * CHUNK_SIZE + x) * 2
+                if offset + 2 > len(decompressed):
+                    row.append(0)
+                else:
+                    tile_id = struct.unpack('<H', decompressed[offset:offset+2])[0]
+                    row.append(tile_id)
+            grid.append(row)
+        return grid
+    except Exception as e:
+        print(f"Tile decode error: {e}")
+        return [[0]*CHUNK_SIZE for _ in range(CHUNK_SIZE)]
 
 map_bp = Blueprint("map", __name__, url_prefix="/maps")
 
@@ -49,6 +75,75 @@ def map_view():
     docs = load_yaml_documents(file_path)
     _, parse_error = validate_yaml_text(raw_text)
 
+    # Process map data
+    tilemap = {}
+    grid_chunks = []
+    entities = []
+    proto_cache = {}
+
+    for doc in docs:
+        # Extract tilemap
+        if "tilemap" in doc and isinstance(doc["tilemap"], dict):
+            tilemap = {int(k): v for k, v in doc["tilemap"].items()}
+
+        # Extract grid chunks (from empty proto entity)
+        if doc.get("proto") == "":
+            for ent in doc.get("entities", []):
+                for comp in ent.get("components", []):
+                    if comp.get("type") == "MapGrid":
+                        chunks = comp.get("chunks", {})
+                        for chunk_key, chunk_data in chunks.items():
+                            try:
+                                chunk_x, chunk_y = map(int, chunk_key.split(","))
+                            except:
+                                continue
+                            encoded_tiles = chunk_data.get("tiles", "")
+                            decoded_tiles = decode_tile_data(encoded_tiles)
+                            grid_chunks.append({
+                                "chunk_x": chunk_x,
+                                "chunk_y": chunk_y,
+                                "tiles": decoded_tiles,
+                                "version": chunk_data.get("version", 0),
+                            })
+
+        # Extract entities with prototype info from DB
+        proto_name = doc.get("proto")
+        if proto_name and proto_name != "":
+            if proto_name not in proto_cache:
+                with get_db() as conn:
+                    row = conn.execute(
+                        "SELECT proto_id, type FROM prototype_ids WHERE proto_id = ? LIMIT 1",
+                        (proto_name,),
+                    ).fetchone()
+                    proto_cache[proto_name] = (
+                        {"id": row["proto_id"], "type": row["type"]}
+                        if row
+                        else {"id": proto_name, "type": "unknown"}
+                    )
+
+            for ent in doc.get("entities", []):
+                pos_x, pos_y = 0.0, 0.0
+                for comp in ent.get("components", []):
+                    if comp.get("type") == "Transform":
+                        pos = comp.get("pos", "0,0")
+                        if isinstance(pos, str):
+                            try:
+                                pos_x, pos_y = map(float, pos.split(","))
+                            except:
+                                pass
+                        elif isinstance(pos, dict):
+                            pos_x = pos.get("x", 0.0)
+                            pos_y = pos.get("y", 0.0)
+                        break
+
+                entities.append({
+                    "uid": ent.get("uid"),
+                    "proto": proto_name,
+                    "x": pos_x,
+                    "y": pos_y,
+                    "proto_type": proto_cache[proto_name]["type"],
+                })
+
     return render_template(
         "map_view.html",
         rel_file=rel_file,
@@ -56,4 +151,7 @@ def map_view():
         raw_text=raw_text,
         parse_ok=not parse_error,
         parse_error=parse_error,
+        tilemap=tilemap,
+        grid_chunks=grid_chunks,
+        entities=entities,
     )

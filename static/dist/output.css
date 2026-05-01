@@ -438,8 +438,8 @@
   .h-48 {
     height: calc(var(--spacing) * 48);
   }
-  .h-64 {
-    height: calc(var(--spacing) * 64);
+  .h-96 {
+    height: calc(var(--spacing) * 96);
   }
   .h-\[95vh\] {
     height: 95vh;
