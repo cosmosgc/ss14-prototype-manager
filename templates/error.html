@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Internal Server Error</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1e1e1e;
+            color: #ddd;
+            padding: 20px;
+        }
+        .error-box {
+            border: 1px solid #ff5555;
+            background: #2a1a1a;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .highlight {
+            color: #ff5555;
+            font-weight: bold;
+        }
+        .hint {
+            background: #1a2a1a;
+            border-left: 4px solid #50fa7b;
+            padding: 10px;
+            margin-top: 15px;
+        }
+        pre {
+            background: #111;
+            padding: 10px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>💥 Internal Server Error</h1>
+
+    <div class="error-box">
+        <strong>Type:</strong> <span class="highlight">{{ error_type }}</span><br>
+        <strong>Message:</strong> <span class="highlight">{{ error_message }}</span>
+    </div>
+
+    {% if "not defined" in error_message %}
+    <div class="hint">
+        ⚠️ <strong>Common cause:</strong><br>
+        You are using something that was never imported or declared.<br><br>
+
+        👉 Check:
+        <ul>
+            <li>Did you forget an <b>import</b>?</li>
+            <li>Is the function defined in another file?</li>
+            <li>Did you misspell the name?</li>
+        </ul>
+    </div>
+    {% endif %}
+
+    <h2>📜 Traceback</h2>
+    <pre>
+{{ traceback }}
+    </pre>
+
+</body>
+</html>

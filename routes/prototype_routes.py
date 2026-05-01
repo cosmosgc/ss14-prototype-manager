@@ -6,6 +6,7 @@ from app import (
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
     collect_audio_refs, collect_prototype_like_refs, build_sprite_cards,
     build_audio_cards, build_prototype_ref_cards, DEFAULT_THUMB_SCALE,
+    resolve_preview_for_prototype_id, collect_sprite_state_pairs, extract_prototypes,
 )
 
 prototype_bp = Blueprint("prototype", __name__, url_prefix="/prototypes")
@@ -66,6 +67,32 @@ def prototype_view():
     prototype_ref_cards = build_prototype_ref_cards(selected["name"], prototype_refs)
     _, parse_error = validate_yaml_text(raw_text)
 
+    # Extract all prototypes from the file
+    all_prototypes = []
+
+    for doc in docs:
+        for proto in extract_prototypes(doc):
+            proto_id = proto.get("id")
+            proto_type = proto.get("type")
+
+            if not proto_id:
+                continue
+
+            sprite, state = resolve_preview_for_prototype_id(
+                selected, proto_id
+            )
+
+            all_prototypes.append({
+                "id": proto_id,
+                "type": proto_type or "unknown",
+                "sprite": sprite,
+                "state": state,
+                "doc": proto
+            })
+    # Get all instances for transfer dropdown
+    from app import load_instances
+    all_instances = load_instances()
+
     return render_template(
         "prototype_view.html",
         rel_file=rel_file,
@@ -79,6 +106,8 @@ def prototype_view():
         prototype_ref_cards=prototype_ref_cards,
         parse_ok=not parse_error,
         parse_error=parse_error,
+        all_prototypes=all_prototypes,
+        all_instances=all_instances,
     )
 
 

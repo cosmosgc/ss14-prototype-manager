@@ -1592,8 +1592,15 @@ def create_app() -> Flask:
     @app.errorhandler(Exception)
     def handle_exception(e):
         import traceback
-        traceback.print_exc()
-        return "Internal Server Error", 500
+        tb = traceback.format_exc()
+
+        return render_template(
+            "error.html",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            traceback=tb,
+            highlight=str(e)  # we’ll use this to emphasize key parts
+        ), 500
 
     return app
 
