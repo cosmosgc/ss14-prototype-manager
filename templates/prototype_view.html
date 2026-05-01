@@ -176,8 +176,7 @@
                         class="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50">
                   <span x-text="isChecking ? 'Checking...' : 'Check Compatibility'"></span>
                 </button>
-                <button @click="transferPrototype('{{ proto.id }}', '{{ rel_file }}')"
-                        :disabled="!compatible || isTransferring"
+                  <button @click="transferPrototype('{{ proto.id }}', '{{ rel_file }}')" :disabled="!compatible || isTransferring"
                         class="rounded bg-emerald-600 px-2 py-1 text-xs text-white hover:bg-emerald-700 disabled:opacity-50">
                   <span x-text="isTransferring ? 'Transferring...' : 'Export to Instance'"></span>
                 </button>
@@ -288,7 +287,6 @@ function transferTool() {
         this.isChecking = false;
       }
     },
-
     async transferPrototype(protoId, relFile) {
       if (!this.targetInstance || !this.compatible) {
         alert("Please check compatibility first.");
@@ -304,22 +302,22 @@ function transferTool() {
       try {
         const formData = new FormData();
         formData.append("proto_id", protoId);
+        formData.append("rel_file", relFile);   // 🔥 NEW
         formData.append("target_instance", this.targetInstance);
 
-        const res = await fetch("/transfer/transfer", {
+        const res = await fetch("{{ url_for('transfer.transfer_prototype') }}", {
           method: "POST",
-          body: new URLSearchParams(formData)
+          body: formData
         });
 
-        if (res.ok) {
-          alert("Transfer completed successfully!");
-          window.location.reload();
-        } else {
-          alert("Transfer failed. Please try again.");
+        if (!res.ok) {
+          throw new Error("Transfer failed");
         }
-      } catch (error) {
-        console.error('Error transferring prototype:', error);
-        alert("Transfer failed. Please try again.");
+
+        window.location.reload();
+      } catch (err) {
+        console.error(err);
+        alert("Transfer failed.");
       } finally {
         this.isTransferring = false;
       }

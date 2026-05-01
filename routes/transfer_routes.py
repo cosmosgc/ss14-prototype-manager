@@ -122,14 +122,14 @@ def check_compatibility():
 
 @transfer_bp.route("/transfer", methods=["POST"])
 def transfer_prototype():
-    """Transfer a prototype to another instance"""
     from app import load_instances
 
     selected = selected_instance_or_400()
     proto_id = request.form.get("proto_id", "").strip()
+    rel_file = request.form.get("rel_file", "").strip()  # 🔥 NEW
     target_instance_name = request.form.get("target_instance", "").strip()
 
-    if not proto_id or not target_instance_name:
+    if not proto_id or not target_instance_name or not rel_file:
         flash("Missing parameters.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
@@ -141,22 +141,59 @@ def transfer_prototype():
         flash("Target instance not found.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # 🔹 Find source file
-    source_path = find_first_prototype_path_by_id(selected["name"], proto_id)
-    if not source_path:
-        flash(f"Prototype {proto_id} not found in source instance.", "error")
+    # 🔹 Use rel_file directly (NO MORE GUESSING)
+    source_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
+    source_file = safe_join(source_root, rel_file)
+
+    if not source_file or not source_file.exists():
+        flash("Source file not found.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    source_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
-    source_file = safe_join(source_root, source_path)
+    # 🔥 Read RAW text
+    try:
+        text = source_file.read_text(encoding="utf-8")
+    except Exception as e:
+        flash(f"Failed to read source file: {e}", "error")
+        return redirect(request.referrer or url_for("prototype.prototypes"))
+
+    # 🔹 Extract ONLY this prototype block
+    proto_block = extract_single_prototype_block(text, proto_id)
+
+    if not proto_block:
+        flash(f"Could not extract prototype {proto_id}", "error")
+        return redirect(request.referrer or url_for("prototype.prototypes"))
+
+    # 🔹 Prepare target file (same relative path)
+    target_root = Path(target_instance["root_path"]) / "Resources" / "Prototypes"
+    target_file = safe_join(target_root, rel_file)
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    existing_text = ""
+    if target_file.exists():
+        existing_text = target_file.read_text(encoding="utf-8")
+
+        # Prevent duplicate
+        import re
+        if re.search(rf"\bid:\s*{re.escape(proto_id)}\b", existing_text):
+            flash(f"{proto_id} already exists in target file.", "error")
+            return redirect(request.referrer or url_for("prototype.prototypes"))
+
+    # 🔹 Append safely
+    new_content = existing_text.strip()
+    if new_content:
+        new_content += "\n\n" + proto_block + "\n"
+    else:
+        new_content = proto_block + "\n"
 
     try:
-        docs = list(load_yaml_documents(source_file))
+        target_file.write_text(new_content, encoding="utf-8", newline="\n")
     except Exception as e:
-        flash(f"Failed to load source YAML: {str(e)}", "error")
+        flash(f"Failed to write file: {e}", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # 🔹 Extract prototype properly (SS14-safe)
+    # 🔹 Parse for asset extraction (ONLY for copying assets)
+    docs = load_yaml_documents(source_file)
+
     proto_doc = None
     for doc in docs:
         for proto in extract_prototypes(doc):
@@ -166,91 +203,8 @@ def transfer_prototype():
         if proto_doc:
             break
 
-    if proto_doc is None:
-        flash(f"Prototype {proto_id} not found in file.", "error")
-        return redirect(request.referrer or url_for("prototype.prototypes"))
-
-    # 🔹 Normalize ordering (VERY IMPORTANT)
-    def normalize_prototype(proto: dict) -> dict:
-        ordered = {}
-
-        for key in ["type", "parent", "id", "name", "description", "suffix", "components"]:
-            if key in proto:
-                ordered[key] = proto[key]
-
-        for k, v in proto.items():
-            if k not in ordered:
-                ordered[k] = v
-
-        # Normalize components
-        if "components" in ordered and isinstance(ordered["components"], list):
-            new_components = []
-            for comp in ordered["components"]:
-                if not isinstance(comp, dict):
-                    continue
-
-                comp_ordered = {}
-                if "type" in comp:
-                    comp_ordered["type"] = comp["type"]
-
-                for k, v in comp.items():
-                    if k != "type":
-                        comp_ordered[k] = v
-
-                new_components.append(comp_ordered)
-
-            ordered["components"] = new_components
-
-        return ordered
-
-    proto_doc = normalize_prototype(proto_doc)
-
-    # 🔹 Prepare target file
-    target_root = Path(target_instance["root_path"]) / "Resources" / "Prototypes"
-    target_file = safe_join(target_root, source_path)
-    target_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # 🔹 Load existing file content
-    if target_file.exists():
-        try:
-            existing_docs = list(load_yaml_documents(target_file))
-        except Exception:
-            existing_docs = []
-    else:
-        existing_docs = []
-
-    # 🔹 Normalize YAML structure
-    if len(existing_docs) == 1 and isinstance(existing_docs[0], list):
-        doc_list = existing_docs[0]
-    elif existing_docs:
-        doc_list = existing_docs
-    else:
-        doc_list = []
-
-    # 🔹 Check duplicate inside SAME FILE
-    if any(isinstance(d, dict) and d.get("id") == proto_id for d in doc_list):
-        flash(f"Prototype {proto_id} already exists in this file. Skipping.", "error")
-        return redirect(request.referrer or url_for("prototype.prototypes"))
-
-    # 🔹 Append prototype
-    doc_list.append(proto_doc)
-
-    # 🔹 Save file (preserve order!)
-    try:
-        with target_file.open("w", encoding="utf-8", newline="\n") as f:
-            yaml.dump(
-                doc_list,
-                f,
-                default_flow_style=False,
-                allow_unicode=True,
-                sort_keys=False  # 🔥 critical
-            )
-    except Exception as e:
-        flash(f"Failed to save to target: {str(e)}", "error")
-        return redirect(request.referrer or url_for("prototype.prototypes"))
-
-    # 🔹 Copy RSI files
-    sprite_refs = collect_sprite_refs(proto_doc)
+    # 🔹 Copy RSI
+    sprite_refs = collect_sprite_refs(proto_doc or {})
     source_textures = Path(selected["root_path"]) / "Resources" / "Textures"
     target_textures = Path(target_instance["root_path"]) / "Resources" / "Textures"
 
@@ -265,8 +219,8 @@ def transfer_prototype():
             shutil.copytree(src, dst)
             copied_sprites.append(sprite)
 
-    # 🔹 Copy audio files
-    audio_refs = collect_audio_refs(proto_doc)
+    # 🔹 Copy audio (same logic style)
+    audio_refs = collect_audio_refs(proto_doc or {})
     source_audio = Path(selected["root_path"]) / "Resources" / "Audio"
     target_audio = Path(target_instance["root_path"]) / "Resources" / "Audio"
 
@@ -277,10 +231,9 @@ def transfer_prototype():
         dst = safe_join(target_audio, rel)
 
         if src and src.exists():
-            if dst:
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
-                copied_audio.append(audio)
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+            copied_audio.append(audio)
 
     flash(
         f"Transferred {proto_id} → {target_instance_name}. "
@@ -289,8 +242,7 @@ def transfer_prototype():
     )
 
     return redirect(request.referrer or url_for("prototype.prototypes"))
-
-
+    
 @transfer_bp.route("/bulk-check")
 def bulk_check():
     """Check compatibility for all prototypes in a file"""
@@ -357,3 +309,27 @@ def bulk_check():
             })
 
     return jsonify({"prototypes": results})
+    
+def extract_single_prototype_block(text: str, proto_id: str) -> str | None:
+    lines = text.splitlines()
+
+    blocks = []
+    current_block = []
+
+    for line in lines:
+        # New block starts at "- " at column 0
+        if line.startswith("- "):
+            if current_block:
+                blocks.append("\n".join(current_block))
+                current_block = []
+        current_block.append(line)
+
+    if current_block:
+        blocks.append("\n".join(current_block))
+
+    # Find correct block
+    for block in blocks:
+        if f"id: {proto_id}" in block:
+            return block.strip()
+
+    return None
