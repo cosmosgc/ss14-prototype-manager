@@ -48,11 +48,19 @@
       <p class="mt-2 text-xs text-slate-500">Rendered from YAML map data</p>
     </section>
 
+    <section class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="font-semibold mb-2">Map Stats</h3>
+      <p class="text-xs text-slate-600">Tilemap entries: {{ tilemap | length }}</p>
+      <p class="text-xs text-slate-600">Grid chunks: {{ grid_chunks | length }}</p>
+      <p class="text-xs text-slate-600">Entities: {{ entities | length }}</p>
+    </section>
+
     <script type="application/json" id="map-data">
       {
         "tilemap": {{ tilemap | tojson }},
         "gridChunks": {{ grid_chunks | tojson }},
-        "entities": {{ entities | tojson }}
+        "entities": {{ entities | tojson }},
+        "decals": {{ decals | tojson }}
       }
     </script>
 </div>

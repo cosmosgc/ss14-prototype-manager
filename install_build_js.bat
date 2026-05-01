@@ -30,13 +30,6 @@ pause
   exit /b %errorlevel%
 )
 
-echo Building CSS with Tailwind...
-call npm run build:css
-if %errorlevel% neq 0 (
-  echo Tailwind build failed with error code %errorlevel%
-  pause
-  exit /b %errorlevel%
-)
 
 echo Building with Vite...
 call npm run build
@@ -46,5 +39,12 @@ if %errorlevel% neq 0 (
   exit /b %errorlevel%
 )
 
+echo Building CSS with Tailwind...
+call npm run build:css
+if %errorlevel% neq 0 (
+  echo Tailwind build failed with error code %errorlevel%
+  pause
+  exit /b %errorlevel%
+)
 echo Done! Output in static/dist/
 pause

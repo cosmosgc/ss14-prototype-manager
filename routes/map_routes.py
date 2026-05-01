@@ -14,7 +14,11 @@ CHUNK_SIZE = 16  # SS14 map chunks are 16x16 tiles
 def decode_tile_data(encoded_str):
     """Decode SS14's base64+zlib compressed tile data into a 16x16 grid of tile IDs."""
     try:
-        decoded = base64.b64decode(encoded_str)
+        # Clean the string - remove whitespace
+        cleaned = "".join(encoded_str.strip().split())
+        if not cleaned:
+            return [[0]*CHUNK_SIZE for _ in range(CHUNK_SIZE)]
+        decoded = base64.b64decode(cleaned)
         decompressed = zlib.decompress(decoded)
         grid = []
         for y in range(CHUNK_SIZE):
@@ -79,70 +83,133 @@ def map_view():
     tilemap = {}
     grid_chunks = []
     entities = []
+    decals = []
     proto_cache = {}
 
-    for doc in docs:
-        # Extract tilemap
-        if "tilemap" in doc and isinstance(doc["tilemap"], dict):
-            tilemap = {int(k): v for k, v in doc["tilemap"].items()}
+    for doc_idx, doc in enumerate(docs):
+        # Document can be a dict or a list
+        items = []
+        if isinstance(doc, list):
+            items = doc
+        elif isinstance(doc, dict):
+            items = [doc]
+        else:
+            continue
 
-        # Extract grid chunks (from empty proto entity)
-        if doc.get("proto") == "":
-            for ent in doc.get("entities", []):
-                for comp in ent.get("components", []):
-                    if comp.get("type") == "MapGrid":
-                        chunks = comp.get("chunks", {})
-                        for chunk_key, chunk_data in chunks.items():
-                            try:
-                                chunk_x, chunk_y = map(int, chunk_key.split(","))
-                            except:
-                                continue
-                            encoded_tiles = chunk_data.get("tiles", "")
-                            decoded_tiles = decode_tile_data(encoded_tiles)
-                            grid_chunks.append({
-                                "chunk_x": chunk_x,
-                                "chunk_y": chunk_y,
-                                "tiles": decoded_tiles,
-                                "version": chunk_data.get("version", 0),
-                            })
+        for item in items:
+            if not isinstance(item, dict):
+                continue
 
-        # Extract entities with prototype info from DB
-        proto_name = doc.get("proto")
-        if proto_name and proto_name != "":
-            if proto_name not in proto_cache:
-                with get_db() as conn:
-                    row = conn.execute(
-                        "SELECT proto_id, type FROM prototype_ids WHERE proto_id = ? LIMIT 1",
-                        (proto_name,),
-                    ).fetchone()
-                    proto_cache[proto_name] = (
-                        {"id": row["proto_id"], "type": row["type"]}
-                        if row
-                        else {"id": proto_name, "type": "unknown"}
-                    )
+            # Extract tilemap from top-level doc (first doc with tilemap)
+            if "tilemap" in item and isinstance(item["tilemap"], dict) and not tilemap:
+                tilemap = {int(k): v for k, v in item["tilemap"].items()}
 
-            for ent in doc.get("entities", []):
-                pos_x, pos_y = 0.0, 0.0
-                for comp in ent.get("components", []):
-                    if comp.get("type") == "Transform":
-                        pos = comp.get("pos", "0,0")
-                        if isinstance(pos, str):
-                            try:
-                                pos_x, pos_y = map(float, pos.split(","))
-                            except:
-                                pass
-                        elif isinstance(pos, dict):
-                            pos_x = pos.get("x", 0.0)
-                            pos_y = pos.get("y", 0.0)
-                        break
+            # Check proto
+            proto_name = item.get("proto", None)
 
-                entities.append({
-                    "uid": ent.get("uid"),
-                    "proto": proto_name,
-                    "x": pos_x,
-                    "y": pos_y,
-                    "proto_type": proto_cache[proto_name]["type"],
-                })
+            # If proto is empty string, this contains map grid and global components
+            if proto_name == "":
+                for ent in item.get("entities", []):
+                    if not isinstance(ent, dict):
+                        continue
+                    for comp in ent.get("components", []):
+                        if not isinstance(comp, dict):
+                            continue
+                        comp_type = comp.get("type", "")
+
+                        # MapGrid - extract chunks
+                        if comp_type == "MapGrid":
+                            chunks = comp.get("chunks", {})
+                            for chunk_key, chunk_data in chunks.items():
+                                try:
+                                    chunk_x, chunk_y = map(int, str(chunk_key).split(","))
+                                except:
+                                    continue
+                                encoded_tiles = chunk_data.get("tiles", "")
+                                decoded_tiles = decode_tile_data(encoded_tiles)
+                                grid_chunks.append({
+                                    "chunk_x": chunk_x,
+                                    "chunk_y": chunk_y,
+                                    "tiles": decoded_tiles,
+                                    "version": chunk_data.get("version", 0),
+                                })
+
+                        # DecalGrid - extract decals
+                        elif comp_type == "DecalGrid":
+                            chunk_collection = comp.get("chunkCollection", {})
+                            if not chunk_collection:
+                                chunk_collection = comp.get("chunkCollection", {})
+                            nodes = chunk_collection.get("nodes", [])
+                            for node in nodes:
+                                if not isinstance(node, dict):
+                                    continue
+                                decal_id = node.get("id", "")
+                                decal_color = node.get("color", "")
+                                decal_decals = node.get("decals", {})
+                                for tile_key, decal_list in decal_decals.items():
+                                    try:
+                                        dx, dy = map(int, str(tile_key).split(","))
+                                    except:
+                                        continue
+                                    for decal in (decal_list if isinstance(decal_list, list) else [decal_list]):
+                                        decals.append({
+                                            "x": dx,
+                                            "y": dy,
+                                            "id": decal_id,
+                                            "color": decal_color,
+                                        })
+
+            # If proto is a non-empty string, this is an entity entry
+            elif proto_name and isinstance(proto_name, str):
+                if proto_name not in proto_cache:
+                    with get_db() as conn:
+                        row = conn.execute(
+                            "SELECT proto_id, type FROM prototype_ids WHERE proto_id = ? LIMIT 1",
+                            (proto_name,),
+                        ).fetchone()
+                        if row:
+                            proto_cache[proto_name] = {"id": row["proto_id"], "type": row["type"]}
+                        else:
+                            proto_cache[proto_name] = {"id": proto_name, "type": "unknown"}
+
+                for ent in item.get("entities", []):
+                    if not isinstance(ent, dict):
+                        continue
+                    uid = ent.get("uid")
+                    pos_x, pos_y = 0.0, 0.0
+                    ent_name = ""
+                    missing_components = ent.get("missingComponents", [])
+
+                    for comp in ent.get("components", []):
+                        if not isinstance(comp, dict):
+                            continue
+                        comp_type = comp.get("type", "")
+
+                        if comp_type == "Transform":
+                            pos = comp.get("pos", "0,0")
+                            if isinstance(pos, str):
+                                try:
+                                    parts = pos.split(",")
+                                    pos_x, pos_y = float(parts[0]), float(parts[1])
+                                except:
+                                    pass
+                            elif isinstance(pos, dict):
+                                pos_x = float(comp.get("x", comp.get("pos", {}).get("x", 0.0)))
+                                pos_y = float(comp.get("y", comp.get("pos", {}).get("y", 0.0)))
+                            break
+
+                        elif comp_type == "MetaData":
+                            ent_name = comp.get("name", "")
+
+                    entities.append({
+                        "uid": uid,
+                        "proto": proto_name,
+                        "name": ent_name,
+                        "x": pos_x,
+                        "y": pos_y,
+                        "proto_type": proto_cache[proto_name]["type"],
+                        "missing_components": missing_components,
+                    })
 
     return render_template(
         "map_view.html",
@@ -154,4 +221,5 @@ def map_view():
         tilemap=tilemap,
         grid_chunks=grid_chunks,
         entities=entities,
+        decals=decals,
     )
