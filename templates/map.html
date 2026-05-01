@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Maps | SS14 Prototype Manager{% endblock %}
+{% macro render_tree(nodes, depth=0) %}
+  <ul class="{{ 'ml-4 border-l border-slate-200 pl-3' if depth > 0 else '' }} space-y-1">
+    {% for node in nodes %}
+      {% if node.type == 'dir' %}
+        <li data-dir-node>
+          <details>
+            <summary class="cursor-pointer list-none text-sm font-semibold text-slate-700 hover:text-slate-900">
+              {{ node.name }}
+            </summary>
+            <div data-dir-children class="mt-1">
+            {{ render_tree(node.children, depth + 1) }}
+            </div>
+          </details>
+        </li>
+      {% else %}
+        <li data-file-node data-file-path="{{ node.path | lower }}" class="group relative flex items-center justify-between rounded px-2 py-1 hover:bg-slate-100">
+          <div class="min-w-0">
+            <a class="font-mono text-xs text-sky-700 hover:underline" href="{{ url_for('map.map_view', file=node.path) }}">{{ node.name }}</a>
+            <p class="truncate font-mono text-[10px] text-slate-500">{{ node.path }}</p>
+          </div>
+        </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+{% endmacro %}
+{% block content %}
+<div class="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold">Map Tree</h1>
+    <p class="text-sm text-slate-600">{{ selected.name }} - {{ selected.root_path }}</p>
+  </div>
+  <a href="{{ url_for('instance.index') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+</div>
+
+<div class="mb-4">
+  <input
+    id="tree-filter"
+    value=""
+    placeholder="Filter by file path..."
+    class="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+    oninput="filterMapTree()"
+  >
+</div>
+
+<section id="map-tree" class="rounded-xl border border-slate-200 bg-white p-4">
+  {{ render_tree(tree) }}
+</section>
+<script>
+function filterMapTree() {
+  const input = document.getElementById("tree-filter");
+  const tree = document.getElementById("map-tree");
+  if (!input || !tree) return;
+
+  const q = input.value.trim().toLowerCase();
+  const fileNodes = Array.from(tree.querySelectorAll("[data-file-node]"));
+  const dirNodes = Array.from(tree.querySelectorAll("[data-dir-node]"));
+
+  for (const fileNode of fileNodes) {
+    const path = fileNode.getAttribute("data-file-path") || "";
+    const match = !q || path.includes(q);
+    fileNode.hidden = !match;
+  }
+
+  for (let i = dirNodes.length - 1; i >= 0; i--) {
+    const dirNode = dirNodes[i];
+    const details = dirNode.querySelector(":scope > details");
+    const children = dirNode.querySelector(":scope > details > [data-dir-children]");
+    if (!details || !children) continue;
+
+    const hasVisible = children.querySelector("[data-file-node]:not([hidden]), [data-dir-node]:not([hidden])") !== null;
+    dirNode.hidden = !hasVisible;
+
+    if (q && hasVisible) {
+      details.open = true;
+    }
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Map Detail | SS14 Prototype Manager{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold">Map Detail</h1>
+    <p class="font-mono text-xs text-slate-600">{{ rel_file }}</p>
+  </div>
+  <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+    <a
+      href="{{ url_for('api.open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
+      class="w-full sm:w-auto rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 text-center"
+    >Open YML in VS Code</a>
+    <a
+      href="{{ url_for('api.open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
+      class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center"
+    >Open YML in Explorer</a>
+    <a href="{{ url_for('map.maps') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+  </div>
+</div>
+
+{% if parse_error %}
+  <div class="mb-4 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+    YAML parse error: {{ parse_error }}
+  </div>
+{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="rounded-xl border border-slate-200 bg-white p-4 lg:col-span-2">
+    <h2 class="mb-2 text-lg font-semibold">Edit YAML</h2>
+    <div x-data="yamlEditor()">
+      <div class="mb-2 flex flex-wrap gap-2">
+        <button type="button" @click="indentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Indent +2</button>
+        <button type="button" @click="outdentSelection()" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Outdent -2</button>
+      </div>
+      <form method="post" action="{{ url_for('map.map_view', file=rel_file) }}">
+        <div class="flex overflow-hidden rounded border border-slate-300 bg-slate-50">
+          <pre x-ref="gutter" class="w-14 select-none overflow-hidden border-r border-slate-200 bg-slate-100 p-3 text-right font-mono text-xs text-slate-500"></pre>
+          <textarea
+            x-ref="editor"
+            @input="syncGutter()"
+            @scroll="syncScroll()"
+            @keydown.tab.prevent="tabIndent($event)"
+            name="content"
+            class="min-h-[60vh] w-full resize-y bg-slate-50 p-3 font-mono text-xs text-slate-900"
+          >{{ raw_text }}</textarea>
+        </div>
+        <button class="mt-3 rounded bg-emerald-600 px-3 py-2 text-sm text-white hover:bg-emerald-700">Save</button>
+      </form>
+    </div>
+  </section>
+
+  <aside class="space-y-4">
+    <section x-data="{ open: true }" class="rounded-xl border border-slate-200 bg-white p-4">
+      <button @click="open = !open" class="flex w-full items-center justify-between">
+        <h3 class="font-semibold">Map Info</h3>
+        <span class="text-xs text-slate-500" x-text="open ? 'Hide' : 'Show'"></span>
+      </button>
+      <div x-show="open" class="mt-3 space-y-2">
+        <p class="text-xs text-slate-600">Documents: {{ docs | length }}</p>
+        <p class="text-xs {{ 'text-emerald-700' if parse_ok else 'text-rose-700' }}">
+          {{ 'Valid YAML' if parse_ok else 'Invalid YAML' }}
+        </p>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script>
+function yamlEditor() {
+  return {
+    init() { this.syncGutter(); },
+    syncGutter() {
+      const editor = this.$refs.editor;
+      const gutter = this.$refs.gutter;
+      const lines = editor.value.split("\n").length;
+      let text = "";
+      for (let i = 1; i <= lines; i++) text += i + "\n";
+      gutter.textContent = text;
+      this.syncScroll();
+    },
+    syncScroll() { this.$refs.gutter.scrollTop = this.$refs.editor.scrollTop; },
+    tabIndent(evt) {
+      const editor = this.$refs.editor;
+      const start = editor.selectionStart;
+      if (start === editor.selectionEnd) {
+        editor.value = editor.value.slice(0, start) + "  " + editor.value.slice(start);
+        editor.selectionStart = editor.selectionEnd = start + 2;
+      } else this.indentSelection();
+      this.syncGutter();
+    },
+    indentSelection() { this.modifySelection("indent"); },
+    outdentSelection() { this.modifySelection("outdent"); },
+    modifySelection(mode) {
+      const editor = this.$refs.editor;
+      const value = editor.value;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const lineEndIdx = value.indexOf("\n", end);
+      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+      const block = value.slice(lineStart, lineEnd);
+      const lines = block.split("\n");
+      const updated = lines.map(line => {
+        if (mode === "indent") return "  " + line;
+        if (line.startsWith("  ")) return line.slice(2);
+        if (line.startsWith("\t")) return line.slice(1);
+        return line;
+      }).join("\n");
+      editor.value = value.slice(0, lineStart) + updated + value.slice(lineEnd);
+      editor.selectionStart = lineStart;
+      editor.selectionEnd = lineStart + updated.length;
+      this.syncGutter();
+    }
+  };
+}
+</script>
+{% endblock %}
