@@ -133,26 +133,22 @@ def transfer_prototype():
         flash("Missing parameters.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
+    # 🔹 Find target instance
     instances = load_instances()
-    target_instance = None
-    for inst in instances:
-        if inst["name"] == target_instance_name:
-            target_instance = inst
-            break
+    target_instance = next((i for i in instances if i["name"] == target_instance_name), None)
 
     if not target_instance:
         flash("Target instance not found.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # Get source prototype
+    # 🔹 Find source file
     source_path = find_first_prototype_path_by_id(selected["name"], proto_id)
     if not source_path:
         flash(f"Prototype {proto_id} not found in source instance.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # Load source file
-    source_proto_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
-    source_file = safe_join(source_proto_root, source_path)
+    source_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
+    source_file = safe_join(source_root, source_path)
 
     try:
         docs = list(load_yaml_documents(source_file))
@@ -160,94 +156,138 @@ def transfer_prototype():
         flash(f"Failed to load source YAML: {str(e)}", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # Find the prototype to transfer
+    # 🔹 Extract prototype properly (SS14-safe)
     proto_doc = None
-    proto_index = -1
-    for i, doc in enumerate(docs):
-        if isinstance(doc, dict) and doc.get("id") == proto_id:
-            proto_doc = doc
-            proto_index = i
+    for doc in docs:
+        for proto in extract_prototypes(doc):
+            if proto.get("id") == proto_id:
+                proto_doc = proto
+                break
+        if proto_doc:
             break
 
     if proto_doc is None:
         flash(f"Prototype {proto_id} not found in file.", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # Determine target file path (same relative path)
-    target_proto_root = Path(target_instance["root_path"]) / "Resources" / "Prototypes"
-    target_file = safe_join(target_proto_root, source_path)
+    # 🔹 Normalize ordering (VERY IMPORTANT)
+    def normalize_prototype(proto: dict) -> dict:
+        ordered = {}
+
+        for key in ["type", "parent", "id", "name", "description", "suffix", "components"]:
+            if key in proto:
+                ordered[key] = proto[key]
+
+        for k, v in proto.items():
+            if k not in ordered:
+                ordered[k] = v
+
+        # Normalize components
+        if "components" in ordered and isinstance(ordered["components"], list):
+            new_components = []
+            for comp in ordered["components"]:
+                if not isinstance(comp, dict):
+                    continue
+
+                comp_ordered = {}
+                if "type" in comp:
+                    comp_ordered["type"] = comp["type"]
+
+                for k, v in comp.items():
+                    if k != "type":
+                        comp_ordered[k] = v
+
+                new_components.append(comp_ordered)
+
+            ordered["components"] = new_components
+
+        return ordered
+
+    proto_doc = normalize_prototype(proto_doc)
+
+    # 🔹 Prepare target file
+    target_root = Path(target_instance["root_path"]) / "Resources" / "Prototypes"
+    target_file = safe_join(target_root, source_path)
     target_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Check if prototype already exists in target and remove it (for update)
-    existing_target_path = find_first_prototype_path_by_id(target_instance["name"], proto_id)
-    if existing_target_path:
-        # Remove from existing file
-        try:
-            existing_file = safe_join(target_proto_root, existing_target_path)
-            existing_docs = list(load_yaml_documents(existing_file))
-            existing_docs = [d for d in existing_docs if not (isinstance(d, dict) and d.get("id") == proto_id)]
-            with existing_file.open("w", encoding="utf-8", newline="\n") as f:
-                yaml.dump_all(existing_docs, f, default_flow_style=False, allow_unicode=True)
-        except Exception as e:
-            flash(f"Warning: Failed to remove existing prototype: {str(e)}", "error")
-
-    # Add prototype to target file
+    # 🔹 Load existing file content
     if target_file.exists():
         try:
-            target_docs = list(load_yaml_documents(target_file))
+            existing_docs = list(load_yaml_documents(target_file))
         except Exception:
-            target_docs = []
+            existing_docs = []
     else:
-        target_docs = []
+        existing_docs = []
 
-    target_docs.append(proto_doc)
+    # 🔹 Normalize YAML structure
+    if len(existing_docs) == 1 and isinstance(existing_docs[0], list):
+        doc_list = existing_docs[0]
+    elif existing_docs:
+        doc_list = existing_docs
+    else:
+        doc_list = []
 
-    # Save to target file
+    # 🔹 Check duplicate inside SAME FILE
+    if any(isinstance(d, dict) and d.get("id") == proto_id for d in doc_list):
+        flash(f"Prototype {proto_id} already exists in this file. Skipping.", "error")
+        return redirect(request.referrer or url_for("prototype.prototypes"))
+
+    # 🔹 Append prototype
+    doc_list.append(proto_doc)
+
+    # 🔹 Save file (preserve order!)
     try:
         with target_file.open("w", encoding="utf-8", newline="\n") as f:
-            yaml.dump_all(target_docs, f, default_flow_style=False, allow_unicode=True)
+            yaml.dump(
+                doc_list,
+                f,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False  # 🔥 critical
+            )
     except Exception as e:
         flash(f"Failed to save to target: {str(e)}", "error")
         return redirect(request.referrer or url_for("prototype.prototypes"))
 
-    # Copy missing RSI files
+    # 🔹 Copy RSI files
     sprite_refs = collect_sprite_refs(proto_doc)
-    source_textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
-    target_textures_root = Path(target_instance["root_path"]) / "Resources" / "Textures"
+    source_textures = Path(selected["root_path"]) / "Resources" / "Textures"
+    target_textures = Path(target_instance["root_path"]) / "Resources" / "Textures"
 
     copied_sprites = []
     for sprite in sprite_refs:
-        source_rsi = safe_join(source_textures_root, sprite)
-        target_rsi = safe_join(target_textures_root, sprite)
+        src = safe_join(source_textures, sprite)
+        dst = safe_join(target_textures, sprite)
 
-        if source_rsi and source_rsi.exists() and source_rsi.is_dir():
-            if target_rsi.exists():
-                shutil.rmtree(target_rsi)
-            shutil.copytree(source_rsi, target_rsi)
+        if src and src.exists() and src.is_dir():
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
             copied_sprites.append(sprite)
 
-    # Copy missing audio files
+    # 🔹 Copy audio files
     audio_refs = collect_audio_refs(proto_doc)
-    source_audio_root = Path(selected["root_path"]) / "Resources" / "Audio"
-    target_audio_root = Path(target_instance["root_path"]) / "Resources" / "Audio"
+    source_audio = Path(selected["root_path"]) / "Resources" / "Audio"
+    target_audio = Path(target_instance["root_path"]) / "Resources" / "Audio"
 
     copied_audio = []
     for audio in audio_refs:
-        audio_rel = audio.removeprefix("/Audio/")
-        source_audio = safe_join(source_audio_root, audio_rel)
-        target_audio = safe_join(target_audio_root, audio_rel)
+        rel = audio.removeprefix("/Audio/")
+        src = safe_join(source_audio, rel)
+        dst = safe_join(target_audio, rel)
 
-        if source_audio and source_audio.exists():
-            if target_audio:
-                target_audio.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_audio, target_audio)
+        if src and src.exists():
+            if dst:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
                 copied_audio.append(audio)
 
-    # Re-scan target instance
-    from app import scan_instance_ids
-    scan_instance_ids(target_instance["name"], target_instance["root_path"])
+    flash(
+        f"Transferred {proto_id} → {target_instance_name}. "
+        f"{len(copied_sprites)} RSI, {len(copied_audio)} audio copied.",
+        "success"
+    )
 
-    flash(f"Successfully transferred {proto_id} to {target_instance_name}. Copied {len(copied_sprites)} RSI(s) and {len(copied_audio)} audio file(s).", "success")
     return redirect(request.referrer or url_for("prototype.prototypes"))
 
 

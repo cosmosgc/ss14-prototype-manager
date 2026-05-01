@@ -238,7 +238,7 @@ def create_prototype():
                 f.write(yaml_str)
         
         # Re-scan instance to update DB
-        scan_instance_ids(selected["name"], selected["root_path"])
+        # scan_instance_ids(selected["name"], selected["root_path"])
         
         flash(f"Prototype {data['id']} created successfully.", "success")
         return redirect(url_for("prototype_creator.edit_prototype", proto_id=data["id"]))
@@ -285,7 +285,7 @@ def edit_prototype(proto_id):
         
         # Save updated prototype
         if update_prototype_in_yaml(file_path, proto_id, proto):
-            scan_instance_ids(selected["name"], selected["root_path"])
+            # scan_instance_ids(selected["name"], selected["root_path"])
             flash(f"Prototype {proto_id} updated.", "success")
         else:
             flash("Failed to update prototype.", "error")
