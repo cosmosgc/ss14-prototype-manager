@@ -17,21 +17,7 @@ if %errorlevel% neq 0 (
   exit /b %errorlevel%
 )
 
-echo Building CSS and JS...
-call npm run build
-if %errorlevel% neq 0 (
-  echo Build failed with error code %errorlevel%
-  pause
-  exit /b %errorlevel%
-)
-
-echo Done! Output in static/dist/ (CSS + JS)
-pause
-  exit /b %errorlevel%
-)
-
-
-echo Building with Vite...
+echo Building JS (Vite)...
 call npm run build
 if %errorlevel% neq 0 (
   echo Vite build failed with error code %errorlevel%
@@ -39,12 +25,13 @@ if %errorlevel% neq 0 (
   exit /b %errorlevel%
 )
 
-echo Building CSS with Tailwind...
+echo Building CSS (Tailwind)...
 call npm run build:css
 if %errorlevel% neq 0 (
   echo Tailwind build failed with error code %errorlevel%
   pause
   exit /b %errorlevel%
 )
+
 echo Done! Output in static/dist/
 pause

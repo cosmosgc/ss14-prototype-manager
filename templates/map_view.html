@@ -43,7 +43,15 @@
     </section>
 
     <section class="rounded-xl border border-slate-200 bg-white p-4">
-      <h3 class="font-semibold mb-2">Map Viewer</h3>
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold">Map Viewer</h3>
+        <div class="flex gap-2">
+          <a href="/maps/api/preview?cache={{ cache_key }}" target="_blank" 
+             class="px-3 py-1 text-xs rounded border border-slate-300 hover:bg-slate-50">
+            View Full Preview
+          </a>
+        </div>
+      </div>
       <div id="map" class="w-full h-96 rounded border border-slate-200"></div>
       <p class="mt-2 text-xs text-slate-500">Rendered from YAML map data</p>
     </section>
@@ -60,7 +68,7 @@
         "tilemap": {{ tilemap | tojson }},
         "gridChunks": {{ grid_chunks | tojson }},
         "entities": {{ entities | tojson }},
-        "decals": {{ decals | tojson }}
+        "cacheKey": "{{ cache_key }}"
       }
     </script>
 </div>

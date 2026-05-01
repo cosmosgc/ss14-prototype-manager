@@ -1,15 +1,17 @@
 import Map from 'ol/Map';
 import View from 'ol/View';
+import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
+import TileImage from 'ol/source/TileImage';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
-import Polygon from 'ol/geom/Polygon';
 import Style from 'ol/style/Style';
 import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 import Text from 'ol/style/Text';
 import CircleStyle from 'ol/style/Circle';
+import { getCenter } from 'ol/extent';
 import 'ol/ol.css';
 
 const mapDataTag = document.getElementById('map-data');
@@ -19,115 +21,65 @@ if (!mapDataTag) {
 }
 
 const mapData = JSON.parse(mapDataTag.textContent);
-const { tilemap = {}, gridChunks = [], entities = [] } = mapData;
+const { tilemap = {}, gridChunks = [], entities = [], cacheKey = '' } = mapData;
 const CHUNK_SIZE = 16;
-
 
 console.log('Map data loaded:', {
   tilemapKeys: Object.keys(tilemap).length,
   gridChunks: gridChunks.length,
-  entities: entities.length
+  entities: entities.length,
+  cacheKey: cacheKey
 });
 
-const tileSource = new VectorSource();
 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 let hasData = false;
 
-// 🔥 Fallback: no chunks → generate fake tiles
-if (!gridChunks.length && Object.keys(tilemap).length) {
-  console.warn("No grid chunks found, generating fallback map");
-
-  let i = 0;
-  const size = 10; // 10x10 grid
-
-  Object.entries(tilemap).forEach(([tileId, tileName]) => {
-    const x = i % size;
-    const y = Math.floor(i / size);
-
-    const rect = new Polygon([[
-      [x, y],
-      [x + 1, y],
-      [x + 1, y + 1],
-      [x, y + 1],
-      [x, y]
-    ]]);
-
-    const feature = new Feature({ geometry: rect });
-
-    // 🔥 generate unique color per tile
-    const hue = (i * 137) % 360;
-    const color = `hsla(${hue}, 70%, 60%, 0.8)`;
-
-    feature.setStyle(new Style({
-      fill: new Fill({ color }),
-      stroke: new Stroke({ color: '#000', width: 0.5 }),
-      text: new Text({
-        text: tileName,
-        font: '10px sans-serif',
-        fill: new Fill({ color: '#000' })
-      })
-    }));
-
-    tileSource.addFeature(feature);
-    i++;
-  });
-}
-
+// Calculate bounds from grid chunks
 gridChunks.forEach(chunk => {
-  const chunkX = chunk.chunk_x;
-  const chunkY = chunk.chunk_y;
-  const tiles = chunk.tiles || [];
-
-  const left = chunkX * CHUNK_SIZE;
-  const bottom = chunkY * CHUNK_SIZE;
+  const cx = chunk.x !== undefined ? chunk.x : chunk.chunk_x;
+  const cy = chunk.y !== undefined ? chunk.y : chunk.chunk_y;
+  const left = cx * CHUNK_SIZE;
+  const bottom = cy * CHUNK_SIZE;
   minX = Math.min(minX, left);
   minY = Math.min(minY, bottom);
   maxX = Math.max(maxX, left + CHUNK_SIZE);
   maxY = Math.max(maxY, bottom + CHUNK_SIZE);
   hasData = true;
+});
 
-  for (let tileY = 0; tileY < CHUNK_SIZE; tileY++) {
-    for (let tileX = 0; tileX < CHUNK_SIZE; tileX++) {
-      const tileId = (tiles[tileY] && tiles[tileY][tileX] != null) ? tiles[tileY][tileX] : 0;
-      const tileName = tilemap[tileId] || `Tile ${tileId}`;
-      const worldX = chunkX * CHUNK_SIZE + tileX;
-      const worldY = chunkY * CHUNK_SIZE + tileY;
+entities.forEach(ent => {
+  minX = Math.min(minX, ent.x);
+  minY = Math.min(minY, ent.y);
+  maxX = Math.max(maxX, ent.x);
+  maxY = Math.max(maxY, ent.y);
+  hasData = true;
+});
 
-      const rect = new Polygon([[
-        [worldX, worldY],
-        [worldX + 1, worldY],
-        [worldX + 1, worldY + 1],
-        [worldX, worldY + 1],
-        [worldX, worldY]
-      ]]);
+console.log(`Bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
 
-      const feature = new Feature({ geometry: rect });
-      feature.set('tileName', tileName);
-      feature.set('tileId', tileId);
+// Create tile source using cached PNG tiles
+// Map chunk coordinates to tile URLs
+const chunkLookup = {};
+gridChunks.forEach(chunk => {
+  const cx = chunk.x !== undefined ? chunk.x : chunk.chunk_x;
+  const cy = chunk.y !== undefined ? chunk.y : chunk.chunk_y;
+  chunkLookup[`${cx},${cy}`] = true;
+});
 
-      let fillColor = 'rgba(200,200,200,0.5)';
-      if (tileName === 'Space') fillColor = 'rgba(0,0,20,0.8)';
-      else if (tileName === 'Plating') fillColor = 'rgba(150,150,150,0.7)';
-      else if (tileName === 'FloorGrass') fillColor = 'rgba(50,150,50,0.7)';
-      else if (tileName.toLowerCase().includes('wall')) fillColor = 'rgba(100,100,100,0.7)';
-      else if (tileName.includes('Shuttle')) fillColor = 'rgba(65,105,225,0.7)';
-
-      feature.setStyle(new Style({
-        fill: new Fill({ color: fillColor }),
-        stroke: new Stroke({ color: 'rgba(0,0,0,0.2)', width: 0.5 }),
-        text: new Text({
-          text: tileName.length > 10 ? '' : tileName,
-          font: '8px sans-serif',
-          fill: new Fill({ color: '#fff' }),
-          stroke: new Stroke({ color: '#000', width: 0.5 })
-        })
-      }));
-
-      tileSource.addFeature(feature);
-    }
+const tileSource = new TileImage({
+  tileUrlFunction: (tileCoord) => {
+    const z = tileCoord[0];
+    const x = tileCoord[1];
+    const y = tileCoord[2];
+    
+    // For simplicity, assume tile coords match chunk coords at zoom 0
+    // In production, you'd want a proper tile grid
+    const url = `/maps/api/tiles/${cacheKey}/${x}_${y}`;
+    return url;
   }
 });
 
+// Entity layer
 const entitySource = new VectorSource();
 
 entities.forEach(ent => {
@@ -136,12 +88,6 @@ entities.forEach(ent => {
   const proto = ent.proto || 'unknown';
   const entName = ent.name || proto;
 
-  minX = Math.min(minX, x);
-  minY = Math.min(minY, y);
-  maxX = Math.max(maxX, x);
-  maxY = Math.max(maxY, y);
-  hasData = true;
-
   const point = new Point([x, y]);
   const feature = new Feature({ geometry: point });
   feature.set('proto', proto);
@@ -149,15 +95,15 @@ entities.forEach(ent => {
   feature.set('name', entName);
   feature.set('uid', ent.uid);
 
-  let color = 'rgba(255,50,50,0.8)';
+  let color = 'rgba(255, 50, 50, 0.8)';
   const protoLower = proto.toLowerCase();
-  if (protoLower.includes('wall')) color = 'rgba(100,100,100,0.8)';
-  else if (protoLower.includes('door') || protoLower.includes('airlock')) color = 'rgba(0,150,200,0.8)';
-  else if (protoLower.includes('cable')) color = 'rgba(255,200,0,0.8)';
-  else if (protoLower.includes('apc') || protoLower.includes('power')) color = 'rgba(200,200,0,0.8)';
-  else if (protoLower.includes('thruster')) color = 'rgba(255,100,0,0.8)';
-  else if (protoLower.includes('seat') || protoLower.includes('chair')) color = 'rgba(150,100,50,0.8)';
-  else if (protoLower.includes('light')) color = 'rgba(255,255,100,0.8)';
+  if (protoLower.includes('wall')) color = 'rgba(100, 100, 100, 0.8)';
+  else if (protoLower.includes('door') || protoLower.includes('airlock')) color = 'rgba(0, 150, 200, 0.8)';
+  else if (protoLower.includes('cable')) color = 'rgba(255, 200, 0, 0.8)';
+  else if (protoLower.includes('apc') || protoLower.includes('power')) color = 'rgba(200, 200, 0, 0.8)';
+  else if (protoLower.includes('thruster')) color = 'rgba(255, 100, 0, 0.8)';
+  else if (protoLower.includes('seat') || protoLower.includes('chair')) color = 'rgba(150, 100, 50, 0.8)';
+  else if (protoLower.includes('light')) color = 'rgba(255, 255, 100, 0.8)';
 
   feature.setStyle(new Style({
     image: new CircleStyle({
@@ -177,18 +123,20 @@ entities.forEach(ent => {
   entitySource.addFeature(feature);
 });
 
+// Create map
 const map = new Map({
   target: 'map',
   layers: [
-    new VectorLayer({ source: tileSource, zIndex: 1 }),
+    new TileLayer({ source: tileSource, zIndex: 1 }),
     new VectorLayer({ source: entitySource, zIndex: 3 })
   ],
   view: new View({
-    center: [0, 0],
+    center: [(minX + maxX) / 2, (minY + maxY) / 2],
     zoom: 2
   })
 });
 
+// Fit to extent if valid
 if (hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
   try {
     map.getView().fit([minX, minY, maxX, maxY], { padding: [50, 50, 50, 50] });
@@ -200,4 +148,4 @@ if (hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(ma
   console.warn('No valid map data to fit. Using default view.');
 }
 
-console.log(`Map rendered: ${gridChunks.length} chunks, ${entities.length} entities`);
+console.log(`Map rendered: ${gridChunks.length} chunk tiles, ${entities.length} entities`);
