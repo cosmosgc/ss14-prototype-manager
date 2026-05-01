@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Manage RSI Files{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto">
+  <h1 class="text-2xl font-bold mb-4">RSI File Manager</h1>
+  
+  <!-- Upload/Create RSI -->
+  <div class="bg-white p-6 rounded border mb-6">
+    <h2 class="text-lg font-semibold mb-3">Upload or Create RSI</h2>
+    <form method="POST" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">RSI Path (relative to Textures/{{ custom_dir or '' }})</label>
+        <input type="text" name="rsi_path" placeholder="Clothing/Neck/Cloaks/mycloak.rsi" 
+               class="w-full border rounded px-3 py-2 text-sm" required>
+        <p class="text-xs text-slate-500 mt-1">Will be created in custom directory if it doesn't exist</p>
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">meta.json (optional)</label>
+        <input type="file" name="meta_json" accept=".json" class="text-sm">
+      </div>
+      
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">PNG Files (optional)</label>
+        <input type="file" name="png_files" accept=".png" multiple class="text-sm">
+      </div>
+      
+      <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded text-sm hover:bg-sky-700">
+        Save RSI
+      </button>
+    </form>
+  </div>
+  
+  <!-- Existing RSIs -->
+  <div class="bg-white p-6 rounded border">
+    <h2 class="text-lg font-semibold mb-3">Existing RSIs in Custom Directory</h2>
+    {% if rsis %}
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+        {% for rsi in rsis %}
+          <a href="{{ url_for('rsi.rsi_view', sprite=rsi) }}" 
+             class="p-2 border rounded hover:bg-slate-50 text-sm">
+            {{ rsi }}
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-slate-500">No RSI files found in custom directory.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

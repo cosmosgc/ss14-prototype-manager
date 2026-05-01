@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Create Prototype{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <h1 class="text-2xl font-bold mb-4">Create New {{ template.name }} Prototype</h1>
+  
+  <form method="POST" class="bg-white p-6 rounded border space-y-4">
+    {% for field in template.fields %}
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">
+          {{ field.label }}
+          {% if field.required %}<span class="text-red-500">*</span>{% endif %}
+        </label>
+        
+        {% if field.type == "textarea" %}
+          <textarea name="{{ field.name }}" 
+                    class="w-full border rounded px-3 py-2 text-sm"
+                    rows="3"
+                    {% if field.required %}required{% endif %}
+                    placeholder="{{ field.placeholder or '' }}">{{ request.form.get(field.name) or '' }}</textarea>
+        
+        {% elif field.type == "checkbox" %}
+          <input type="checkbox" name="{{ field.name }}" 
+                 class="h-4 w-4 text-sky-600"
+                 {% if request.form.get(field.name) == "on" or field.default %}checked{% endif %}>
+        
+        {% else %}
+          <input type="text" name="{{ field.name }}" 
+                 class="w-full border rounded px-3 py-2 text-sm"
+                 value="{{ request.form.get(field.name) or field.default or '' }}"
+                 {% if field.required %}required{% endif %}
+                 placeholder="{{ field.placeholder or '' }}">
+        {% endif %}
+      </div>
+    {% endfor %}
+    
+    <!-- Target File Selection -->
+    <div class="border-t pt-4">
+      <h3 class="font-medium text-slate-700 mb-2">Target YAML File</h3>
+      <div class="space-y-2">
+        <div>
+          <input type="radio" name="file_option" value="default" checked 
+                 id="default_file" class="mr-2">
+          <label for="default_file" class="text-sm">
+            Default: {{ template.default_filename }} in {{ template.target_dir }}
+          </label>
+        </div>
+        <div>
+          <input type="radio" name="file_option" value="new" id="new_file" class="mr-2">
+          <label for="new_file" class="text-sm">New file:</label>
+          <input type="text" name="new_filename" placeholder="filename.yml" 
+                 class="ml-2 border rounded px-2 py-1 text-sm">
+        </div>
+        <div>
+          <input type="radio" name="file_option" value="existing" id="existing_file" class="mr-2">
+          <label for="existing_file" class="text-sm">Existing file path:</label>
+          <input type="text" name="target_file" placeholder="Entities/Clothing/Neck/cloaks.yml" 
+                 class="ml-2 border rounded px-2 py-1 text-sm w-64">
+        </div>
+      </div>
+    </div>
+    
+    <div class="flex gap-3">
+      <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded text-sm hover:bg-sky-700">
+        Create Prototype
+      </button>
+      <a href="{{ url_for('prototype_creator.index') }}" class="border px-4 py-2 rounded text-sm hover:bg-slate-50">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
