@@ -63,8 +63,31 @@
         </p>
       </div>
     </section>
+
+    <section class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="font-semibold mb-2">OpenLayers Test</h3>
+      <div id="map" class="w-full h-64 rounded border border-slate-200"></div>
+      <p class="mt-2 text-xs text-slate-500">Check browser console for initialization logs.</p>
+    </section>
   </aside>
 </div>
+
+<script type="module" src="{{ url_for('static', filename='dist/main.js') }}"></script>
+<script>
+  setTimeout(() => {
+    if (window.testMap) {
+      const msg = document.createElement('p');
+      msg.className = 'mt-1 text-xs text-emerald-700';
+      msg.textContent = '✓ OpenLayers JS loaded successfully';
+      document.getElementById('map').parentNode.appendChild(msg);
+    } else {
+      const msg = document.createElement('p');
+      msg.className = 'mt-1 text-xs text-rose-700';
+      msg.textContent = '✗ OpenLayers JS failed to load';
+      document.getElementById('map').parentNode.appendChild(msg);
+    }
+  }, 1000);
+</script>
 
 <script>
 function yamlEditor() {
