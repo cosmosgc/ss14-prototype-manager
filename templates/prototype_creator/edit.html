@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Edit Prototype: {{ proto_id }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-2xl font-bold">Edit: {{ proto_id }}</h1>
+    <a href="{{ url_for('prototype_creator.index') }}" class="text-sm text-sky-700 hover:underline">
+      Back to Dashboard
+    </a>
+  </div>
+  
+  <!-- Prototype Info -->
+  <div class="bg-white p-4 rounded border mb-4">
+    <div class="grid grid-cols-2 gap-2 text-sm">
+      <div><span class="font-medium">File:</span> {{ rel_file }}</div>
+      <div><span class="font-medium">Type:</span> {{ proto.get('type', 'N/A') }}</div>
+      <div><span class="font-medium">Parent:</span> {{ proto.get('parent', 'N/A') }}</div>
+      {% if sprite %}
+        <div class="col-span-2">
+          <span class="font-medium">Sprite Preview:</span>
+          <img src="{{ url_for('rsi.rsi_preview', sprite=sprite, state=state, scale=2) }}" 
+               alt="Sprite preview" class="mt-1 border rounded">
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- Edit Form -->
+  <form method="POST" class="bg-white p-6 rounded border space-y-4">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Name</label>
+      <input type="text" name="name" value="{{ proto.get('name', '') }}" 
+             class="w-full border rounded px-3 py-2 text-sm" required>
+    </div>
+    
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+      <textarea name="description" rows="3" 
+                class="w-full border rounded px-3 py-2 text-sm">{{ proto.get('description', '') }}</textarea>
+    </div>
+    
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Sprite Path</label>
+      <input type="text" name="sprite" value="{{ sprite or '' }}" 
+             class="w-full border rounded px-3 py-2 text-sm" required>
+      {% if sprite %}
+        <p class="text-xs text-slate-500 mt-1">Current: {{ sprite }}</p>
+      {% endif %}
+    </div>
+    
+    <div class="flex gap-3">
+      <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded text-sm hover:bg-sky-700">
+        Save Changes
+      </button>
+      <a href="{{ url_for('prototype_creator.index') }}" class="border px-4 py-2 rounded text-sm hover:bg-slate-50">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+
+{% block scripts %}
+<script>
+// Extract sprite from components for preview
+document.addEventListener('DOMContentLoaded', function() {
+  const spriteInput = document.querySelector('input[name="sprite"]');
+  if (spriteInput && !spriteInput.value) {
+    // Try to get sprite from prototype components
+    const proto = {{ proto|tojson }};
+    if (proto.components) {
+      for (const comp of proto.components) {
+        if (comp.type === 'Sprite' && comp.sprite) {
+          spriteInput.value = comp.sprite;
+          break;
+        }
+      }
+    }
+  }
+});
+</script>
+{% endblock %}

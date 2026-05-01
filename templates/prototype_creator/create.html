@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% block title %}Create Prototype{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto">
+  <h1 class="text-2xl font-bold mb-4">Create New {{ template.name }} Prototype</h1>
+
+  <form method="POST" @submit.prevent="if(validateAll()) $el.submit()" action="{{ url_for('prototype_creator.create_prototype', template=template_key) }}" x-data="prototypeCreatorTools()" class="grid gap-8 lg:grid-cols-2">
+    <!-- Left Column: Form Fields -->
+    <div class="bg-white p-6 rounded border space-y-4">
+      {% for field in template.fields %}
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">
+            {{ field.label }}
+            {% if field.required %}<span class="text-red-500">*</span>{% endif %}
+          </label>
+
+          {% if field.name == "sprite" %}
+            <div class="space-y-2">
+              <input type="text" name="{{ field.name }}"
+                     x-model="spritePath"
+                     @input.debounce.250ms="searchRsi()"
+                     class="w-full border rounded px-3 py-2 text-sm font-mono"
+                     value="{{ request.form.get(field.name) or field.default or '' }}"
+                     {% if field.required %}required{% endif %}
+                     placeholder="{{ field.placeholder or '' }}">
+              <div class="mt-2 flex items-center justify-center" x-show="isLoadingRsi">
+                <svg class="animate-spin h-5 w-5 text-sky-600" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <div class="max-h-40 overflow-auto rounded-lg border bg-white shadow-inner" x-show="rsiResults.length > 0">
+                <template x-for="rsi in rsiResults" :key="rsi">
+                  <button type="button" @click="pickRsi(rsi)" class="flex w-full items-center gap-3 border-b border-slate-100 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors duration-150 last:border-b-0">
+                    <img loading="lazy"
+                      :src="spriteThumb(rsi, 'icon')"
+                      class="h-10 w-10 rounded-lg border bg-white object-contain pixelated shadow-sm"
+                      onerror="this.style.display='none'">
+                    <span class="font-mono text-slate-700" x-text="rsi"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          {% elif field.type == "textarea" %}
+            <textarea name="{{ field.name }}"
+                      class="w-full border rounded px-3 py-2 text-sm"
+                      rows="3"
+                      {% if field.required %}required{% endif %}
+                      placeholder="{{ field.placeholder or '' }}">{{ request.form.get(field.name) or '' }}</textarea>
+
+          {% elif field.type == "checkbox" %}
+            <input type="checkbox" name="{{ field.name }}"
+                   class="h-4 w-4 text-sky-600"
+                   {% if request.form.get(field.name) == "on" or field.default %}checked{% endif %}>
+
+          {% elif field.name == "id" %}
+            <div class="space-y-2">
+              <input type="text" name="{{ field.name }}"
+                     @input.debounce.300ms="checkIdUnique()"
+                     class="w-full border rounded px-3 py-2 text-sm font-mono"
+                     value="{{ request.form.get(field.name) or '' }}"
+                     {% if field.required %}required{% endif %}
+                     placeholder="{{ field.placeholder or '' }}">
+              <div x-show="idCheckResult !== null" class="text-sm">
+                <span x-show="idCheckResult !== null && !idCheckResult.exists" class="text-green-600">✓ ID is available</span>
+                <span x-show="idCheckResult !== null && idCheckResult.exists" class="text-red-600">✗ ID already exists in <span class="font-mono" x-text="idCheckResult.path"></span></span>
+              </div>
+            </div>
+          {% else %}
+            <input type="text" name="{{ field.name }}"
+                   class="w-full border rounded px-3 py-2 text-sm"
+                   value="{{ request.form.get(field.name) or field.default or '' }}"
+                   {% if field.required %}required{% endif %}
+                   placeholder="{{ field.placeholder or '' }}">
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <!-- Sprite State Selection (if sprite field exists) -->
+      <div x-show="spritePath">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Sprite State</label>
+        <div class="grid grid-cols-2 gap-3">
+          <input type="text" name="sprite_state" x-model="spriteState" class="w-full border rounded px-3 py-2 text-sm font-mono bg-white" placeholder="icon">
+          <select @change="updateSpritePreview()" class="w-full border rounded px-3 py-2 text-sm font-mono bg-white">
+            <template x-for="state in rsiStates" :key="state">
+              <option :value="state" x-text="state" :selected="state === spriteState"></option>
+            </template>
+          </select>
+        </div>
+        <div class="mt-3 flex justify-center">
+          <img x-show="spritePreviewUrl" :src="spritePreviewUrl"
+               class="h-20 w-20 rounded-xl border-2 border-slate-200 bg-slate-100 object-contain pixelated shadow-md">
+        </div>
+      </div>
+
+      <!-- Target File Selection -->
+      <div class="border-t pt-4">
+        <h3 class="font-medium text-slate-700 mb-2">Target YAML File</h3>
+        <div class="space-y-2">
+          <div>
+            <input type="radio" name="file_option" value="default" checked
+                   id="default_file" class="mr-2">
+            <label for="default_file" class="text-sm">
+              Default: {{ template.default_filename }} in {{ template.target_dir }}
+            </label>
+          </div>
+          <div>
+            <input type="radio" name="file_option" value="new" id="new_file" class="mr-2">
+            <label for="new_file" class="text-sm">New file:</label>
+            <input type="text" name="new_filename" placeholder="filename.yml"
+                   class="ml-2 border rounded px-2 py-1 text-sm">
+          </div>
+          <div>
+            <input type="radio" name="file_option" value="existing" id="existing_file" class="mr-2">
+            <label for="existing_file" class="text-sm">Existing file path:</label>
+            <input type="text" name="target_file" placeholder="Entities/Clothing/Neck/cloaks.yml"
+                   class="ml-2 border rounded px-2 py-1 text-sm w-64">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button type="submit" class="bg-sky-600 text-white px-4 py-2 rounded text-sm hover:bg-sky-700">
+          Create Prototype
+        </button>
+        <button type="button" @click="refreshPreview()" :disabled="isRefreshingPreview" class="border px-4 py-2 rounded text-sm hover:bg-slate-50 disabled:opacity-50">
+          <span x-text="isRefreshingPreview ? 'Refreshing...' : 'Preview YAML'"></span>
+        </button>
+        <a href="{{ url_for('prototype_creator.index') }}" class="border px-4 py-2 rounded text-sm hover:bg-slate-50">
+          Cancel
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Column: YAML Preview -->
+    <div class="bg-white rounded-2xl shadow-lg border border-slate-200 p-6 space-y-6">
+      <div class="flex items-center space-x-3">
+        <div class="flex-shrink-0">
+          <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-slate-900">YAML Preview</h2>
+      </div>
+      <pre class="max-h-96 overflow-auto rounded-xl bg-slate-900 p-4 text-sm text-green-300 font-mono shadow-inner border border-slate-700" x-text="yamlPreview"></pre>
+    </div>
+  </form>
+</div>
+
+<script>
+function prototypeCreatorTools() {
+  return {
+    spritePath: "",
+    spriteState: "icon",
+    rsiQuery: "",
+    rsiResults: [],
+    rsiStates: [],
+    spritePreviewUrl: "",
+    isLoadingRsi: false,
+    isRefreshingPreview: false,
+    yamlPreview: "",
+    idCheckResult: null,
+    rsiController: null,
+
+    init() {
+      const spriteInput = document.querySelector('[name="sprite"]');
+      if (spriteInput && spriteInput.value) {
+        this.spritePath = spriteInput.value;
+        this.loadRsiStates();
+      }
+    },
+
+    spriteThumb(sprite, state) {
+      return `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state || "icon")}&scale=2`;
+    },
+
+    updateSpritePreview() {
+      if (!this.spritePath) {
+        this.spritePreviewUrl = "";
+        return;
+      }
+      this.spritePreviewUrl = this.spriteThumb(this.spritePath, this.spriteState);
+    },
+
+    async loadRsiStates() {
+      if (!this.spritePath) return;
+      try {
+        const res = await fetch(`/rsi/api/states?sprite=${encodeURIComponent(this.spritePath)}`);
+        this.rsiStates = await res.json();
+        if (this.rsiStates.length > 0 && !this.rsiStates.includes(this.spriteState)) {
+          this.spriteState = this.rsiStates[0];
+        }
+        this.updateSpritePreview();
+      } catch (error) {
+        console.error('Error loading RSI states:', error);
+      }
+    },
+
+    async searchRsi() {
+      if (!this.spritePath.trim()) {
+        this.rsiResults = [];
+        this.isLoadingRsi = false;
+        return;
+      }
+      if (this.rsiController) this.rsiController.abort();
+      this.rsiController = new AbortController();
+      this.isLoadingRsi = true;
+      try {
+        const res = await fetch(`/rsi/api/suggest?q=${encodeURIComponent(this.spritePath)}`, {
+          signal: this.rsiController.signal
+        });
+        this.rsiResults = await res.json();
+      } catch (error) {
+        if (error.name !== 'AbortError') {
+          console.error('Error searching RSI:', error);
+          this.rsiResults = [];
+        }
+      } finally {
+        this.isLoadingRsi = false;
+        this.rsiController = null;
+      }
+    },
+
+    async pickRsi(rsi) {
+      if (this.rsiController) this.rsiController.abort();
+      this.spritePath = rsi;
+      this.rsiResults = [];
+      await this.loadRsiStates();
+    },
+
+    async checkIdUnique() {
+      const idInput = document.querySelector('[name="id"]');
+      if (!idInput || !idInput.value.trim()) {
+        this.idCheckResult = null;
+        return;
+      }
+      try {
+        const res = await fetch(`/prototype-creator/api/check-id/${encodeURIComponent(idInput.value)}`);
+        this.idCheckResult = await res.json();
+      } catch (error) {
+        console.error('Error checking ID:', error);
+        this.idCheckResult = null;
+      }
+    },
+
+    async refreshPreview() {
+      this.isRefreshingPreview = true;
+      try {
+        const form = document.querySelector('form');
+        const formData = new FormData(form);
+        const data = {};
+        for (let [key, value] of formData.entries()) {
+          data[key] = value;
+        }
+        const preview = this.generateYamlPreview(data);
+        this.yamlPreview = preview;
+      } catch (error) {
+        console.error('Error refreshing preview:', error);
+      } finally {
+        this.isRefreshingPreview = false;
+      }
+    },
+
+    generateYamlPreview(data) {
+      const lines = ["- type: entity"];
+      lines.push(`  parent: {{ template.parent }}`);
+      if (data["id"]) lines.push(`  id: ${data["id"]}`);
+      if (data["name"]) lines.push(`  name: ${data["name"]}`);
+      if (data["suffix"]) lines.push(`  suffix: ${data["suffix"]}`);
+      if (data["description"]) lines.push(`  description: ${data["description"]}`);
+      lines.push("  components:");
+      lines.push("  - type: Sprite");
+      lines.push(`    sprite: ${data["sprite"] || "..."}`);
+      lines.push("  - type: Clothing");
+      lines.push(`    sprite: ${data["sprite"] || "..."}`);
+      return lines.join("\n");
+    },
+
+    validateAll() {
+      const idInput = document.querySelector('[name="id"]');
+      if (idInput && this.idCheckResult && this.idCheckResult.exists) {
+        alert('Prototype ID already exists. Please choose a different ID.');
+        return false;
+      }
+      return true;
+    }
+  };
+}
+</script>
+{% endblock %}

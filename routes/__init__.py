@@ -20,3 +20,4 @@ def register_blueprints(app):
                     attr,
                     url_prefix=attr.url_prefix or "",
                 )
+    print([rule.rule for rule in app.url_map.iter_rules()])
