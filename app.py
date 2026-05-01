@@ -937,8 +937,10 @@ def scan_instance_ids(instance_name: str, root_path: str):
 
                     if isinstance(current, dict):
                         proto_id = current.get("id")
+                        proto_type = current.get("type")
 
-                        if isinstance(proto_id, str):
+                        # 🔥 Only accept REAL prototypes
+                        if isinstance(proto_id, str) and isinstance(proto_type, str):
                             # Try to get type, fallback if missing
                             proto_type = current.get("type") or "unknown"
 
