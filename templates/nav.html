@@ -1,0 +1,121 @@
+<nav class="border-b border-slate-200 bg-white shadow-sm" x-data="{ open: false, menu: null }">
+  <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+
+    <!-- Left -->
+    <div class="flex items-center gap-4">
+      <a href="{{ url_for('instance.index') }}" class="text-lg font-bold tracking-tight text-slate-800">
+        SS14 Manager
+      </a>
+
+      <!-- Desktop menu -->
+      <div class="hidden md:flex items-center gap-4 text-sm">
+
+        <!-- Prototypes -->
+        <div class="relative" @mouseenter="menu = 'proto'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Prototypes</button>
+          <div x-show="menu === 'proto'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('prototype.prototypes') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Browse</a>
+            <a href="{{ url_for('prototype_creator.index') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Create</a>
+            <a href="{{ url_for('instance.id_search') }}" class="block px-3 py-2 rounded hover:bg-slate-100">ID Search</a>
+          </div>
+        </div>
+
+        <!-- Assets -->
+        <div class="relative" @mouseenter="menu = 'assets'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Assets</button>
+          <div x-show="menu === 'assets'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('rsi.rsi_explorer') }}" class="block px-3 py-2 rounded hover:bg-slate-100">RSI Explorer</a>
+            <a href="{{ url_for('custom.custom_files') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Custom Files</a>
+          </div>
+        </div>
+
+        <!-- Cargo -->
+        <div class="relative" @mouseenter="menu = 'cargo'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Cargo</button>
+          <div x-show="menu === 'cargo'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('custom.custom_cargo_catalog') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Catalog</a>
+          </div>
+        </div>
+
+        <!-- Media -->
+        <div class="relative" @mouseenter="menu = 'media'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Media</button>
+          <div x-show="menu === 'media'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('media.radio') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Radio</a>
+            <a href="{{ url_for('media.jukebox_manager') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Jukebox</a>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <a href="{{ url_for('instance.options') }}"
+           class="font-medium text-slate-700 hover:text-sky-600">
+          Options
+        </a>
+
+      </div>
+    </div>
+
+    <!-- Right -->
+    <div class="flex items-center gap-3">
+
+      <div class="hidden md:block text-sm text-slate-600">
+        {{ instances_count }} instances
+      </div>
+
+      {% if selected_instance_name %}
+      <div class="hidden md:block text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md">
+        {{ selected_instance_name }}
+      </div>
+      {% endif %}
+
+      <!-- Mobile button -->
+      <button @click="open = !open" class="md:hidden p-2 rounded-lg hover:bg-slate-100">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor">
+          <path x-show="!open" stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          <path x-show="open" x-cloak stroke-linecap="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Mobile menu -->
+  <div x-show="open" x-transition class="md:hidden border-t bg-white" x-cloak>
+    <div class="px-4 py-4 space-y-4 text-sm">
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Prototypes</p>
+        <a href="{{ url_for('prototype.prototypes') }}" class="block py-1">Browse</a>
+        <a href="{{ url_for('prototype_creator.index') }}" class="block py-1">Create</a>
+        <a href="{{ url_for('instance.id_search') }}" class="block py-1">ID Search</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Assets</p>
+        <a href="{{ url_for('rsi.rsi_explorer') }}" class="block py-1">RSI Explorer</a>
+        <a href="{{ url_for('custom.custom_files') }}" class="block py-1">Custom Files</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Cargo</p>
+        <a href="{{ url_for('custom.custom_cargo_catalog') }}" class="block py-1">Catalog</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Media</p>
+        <a href="{{ url_for('media.radio') }}" class="block py-1">Radio</a>
+        <a href="{{ url_for('media.jukebox_manager') }}" class="block py-1">Jukebox</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">System</p>
+        <a href="{{ url_for('instance.options') }}" class="block py-1">Options</a>
+      </div>
+
+    </div>
+  </div>
+</nav>
