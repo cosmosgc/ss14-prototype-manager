@@ -201,47 +201,31 @@ def decode_tile_data(encoded_str):
         return [[0]*CHUNK_SIZE for _ in range(CHUNK_SIZE)]
 
 
-def render_chunk_png(tiles, tilemap, instance_root: Path, instance_name: str, output_path):
-    """Render a single chunk as PNG using actual tile textures"""
+def render_chunk_png(tiles, tilemap, texture_cache: dict, output_path):
+    """Render a single chunk as PNG using pre-cached textures"""
     img = Image.new('RGBA', (CHUNK_SIZE * TILE_SIZE_PX, CHUNK_SIZE * TILE_SIZE_PX))
     draw = ImageDraw.Draw(img)
-    
-    textures_root = instance_root / "Resources" / "Textures"
-    sprite_cache: dict[str, Image.Image] = {}
     
     for y in range(CHUNK_SIZE):
         for x in range(CHUNK_SIZE):
             tile_id = tiles[y][x]
             tile_name = tilemap.get(tile_id, "Space")
             
-            if tile_name == "Space":
-                color = (0, 0, 0, 255)
-                draw.rectangle([x * TILE_SIZE_PX, y * TILE_SIZE_PX, (x + 1) * TILE_SIZE_PX - 1, (y + 1) * TILE_SIZE_PX - 1], fill=color)
-                continue
+            x0 = x * TILE_SIZE_PX
+            y0 = y * TILE_SIZE_PX
             
-            sprite_info = get_tile_sprite_info(instance_name, tile_name)
-            
-            if sprite_info:
-                sprite, state = sprite_info
-                cache_key = f"{sprite}:{state}"
-                if cache_key not in sprite_cache:
-                    tex = extract_tile_texture(textures_root, sprite, state)
-                    if tex:
-                        sprite_cache[cache_key] = tex
-                
-                tile_img = sprite_cache.get(cache_key)
-                if tile_img:
-                    img.paste(tile_img, (x * TILE_SIZE_PX, y * TILE_SIZE_PX), tile_img)
-                    continue
-            
-            color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
-            draw.rectangle([x * TILE_SIZE_PX, y * TILE_SIZE_PX, (x + 1) * TILE_SIZE_PX - 1, (y + 1) * TILE_SIZE_PX - 1], fill=color)
+            texture = texture_cache.get(tile_name)
+            if texture:
+                img.paste(texture, (x0, y0), texture)
+            else:
+                color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
+                draw.rectangle([x0, y0, x0 + TILE_SIZE_PX - 1, y0 + TILE_SIZE_PX - 1], fill=color)
     
     img.save(output_path)
     return output_path
 
 
-def render_full_map_png(tilemap, grid_chunks, instance_root: Path, instance_name: str, output_path, scale=4):
+def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, scale=4):
     """Render the entire map as a single PNG image (flipped Y for OpenLayers)"""
     if not grid_chunks:
         print("DEBUG: No chunks to render")
@@ -263,9 +247,6 @@ def render_full_map_png(tilemap, grid_chunks, instance_root: Path, instance_name
     img = Image.new('RGBA', (map_width * scale, map_height * scale))
     draw = ImageDraw.Draw(img)
     
-    textures_root = instance_root / "Resources" / "Textures"
-    sprite_cache: dict[str, Image.Image] = {}
-    
     for (cx, cy), chunk in chunk_lookup.items():
         tiles = chunk["tiles"]
         # Flip Y: SS14 Y-up -> OpenLayers Y-down
@@ -277,39 +258,19 @@ def render_full_map_png(tilemap, grid_chunks, instance_root: Path, instance_name
                 tile_id = tiles[y][x]
                 tile_name = tilemap.get(tile_id, "Space")
                 
-                if tile_name == "Space":
-                    color = (0, 0, 0, 255)
-                    px = (offset_x + x) * scale
-                    py = (offset_y + y) * scale
-                    draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
-                    continue
-                
-                sprite_info = get_tile_sprite_info(instance_name, tile_name)
-                
-                if sprite_info:
-                    sprite, state = sprite_info
-                    cache_key = f"{sprite}:{state}"
-                    if cache_key not in sprite_cache:
-                        tex = extract_tile_texture(textures_root, sprite, state)
-                        if tex:
-                            sprite_cache[cache_key] = tex
-                    
-                    tile_img = sprite_cache.get(cache_key)
-                    if tile_img:
-                        px = (offset_x + x) * scale
-                        py = (offset_y + y) * scale
-                        # Scale down the texture to fit
-                        if scale == 1:
-                            img.paste(tile_img, (px, py), tile_img)
-                        else:
-                            small = tile_img.resize((scale, scale), Image.Resampling.NEAREST)
-                            img.paste(small, (px, py), small)
-                        continue
-                
-                color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
                 px = (offset_x + x) * scale
                 py = (offset_y + y) * scale
-                draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
+                
+                texture = texture_cache.get(tile_name)
+                if texture:
+                    if scale == 1:
+                        img.paste(texture, (px, py), texture)
+                    else:
+                        small = texture.resize((scale, scale), Image.Resampling.NEAREST)
+                        img.paste(small, (px, py), small)
+                else:
+                    color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
+                    draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
     
     img.save(output_path)
     print(f"DEBUG: Saved full map preview (flipped): {output_path}")
@@ -466,17 +427,44 @@ def map_view():
         instance_root = Path(selected["root_path"])
         instance_name = selected["name"]
         
+        # Step 1: Build tile -> sprite mapping ONCE for all unique tiles
+        tile_sprite_map = {}
+        unique_tile_names = set(tilemap.values())
+        print(f"DEBUG: Resolving sprites for {len(unique_tile_names)} unique tiles...")
+        
+        for tile_name in unique_tile_names:
+            if tile_name and tile_name != "Space":
+                tile_sprite_map[tile_name] = get_tile_sprite_info(instance_name, tile_name)
+        
+        # Step 2: Preload all textures ONCE
+        textures_root = instance_root / "Resources" / "Textures"
+        texture_cache = {}
+        print(f"DEBUG: Loading textures...")
+        
+        for tile_name, sprite_info in tile_sprite_map.items():
+            if not sprite_info:
+                continue
+            sprite, state = sprite_info
+            tex = extract_tile_texture(textures_root, sprite, state)
+            if tex:
+                # Resize to TILE_SIZE_PX if needed
+                if tex.size != (TILE_SIZE_PX, TILE_SIZE_PX):
+                    tex = tex.resize((TILE_SIZE_PX, TILE_SIZE_PX), Image.Resampling.NEAREST)
+                texture_cache[tile_name] = tex
+        
+        print(f"DEBUG: Loaded {len(texture_cache)} textures, rendering chunks...")
+        
+        # Step 3: Render chunks using texture cache
         for chunk in grid_chunks:
             cx = chunk["x"]
             cy = chunk["y"]
             chunk_file = tiles_dir / f"chunk_{cx}_{cy}.png"
-            print(f"DEBUG: Rendering chunk ({cx}, {cy}) to {chunk_file}")
-            render_chunk_png(chunk["tiles"], tilemap, instance_root, instance_name, chunk_file)
+            render_chunk_png(chunk["tiles"], tilemap, texture_cache, chunk_file)
         
         # Generate full map preview
         print("DEBUG: Generating full map preview...")
         preview_path = tile_cache_dir / "preview.png"
-        render_full_map_png(tilemap, grid_chunks, instance_root, instance_name, preview_path)
+        render_full_map_png(tilemap, grid_chunks, texture_cache, preview_path)
         
         # Save metadata
         with open(meta_path, "w") as f:
