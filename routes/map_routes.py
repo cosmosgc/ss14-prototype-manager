@@ -224,7 +224,7 @@ def render_chunk_png(tiles, tilemap, texture_cache: dict, output_path):
     img.save(output_path)
     return output_path
 
-def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, scale=4):
+def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, scale=64):
     """Render the entire map as a single PNG image (flipped Y for OpenLayers)"""
 
     if not grid_chunks:
