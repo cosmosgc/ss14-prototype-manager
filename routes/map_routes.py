@@ -269,9 +269,8 @@ def render_full_map_png(tilemap, grid_chunks, instance_root: Path, instance_name
     for (cx, cy), chunk in chunk_lookup.items():
         tiles = chunk["tiles"]
         # Flip Y: SS14 Y-up -> OpenLayers Y-down
-        flipped_cy = max_cy - cy
         offset_x = (cx - min_cx) * CHUNK_SIZE
-        offset_y = (flipped_cy - min_cy) * CHUNK_SIZE
+        offset_y = (max_cy - cy) * CHUNK_SIZE
         
         for y in range(CHUNK_SIZE):
             for x in range(CHUNK_SIZE):
