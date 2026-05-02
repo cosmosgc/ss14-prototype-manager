@@ -10,7 +10,8 @@ import yaml
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
-    build_tree, validate_yaml_text,
+    build_tree, validate_yaml_text, get_db, load_yaml_documents,
+    find_first_sprite_in_text, list_rsi_states, IgnoreUnknownTagLoader,
 )
 
 CHUNK_SIZE = 16
@@ -21,12 +22,41 @@ TILE_DATA_SIZE = 7  # SS14 format 6/7: 7 bytes per tile
 TILE_COLORS = {
     "Space": (0, 0, 0, 255),
     "FloorAstroGrass": (34, 139, 34, 255),
+    "FloorAstroSnow": (255, 250, 250, 255),
+    "FloorBlueCircuit": (0, 0, 255, 255),
+    "FloorDark": (64, 64, 64, 255),
+    "FloorDarkMini": (72, 72, 72, 255),
+    "FloorDarkMono": (80, 80, 80, 255),
+    "FloorDarkOffset": (70, 70, 70, 255),
+    "FloorDirt": (139, 69, 19, 255),
+    "FloorFreezer": (173, 216, 230, 255),
     "FloorGrass": (50, 205, 50, 255),
-    "Plating": (120, 120, 120, 255),
+    "FloorGrassDark": (40, 100, 40, 255),
+    "FloorGrassJungle": (34, 139, 34, 255),
+    "FloorGrassLight": (144, 238, 144, 255),
+    "FloorHydro": (107, 142, 35, 255),
+    "FloorJungleAstroGrass": (34, 139, 34, 255),
+    "FloorKitchen": (255, 228, 196, 255),
+    "FloorMowedAstroGrass": (34, 139, 34, 255),
+    "FloorPlanetDirt": (139, 69, 19, 255),
+    "FloorPlanetGrass": (50, 205, 50, 255),
+    "FloorReinforced": (100, 100, 100, 255),
+    "FloorSnow": (255, 250, 250, 255),
+    "FloorSteel": (192, 192, 192, 255),
+    "FloorSteelMini": (200, 200, 200, 255),
+    "FloorSteelMono": (208, 208, 208, 255),
+    "FloorTechMaint2": (128, 128, 128, 255),
+    "FloorWhite": (255, 255, 255, 255),
+    "FloorWhiteDiagonal": (245, 245, 245, 255),
+    "FloorWhiteDiagonalMini": (250, 250, 250, 255),
+    "FloorWhiteMini": (255, 255, 255, 255),
+    "FloorWhiteMono": (240, 240, 240, 255),
+    "FloorWood": (165, 42, 42, 255),
+    "FloorWoodLarge": (160, 40, 40, 255),
+    "FloorWoodTile": (170, 44, 44, 255),
     "Lattice": (150, 150, 150, 255),
-    "FloorShuttleBlue": (65, 105, 225, 255),
-    "FloorShuttleOrange": (255, 165, 0, 255),
-    "FloorShuttleWhite": (255, 255, 255, 255),
+    "Plating": (120, 120, 120, 255),
+    "PlatingAsteroid": (100, 100, 100, 255),
 }
 
 # Custom YAML loader to ignore SS14 tags
@@ -43,6 +73,99 @@ def ignore_unknown(loader, tag_suffix, node):
     return None
 
 IgnoreTagsLoader.add_multi_constructor('!', ignore_unknown)
+
+
+def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] | None:
+    """Look up sprite info for a tile by ID - scans tile definition files"""
+    if not tile_name or tile_name == "Space":
+        return None
+    
+    instance_root = None
+    with get_db() as conn:
+        inst_row = conn.execute(
+            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
+        ).fetchone()
+        if inst_row:
+            instance_root = Path(inst_row["root_path"])
+    
+    if not instance_root:
+        return None
+    
+    # Scan tile files directly for this tile
+    tile_files = [
+        "Tiles/floors.yml",
+        "Tiles/plating.yml",
+        "_DV/Tiles/floors.yml", 
+        "_DV/Tiles/plating.yml",
+        "_Nuclear14/Tiles/floors.yml",
+        "_DV/CosmicCult/Tileset/floors.yml",
+    ]
+    
+    proto_root = instance_root / "Resources" / "Prototypes"
+    for tile_file in tile_files:
+        proto_path = proto_root / tile_file
+        if not proto_path.exists():
+            continue
+        try:
+            docs = load_yaml_documents(proto_path)
+            # Each doc is a list of tile definitions
+            all_tiles = docs[0] if docs else []
+            for tile in all_tiles:
+                if isinstance(tile, dict) and tile.get("id") == tile_name:
+                    sprite = tile.get("sprite")
+                    if sprite and isinstance(sprite, str):
+                        sprite = sprite.strip()
+                        if sprite.startswith("/"):
+                            sprite = sprite[1:]
+                        # Strip leading "Textures/" or "textures/"
+                        if sprite.lower().startswith("textures/"):
+                            sprite = sprite[9:]
+                        if sprite.endswith(".png"):
+                            sprite = sprite[:-4]
+                        elif sprite.endswith(".rsi"):
+                            sprite = sprite[:-4]
+                        if sprite:
+                            return sprite, "icon"
+        except Exception:
+            continue
+    
+    return None
+
+
+def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.Image | None:
+    """Load a tile texture image from RSI or direct PNG"""
+    # Check for direct PNG first
+    direct_png = textures_root / f"{sprite}.png"
+    if direct_png.exists():
+        try:
+            with Image.open(direct_png) as im:
+                return im.convert("RGBA")
+        except Exception:
+            pass
+    
+    # Try RSI folder
+    rsi_dir = safe_join(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return None
+    
+    # Check for meta.json states or fall back to PNG files
+    available_states = list_rsi_states(rsi_dir)
+    actual_state = state if state in available_states else "icon"
+    if actual_state not in available_states:
+        actual_state = available_states[0] if available_states else None
+    
+    if not actual_state:
+        return None
+    
+    png_path = rsi_dir / f"{actual_state}.png"
+    if not png_path.exists():
+        return None
+    
+    try:
+        with Image.open(png_path) as im:
+            return im.convert("RGBA")
+    except Exception:
+        return None
 
 map_bp = Blueprint("map", __name__, url_prefix="/maps")
 
@@ -78,28 +201,47 @@ def decode_tile_data(encoded_str):
         return [[0]*CHUNK_SIZE for _ in range(CHUNK_SIZE)]
 
 
-def render_chunk_png(tiles, tilemap, output_path):
-    """Render a single chunk as PNG"""
+def render_chunk_png(tiles, tilemap, instance_root: Path, instance_name: str, output_path):
+    """Render a single chunk as PNG using actual tile textures"""
     img = Image.new('RGBA', (CHUNK_SIZE * TILE_SIZE_PX, CHUNK_SIZE * TILE_SIZE_PX))
     draw = ImageDraw.Draw(img)
+    
+    textures_root = instance_root / "Resources" / "Textures"
+    sprite_cache: dict[str, Image.Image] = {}
     
     for y in range(CHUNK_SIZE):
         for x in range(CHUNK_SIZE):
             tile_id = tiles[y][x]
             tile_name = tilemap.get(tile_id, "Space")
-            color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))  # Magenta for unknown
             
-            x0 = x * TILE_SIZE_PX
-            y0 = y * TILE_SIZE_PX
-            x1 = x0 + TILE_SIZE_PX - 1
-            y1 = y0 + TILE_SIZE_PX - 1
-            draw.rectangle([x0, y0, x1, y1], fill=color)
+            if tile_name == "Space":
+                color = (0, 0, 0, 255)
+                draw.rectangle([x * TILE_SIZE_PX, y * TILE_SIZE_PX, (x + 1) * TILE_SIZE_PX - 1, (y + 1) * TILE_SIZE_PX - 1], fill=color)
+                continue
+            
+            sprite_info = get_tile_sprite_info(instance_name, tile_name)
+            
+            if sprite_info:
+                sprite, state = sprite_info
+                cache_key = f"{sprite}:{state}"
+                if cache_key not in sprite_cache:
+                    tex = extract_tile_texture(textures_root, sprite, state)
+                    if tex:
+                        sprite_cache[cache_key] = tex
+                
+                tile_img = sprite_cache.get(cache_key)
+                if tile_img:
+                    img.paste(tile_img, (x * TILE_SIZE_PX, y * TILE_SIZE_PX), tile_img)
+                    continue
+            
+            color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
+            draw.rectangle([x * TILE_SIZE_PX, y * TILE_SIZE_PX, (x + 1) * TILE_SIZE_PX - 1, (y + 1) * TILE_SIZE_PX - 1], fill=color)
     
     img.save(output_path)
     return output_path
 
 
-def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
+def render_full_map_png(tilemap, grid_chunks, instance_root: Path, instance_name: str, output_path, scale=4):
     """Render the entire map as a single PNG image (flipped Y for OpenLayers)"""
     if not grid_chunks:
         print("DEBUG: No chunks to render")
@@ -121,6 +263,9 @@ def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
     img = Image.new('RGBA', (map_width * scale, map_height * scale))
     draw = ImageDraw.Draw(img)
     
+    textures_root = instance_root / "Resources" / "Textures"
+    sprite_cache: dict[str, Image.Image] = {}
+    
     for (cx, cy), chunk in chunk_lookup.items():
         tiles = chunk["tiles"]
         # Flip Y: SS14 Y-up -> OpenLayers Y-down
@@ -131,7 +276,38 @@ def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
         for y in range(CHUNK_SIZE):
             for x in range(CHUNK_SIZE):
                 tile_id = tiles[y][x]
-                color = TILE_COLORS.get(tilemap.get(tile_id, "Space"), (255, 0, 255, 255))
+                tile_name = tilemap.get(tile_id, "Space")
+                
+                if tile_name == "Space":
+                    color = (0, 0, 0, 255)
+                    px = (offset_x + x) * scale
+                    py = (offset_y + y) * scale
+                    draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
+                    continue
+                
+                sprite_info = get_tile_sprite_info(instance_name, tile_name)
+                
+                if sprite_info:
+                    sprite, state = sprite_info
+                    cache_key = f"{sprite}:{state}"
+                    if cache_key not in sprite_cache:
+                        tex = extract_tile_texture(textures_root, sprite, state)
+                        if tex:
+                            sprite_cache[cache_key] = tex
+                    
+                    tile_img = sprite_cache.get(cache_key)
+                    if tile_img:
+                        px = (offset_x + x) * scale
+                        py = (offset_y + y) * scale
+                        # Scale down the texture to fit
+                        if scale == 1:
+                            img.paste(tile_img, (px, py), tile_img)
+                        else:
+                            small = tile_img.resize((scale, scale), Image.Resampling.NEAREST)
+                            img.paste(small, (px, py), small)
+                        continue
+                
+                color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
                 px = (offset_x + x) * scale
                 py = (offset_y + y) * scale
                 draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
@@ -288,17 +464,20 @@ def map_view():
         tiles_dir = tile_cache_dir / "tiles"
         tiles_dir.mkdir(parents=True, exist_ok=True)
         
+        instance_root = Path(selected["root_path"])
+        instance_name = selected["name"]
+        
         for chunk in grid_chunks:
             cx = chunk["x"]
             cy = chunk["y"]
             chunk_file = tiles_dir / f"chunk_{cx}_{cy}.png"
             print(f"DEBUG: Rendering chunk ({cx}, {cy}) to {chunk_file}")
-            render_chunk_png(chunk["tiles"], tilemap, chunk_file)
+            render_chunk_png(chunk["tiles"], tilemap, instance_root, instance_name, chunk_file)
         
         # Generate full map preview
         print("DEBUG: Generating full map preview...")
         preview_path = tile_cache_dir / "preview.png"
-        render_full_map_png(tilemap, grid_chunks, preview_path)
+        render_full_map_png(tilemap, grid_chunks, instance_root, instance_name, preview_path)
         
         # Save metadata
         with open(meta_path, "w") as f:
