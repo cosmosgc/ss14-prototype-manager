@@ -7,6 +7,7 @@ import hashlib
 import sqlite3
 from PIL import Image, ImageDraw, ImageFont
 import yaml
+import math
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
@@ -150,9 +151,15 @@ def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.
     
     # Check for meta.json states or fall back to PNG files
     available_states = list_rsi_states(rsi_dir)
-    actual_state = state if state in available_states else "icon"
-    if actual_state not in available_states:
-        actual_state = available_states[0] if available_states else None
+    if state in available_states:
+        actual_state = state
+    elif "icon" in available_states:
+        actual_state = "icon"
+    elif available_states:
+        actual_state = available_states[0]
+    else:
+        return None
+    print(f"Entity {proto} → px={px}, py={py}")
     
     if not actual_state:
         return None
@@ -256,28 +263,43 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
         return None
     
     sprite = None
-    state = "icon"
-    
+    state = None
+
     for doc in docs:
         if isinstance(doc, dict) and doc.get("id") == proto:
-            # Try to get sprite from components
             components = doc.get("components", [])
+
             if isinstance(components, list):
                 for comp in components:
-                    if isinstance(comp, dict):
-                        if comp.get("type") == "Icon" and isinstance(comp.get("sprite"), str):
-                            sprite = comp["sprite"]
-                            if isinstance(comp.get("state"), str):
-                                state = comp["state"]
+                    if not isinstance(comp, dict):
+                        continue
+
+                    if comp.get("type") == "Icon":
+                        sprite = comp.get("sprite")
+                        state = comp.get("state")
+                        break
+
+                    if comp.get("type") == "Sprite":
+                        sprite = comp.get("sprite")
+
+                        # Try direct state
+                        if isinstance(comp.get("state"), str):
+                            state = comp["state"]
                             break
-                        if comp.get("type") == "Sprite" and isinstance(comp.get("sprite"), str):
-                            sprite = comp["sprite"]
-                            if isinstance(comp.get("state"), str):
-                                state = comp["state"]
+
+                        # Try layers
+                        layers = comp.get("layers")
+                        if isinstance(layers, list) and layers:
+                            layer = layers[0]
+                            if isinstance(layer, dict):
+                                state = layer.get("state")
                             break
+
+            # fallback to root
             if not sprite:
                 sprite = doc.get("sprite")
-                state = doc.get("state", "icon")
+                state = doc.get("state")
+
             break
     
     if not sprite or not isinstance(sprite, str):
@@ -292,7 +314,24 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
         sprite = sprite[:-4]
     
     textures_root = instance_root / "Resources" / "Textures"
-    tex = extract_tile_texture(textures_root, sprite, state)
+    # Robust state fallback
+    rsi_dir = safe_join(textures_root, sprite)
+    available_states = list_rsi_states(rsi_dir) if rsi_dir else []
+
+    if state in available_states:
+        chosen_state = state
+    elif "icon" in available_states:
+        chosen_state = "icon"
+    elif available_states:
+        chosen_state = available_states[0]
+    else:
+        chosen_state = None
+
+    if not chosen_state:
+        return None
+    print(f"{proto} → sprite={sprite}, state={state}, available={available_states}")
+
+    tex = extract_tile_texture(textures_root, sprite, chosen_state)
     
     if not tex:
         return None
@@ -311,7 +350,7 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
 
 
 def render_entity_layer(entities: list, instance_name: str, 
-                       min_cx: int, max_cy: int, 
+                       min_cx: int, min_cy: int, 
                        x_range: int, y_range: int,
                        output_path: Path, scale: int = 64) -> Path | None:
     """Render entities as a separate PNG layer"""
@@ -327,36 +366,39 @@ def render_entity_layer(entities: list, instance_name: str,
     # Cache for entity icons
     icon_cache = {}
     
-    # Calculate min_cy from max_cy and y_range
-    min_cy = max_cy - y_range
     
     for ent in entities:
         x = ent.get("x", 0)
         y = ent.get("y", 0)
         proto = ent.get("proto", "")
         
-        # Same transform as chunks: normalize → flip
-        chunk_x = int(x // CHUNK_SIZE)
+        # SS14 has Y-up, images have Y-down
+        # Step 1: Get chunk indices (SS14 space)
+        
+                
+        chunk_x = math.floor(x / CHUNK_SIZE)
+        chunk_y = math.floor(y / CHUNK_SIZE)
+
         local_x = int(x) % CHUNK_SIZE
-        
-        # For Y: apply the SAME normalize+flip as chunks
-        chunk_y = int(y // CHUNK_SIZE)
         local_y = int(y) % CHUNK_SIZE
-        
-        # Normalize
+
         cx_index = chunk_x - min_cx
         cy_index = chunk_y - min_cy
-        # Flip
         cy_flipped = y_range - cy_index
-        
-        px = (cx_index * CHUNK_SIZE + local_x) * scale
-        py = (cy_flipped * CHUNK_SIZE + local_y) * scale
-        
+
+        offset_x = cx_index * CHUNK_SIZE
+        offset_y = cy_flipped * CHUNK_SIZE
+
+        px = (offset_x + local_x) * scale
+        py = (offset_y + (CHUNK_SIZE - 1 - local_y)) * scale
         # Get entity icon
         if proto not in icon_cache:
+            
+            print(f"getting Entity icon {proto} → px={px}, py={py}")
             icon = get_entity_icon(instance_name, proto, scale)
             if icon:
                 icon_cache[proto] = icon
+                print(f"Cached icon for {proto}")
         
         icon = icon_cache.get(proto)
         if icon:
@@ -368,7 +410,7 @@ def render_entity_layer(entities: list, instance_name: str,
             draw = ImageDraw.Draw(img)
             r = scale // 2
             draw.ellipse([px - r, py - r, px + r, py + r], fill=color)
-    
+    print(f"DEBUG: Rendered {len(entities)} entities on layer")
     img.save(output_path)
     return output_path
 
@@ -496,7 +538,8 @@ def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, 
                 tile_name = tilemap.get(tile_id, "Space")
 
                 px = (offset_x + x) * scale
-                py = (offset_y + y) * scale
+                # py = (offset_y + (y)) * scale
+                py = (offset_y + (CHUNK_SIZE - 1 - y)) * scale
 
                 # Fast path for space
                 if tile_name == "Space":
@@ -721,7 +764,7 @@ def map_view():
             y_range = max_cy - min_cy
             
             entity_layer_path = tile_cache_dir / "entities.png"
-            render_entity_layer(entities, selected["name"], min_cx, max_cy, x_range, y_range, entity_layer_path, scale=64)
+            render_entity_layer(entities, selected["name"], min_cx, min_cy, x_range, y_range, entity_layer_path, scale=64)
         
         # Pre-cache entity icons
         print("DEBUG: Pre-caching entity icons...")
@@ -752,7 +795,7 @@ def map_view():
             x_range = max_cx - min_cx
             y_range = max_cy - min_cy
             entity_layer_path = tile_cache_dir / "entities.png"
-            render_entity_layer(entities, selected["name"], min_cx, max_cy, x_range, y_range, entity_layer_path, scale=64)
+            render_entity_layer(entities, selected["name"], min_cx, min_cy, x_range, y_range, entity_layer_path, scale=64)
         
         # Pre-cache entity icons if needed
         unique_protos = set()
