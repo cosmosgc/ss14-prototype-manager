@@ -771,6 +771,7 @@ def map_view():
         unique_protos = set()
         for ent in entities:
             proto = ent.get("proto", "")
+            print(f"DEBUG: Found entity proto: {proto}")
             if proto:
                 unique_protos.add(proto)
         for proto in unique_protos:

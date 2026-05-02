@@ -116,8 +116,37 @@ function createLayerControls() {
   masterLabel.style.cssText = 'margin-left:4px; font-size:12px; cursor:pointer;';
   masterLabel.prepend(masterCheckbox);
   masterDiv.appendChild(masterLabel);
-  
   controlDiv.appendChild(masterDiv);
+  
+  // Entity names toggle
+  const namesDiv = document.createElement('div');
+  namesDiv.style.cssText = 'margin-bottom:8px;';
+  const namesCheckbox = document.createElement('input');
+  namesCheckbox.type = 'checkbox';
+  namesCheckbox.checked = true;
+  namesCheckbox.id = 'names-toggle';
+  namesCheckbox.addEventListener('change', () => {
+    const checked = namesCheckbox.checked;
+    // Update all entity layer styles
+    Object.values(entityLayers).forEach(layer => {
+      const source = layer.getSource();
+      source.forEachFeature(feature => {
+        const style = feature.getStyle();
+        if (style) {
+          const textStyle = style.getText();
+          if (textStyle) {
+            textStyle.setText(checked ? (feature.get('name') || '') : '');
+          }
+        }
+      });
+    });
+  });
+  const namesLabel = document.createElement('label');
+  namesLabel.textContent = 'Show Names';
+  namesLabel.style.cssText = 'margin-left:4px; font-size:12px; cursor:pointer;';
+  namesLabel.prepend(namesCheckbox);
+  namesDiv.appendChild(namesLabel);
+  controlDiv.appendChild(namesDiv);
   
   // Separator
   const sep = document.createElement('hr');
@@ -248,7 +277,7 @@ Object.keys(entitiesByType).forEach(entType => {
     const cyFlipped = yRange - cyIndex;
 
     const flippedX = (cxIndex * CHUNK_SIZE) + localX;
-    const flippedY = (cyFlipped * CHUNK_SIZE) + localY;
+    const flippedY = (cyFlipped * CHUNK_SIZE) + (CHUNK_SIZE - 1 - localY);
 
     const point = new Point([flippedX, flippedY]);
 
@@ -257,11 +286,20 @@ Object.keys(entitiesByType).forEach(entType => {
     feature.set('name', ent.name || ent.proto || '');
     feature.set('type', entType);
 
+    const entName = ent.name || ent.proto || '';
+    
     feature.setStyle(new Style({
       image: new CircleStyle({
         radius: 4,
         fill: new Fill({ color: color }),
         stroke: new Stroke({ color: '#fff', width: 1 })
+      }),
+      text: new Text({
+        text: entName.substring(0, 12),
+        offsetY: -12,
+        font: '9px sans-serif',
+        fill: new Fill({ color: '#000' }),
+        stroke: new Stroke({ color: '#fff', width: 2 })
       })
     }));
 
