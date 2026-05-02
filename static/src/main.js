@@ -47,56 +47,83 @@ console.log('Map data loaded:', {
 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 let hasData = false;
 
+let minCy = Infinity;
+let maxCy = -Infinity;
+
 gridChunks.forEach(chunk => {
   const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
   const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
+
   const left = cx * CHUNK_SIZE;
   const bottom = cy * CHUNK_SIZE;
+
   minX = Math.min(minX, left);
   minY = Math.min(minY, bottom);
   maxX = Math.max(maxX, left + CHUNK_SIZE);
   maxY = Math.max(maxY, bottom + CHUNK_SIZE);
+
+  minCy = Math.min(minCy, cy);
+  maxCy = Math.max(maxCy, cy);
+
   hasData = true;
 });
 
-// Store SS14 bounds for Y-flipping
+// Store SS14 bounds for Y-flipping (unchanged)
 const ss14_minY = minY;
 const ss14_maxY = maxY;
 
-// Flip entity Y coordinates for OpenLayers (Y-down)
-const flippedEntities = entities.map(ent => ({
-  ...ent,
-  flippedY: ss14_minY + ss14_maxY - ent.y
-}));
+// Flip entity Y to match chunk coordinate system
+const yRange = maxCy - minCy;
+
+const flippedEntities = entities.map(ent => {
+  const worldY = ent.y || 0;
+
+  // Convert world Y → chunk-relative tile space
+  const tileY = worldY;
+
+  // Normalize to chunk space origin
+  const normalizedY = tileY - (minCy * CHUNK_SIZE);
+
+  // Flip in same space as chunks
+  const flippedY = (yRange * CHUNK_SIZE) - normalizedY;
+
+  return {
+    ...ent,
+    flippedY
+  };
+});
 
 console.log(`SS14 bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
 
 // Create layers array
 const layers = [];
 
-// Add chunk image layers instead of preview
+// Add chunk image layers
 if (cacheKey && hasData && gridChunks.length > 0) {
   const baseUrl = '/maps/api/tiles/' + cacheKey;
-  
-  // Get Y range for flipping
-  const allCy = gridChunks.map(c => c.y !== undefined ? c.y : (c.chunk_y || 0));
-  const maxCy = Math.max(...allCy);
-  
+
+  const yRange = maxCy - minCy;
+
   gridChunks.forEach(chunk => {
     const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
     const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
-    
-    // Flip Y: image has y=0 at TOP, but SS14/OL expects y=0 at BOTTOM
-    // So we flip: new_y = max_y - old_y
-    const flippedCy = maxCy - cy;
-    
+
+    // ✅ FIX: normalize → then flip (same as Python)
+    const cyIndex = cy - minCy;
+    const cyFlipped = yRange - cyIndex;
+
     const left = cx * CHUNK_SIZE;
-    const bottom = flippedCy * CHUNK_SIZE;
-    
-    const chunkExtent = [left, bottom, left + CHUNK_SIZE, bottom + CHUNK_SIZE];
-    
+    const bottom = (cyFlipped - 1) * CHUNK_SIZE;
+
+    const chunkExtent = [
+      left,
+      bottom,
+      left + CHUNK_SIZE,
+      bottom + CHUNK_SIZE
+    ];
+
     const tileUrl = `${baseUrl}/chunk_${cx}_${cy}.png`;
-    
+
     const chunkLayer = new ImageLayer({
       source: new Static({
         url: tileUrl,
@@ -105,7 +132,7 @@ if (cacheKey && hasData && gridChunks.length > 0) {
       }),
       zIndex: 1
     });
-    
+
     layers.push(chunkLayer);
   });
 } else {
