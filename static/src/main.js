@@ -34,6 +34,7 @@ const gridChunks = mapData.gridChunks || [];
 const entities = mapData.entities || [];
 const cacheKey = mapData.cacheKey || '';
 const CHUNK_SIZE = 16;
+const TILE_SIZE_PX = 32;
 
 console.log('Map data loaded:', {
   tilemapKeys: Object.keys(tilemap).length,
@@ -63,37 +64,52 @@ const ss14_minY = minY;
 const ss14_maxY = maxY;
 
 // Flip entity Y coordinates for OpenLayers (Y-down)
-// Formula: openlayers_y = ss14_maxY - (ent.y - ss14_minY)
-// Simplified: openlayers_y = ss14_minY + ss14_maxY - ent.y
 const flippedEntities = entities.map(ent => ({
   ...ent,
   flippedY: ss14_minY + ss14_maxY - ent.y
 }));
 
 console.log(`SS14 bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
-console.log('Sample flipped entity:', flippedEntities[0]);
 
 // Create layers array
 const layers = [];
 
-// Add map preview image if available
-if (cacheKey && hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-  const extent = [minX, minY, maxX, maxY];
-  const previewUrl = `/maps/api/preview?cache=${cacheKey}`;
+// Add chunk image layers instead of preview
+if (cacheKey && hasData && gridChunks.length > 0) {
+  const baseUrl = '/maps/api/tiles/' + cacheKey;
   
-  console.log('Adding preview layer with extent:', extent);
+  // Get Y range for flipping
+  const allCy = gridChunks.map(c => c.y !== undefined ? c.y : (c.chunk_y || 0));
+  const maxCy = Math.max(...allCy);
   
-  const previewLayer = new ImageLayer({
-    source: new Static({
-      url: previewUrl,
-      imageExtent: extent,
-    }),
-    zIndex: 1
+  gridChunks.forEach(chunk => {
+    const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
+    const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
+    
+    // Flip Y: image has y=0 at TOP, but SS14/OL expects y=0 at BOTTOM
+    // So we flip: new_y = max_y - old_y
+    const flippedCy = maxCy - cy;
+    
+    const left = cx * CHUNK_SIZE;
+    const bottom = flippedCy * CHUNK_SIZE;
+    
+    const chunkExtent = [left, bottom, left + CHUNK_SIZE, bottom + CHUNK_SIZE];
+    
+    const tileUrl = `${baseUrl}/chunk_${cx}_${cy}.png`;
+    
+    const chunkLayer = new ImageLayer({
+      source: new Static({
+        url: tileUrl,
+        imageExtent: chunkExtent,
+        imageSize: [CHUNK_SIZE * TILE_SIZE_PX, CHUNK_SIZE * TILE_SIZE_PX]
+      }),
+      zIndex: 1
+    });
+    
+    layers.push(chunkLayer);
   });
-  
-  layers.push(previewLayer);
 } else {
-  console.warn('Cannot add preview layer - missing cacheKey or invalid bounds');
+  console.warn('Cannot add chunk layers - missing cacheKey or no chunks');
 }
 
 // Entity layer (with flipped Y)
