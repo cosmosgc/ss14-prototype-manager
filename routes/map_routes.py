@@ -5,7 +5,7 @@ import struct
 import json
 import hashlib
 import sqlite3
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import yaml
 
 from app import (
@@ -167,6 +167,212 @@ def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.
     except Exception:
         return None
 
+
+def get_entity_type(proto: str) -> str:
+    """Extract entity type group from prototype name"""
+    proto_lower = proto.lower()
+    if any(x in proto_lower for x in ['wall', 'grille']):
+        return 'walls'
+    if any(x in proto_lower for x in ['door', 'airlock']):
+        return 'doors'
+    if any(x in proto_lower for x in ['cable', 'wire']):
+        return 'cables'
+    if any(x in proto_lower for x in ['apc', 'power', 'smes']):
+        return 'power'
+    if any(x in proto_lower for x in ['thruster', 'engine']):
+        return 'thrusters'
+    if any(x in proto_lower for x in ['seat', 'chair', 'bed']):
+        return 'furniture'
+    if any(x in proto_lower for x in ['light', 'lamp']):
+        return 'lights'
+    if any(x in proto_lower for x in ['med', 'chem', 'pill']):
+        return 'medical'
+    if any(x in proto_lower for x in ['weapon', 'gun', 'laser']):
+        return 'weapons'
+    if any(x in proto_lower for x in ['tank', 'canister']):
+        return 'gas'
+    return 'other'
+
+
+ENTITY_COLORS = {
+    'walls': (100, 100, 100, 200),
+    'doors': (0, 150, 200, 200),
+    'cables': (255, 200, 0, 200),
+    'power': (200, 200, 0, 200),
+    'thrusters': (255, 100, 0, 200),
+    'furniture': (150, 100, 50, 200),
+    'lights': (255, 255, 100, 200),
+    'medical': (255, 100, 100, 200),
+    'weapons': (255, 50, 50, 200),
+    'gas': (100, 200, 255, 200),
+    'other': (150, 150, 150, 200),
+}
+
+
+def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Image.Image | None:
+    """Get or create cached entity icon"""
+    # Check cache first
+    cache_dir = Path("static") / "entity_cache" / instance_name
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    icon_path = cache_dir / f"{proto}.png"
+    
+    if icon_path.exists():
+        try:
+            with Image.open(icon_path) as im:
+                return im.convert("RGBA")
+        except Exception:
+            pass
+    
+    # Try to get sprite from prototype
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
+            (proto, instance_name)
+        ).fetchone()
+    
+    if not row:
+        return None
+    
+    instance_root = None
+    with get_db() as conn:
+        inst_row = conn.execute(
+            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
+        ).fetchone()
+        if inst_row:
+            instance_root = Path(inst_row["root_path"])
+    
+    if not instance_root:
+        return None
+    
+    proto_root = instance_root / "Resources" / "Prototypes"
+    proto_path = safe_join(proto_root, row["rel_path"])
+    
+    if not proto_path or not proto_path.exists():
+        return None
+    
+    try:
+        docs = load_yaml_documents(proto_path)
+    except Exception:
+        return None
+    
+    sprite = None
+    state = "icon"
+    
+    for doc in docs:
+        if isinstance(doc, dict) and doc.get("id") == proto:
+            # Try to get sprite from components
+            components = doc.get("components", [])
+            if isinstance(components, list):
+                for comp in components:
+                    if isinstance(comp, dict):
+                        if comp.get("type") == "Icon" and isinstance(comp.get("sprite"), str):
+                            sprite = comp["sprite"]
+                            if isinstance(comp.get("state"), str):
+                                state = comp["state"]
+                            break
+                        if comp.get("type") == "Sprite" and isinstance(comp.get("sprite"), str):
+                            sprite = comp["sprite"]
+                            if isinstance(comp.get("state"), str):
+                                state = comp["state"]
+                            break
+            if not sprite:
+                sprite = doc.get("sprite")
+                state = doc.get("state", "icon")
+            break
+    
+    if not sprite or not isinstance(sprite, str):
+        return None
+    
+    sprite = sprite.strip()
+    if sprite.startswith("/"):
+        sprite = sprite[1:]
+    if sprite.endswith(".png"):
+        sprite = sprite[:-4]
+    elif sprite.endswith(".rsi"):
+        sprite = sprite[:-4]
+    
+    textures_root = instance_root / "Resources" / "Textures"
+    tex = extract_tile_texture(textures_root, sprite, state)
+    
+    if not tex:
+        return None
+    
+    # Resize to icon size
+    if tex.size != (icon_size, icon_size):
+        tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
+    
+    # Save to cache
+    try:
+        tex.save(icon_path)
+    except Exception:
+        pass
+    
+    return tex
+
+
+def render_entity_layer(entities: list, instance_name: str, 
+                       min_cx: int, max_cy: int, 
+                       x_range: int, y_range: int,
+                       output_path: Path, scale: int = 64) -> Path | None:
+    """Render entities as a separate PNG layer"""
+    if not entities:
+        return None
+    
+    # Image dimensions
+    map_width = (x_range + 1) * CHUNK_SIZE
+    map_height = (y_range + 1) * CHUNK_SIZE
+    
+    img = Image.new('RGBA', (map_width * scale, map_height * scale))
+    
+    # Cache for entity icons
+    icon_cache = {}
+    
+    # Calculate min_cy from max_cy and y_range
+    min_cy = max_cy - y_range
+    
+    for ent in entities:
+        x = ent.get("x", 0)
+        y = ent.get("y", 0)
+        proto = ent.get("proto", "")
+        
+        # Same transform as chunks: normalize → flip
+        chunk_x = int(x // CHUNK_SIZE)
+        local_x = int(x) % CHUNK_SIZE
+        
+        # For Y: apply the SAME normalize+flip as chunks
+        chunk_y = int(y // CHUNK_SIZE)
+        local_y = int(y) % CHUNK_SIZE
+        
+        # Normalize
+        cx_index = chunk_x - min_cx
+        cy_index = chunk_y - min_cy
+        # Flip
+        cy_flipped = y_range - cy_index
+        
+        px = (cx_index * CHUNK_SIZE + local_x) * scale
+        py = (cy_flipped * CHUNK_SIZE + local_y) * scale
+        
+        # Get entity icon
+        if proto not in icon_cache:
+            icon = get_entity_icon(instance_name, proto, scale)
+            if icon:
+                icon_cache[proto] = icon
+        
+        icon = icon_cache.get(proto)
+        if icon:
+            img.paste(icon, (int(px), int(py)), icon)
+        else:
+            # Fallback: colored circle
+            ent_type = get_entity_type(proto)
+            color = ENTITY_COLORS.get(ent_type, (255, 0, 255, 200))
+            draw = ImageDraw.Draw(img)
+            r = scale // 2
+            draw.ellipse([px - r, py - r, px + r, py + r], fill=color)
+    
+    img.save(output_path)
+    return output_path
+
+
 map_bp = Blueprint("map", __name__, url_prefix="/maps")
 
 
@@ -290,7 +496,7 @@ def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, 
                 tile_name = tilemap.get(tile_id, "Space")
 
                 px = (offset_x + x) * scale
-                py = (offset_y + (CHUNK_SIZE - 1 - y)) * scale
+                py = (offset_y + y) * scale
 
                 # Fast path for space
                 if tile_name == "Space":
@@ -427,6 +633,13 @@ def map_view():
     print(f"DEBUG: Grid chunks: {len(grid_chunks)}")
     print(f"DEBUG: Entities: {len(entities)}")
     
+    # Build entity types (always)
+    entity_types = {}
+    for ent in entities:
+        proto = ent.get("proto", "")
+        ent_type = get_entity_type(proto)
+        entity_types[proto] = ent_type
+    
     # Generate cache key and tile images
     cache_key = get_map_cache_key(selected["name"], rel_file)
     tile_cache_dir = Path("static") / "map_cache" / cache_key
@@ -479,7 +692,6 @@ def map_view():
             sprite, state = sprite_info
             tex = extract_tile_texture(textures_root, sprite, state)
             if tex:
-                # Resize to TILE_SIZE_PX if needed
                 if tex.size != (TILE_SIZE_PX, TILE_SIZE_PX):
                     tex = tex.resize((TILE_SIZE_PX, TILE_SIZE_PX), Image.Resampling.NEAREST)
                 texture_cache[tile_name] = tex
@@ -498,6 +710,29 @@ def map_view():
         preview_path = tile_cache_dir / "preview.png"
         render_full_map_png(tilemap, grid_chunks, texture_cache, preview_path)
         
+        # Generate entity layer
+        if entities:
+            print("DEBUG: Generating entity layer...")
+            min_cx = min(c["x"] for c in grid_chunks)
+            max_cx = max(c["x"] for c in grid_chunks)
+            min_cy = min(c["y"] for c in grid_chunks)
+            max_cy = max(c["y"] for c in grid_chunks)
+            x_range = max_cx - min_cx
+            y_range = max_cy - min_cy
+            
+            entity_layer_path = tile_cache_dir / "entities.png"
+            render_entity_layer(entities, selected["name"], min_cx, max_cy, x_range, y_range, entity_layer_path, scale=64)
+        
+        # Pre-cache entity icons
+        print("DEBUG: Pre-caching entity icons...")
+        unique_protos = set()
+        for ent in entities:
+            proto = ent.get("proto", "")
+            if proto:
+                unique_protos.add(proto)
+        for proto in unique_protos:
+            get_entity_icon(instance_name, proto, 32)
+        
         # Save metadata
         with open(meta_path, "w") as f:
             json.dump({
@@ -507,6 +742,28 @@ def map_view():
         print("DEBUG: Tile generation complete")
     else:
         print("DEBUG: Skipping tile generation (cached)")
+        # Still ensure entity layer exists
+        if entities and not (tile_cache_dir / "entities.png").exists():
+            print("DEBUG: Generating missing entity layer...")
+            min_cx = min(c["x"] for c in grid_chunks)
+            max_cx = max(c["x"] for c in grid_chunks)
+            min_cy = min(c["y"] for c in grid_chunks)
+            max_cy = max(c["y"] for c in grid_chunks)
+            x_range = max_cx - min_cx
+            y_range = max_cy - min_cy
+            entity_layer_path = tile_cache_dir / "entities.png"
+            render_entity_layer(entities, selected["name"], min_cx, max_cy, x_range, y_range, entity_layer_path, scale=64)
+        
+        # Pre-cache entity icons if needed
+        unique_protos = set()
+        for ent in entities:
+            proto = ent.get("proto", "")
+            if proto:
+                unique_protos.add(proto)
+        for proto in unique_protos:
+            icon_path = Path("static") / "entity_cache" / selected["name"] / f"{proto}.png"
+            if not icon_path.exists():
+                get_entity_icon(selected["name"], proto, 32)
     
     return render_template(
         "map_view.html",
@@ -517,6 +774,7 @@ def map_view():
         tilemap=tilemap,
         grid_chunks=grid_chunks,
         entities=entities,
+        entity_types=entity_types,
         cache_key=cache_key,
     )
 
@@ -568,3 +826,20 @@ def map_preview():
     if not preview_path.exists():
         abort(404)
     return send_file(preview_path, mimetype='image/png')
+
+
+@map_bp.route("/api/entity-layer/<cache_key>")
+def get_entity_layer(cache_key):
+    """Serve entity layer image"""
+    entity_path = Path("static") / "map_cache" / cache_key / "entities.png"
+    if not entity_path.exists():
+        abort(404)
+    return send_file(entity_path, mimetype='image/png')
+
+@map_bp.route("/api/entity-icon/<instance_name>/<proto>")
+def get_entity_icon_api(instance_name, proto):
+    """Serve cached entity icon"""
+    icon_path = Path("static") / "entity_cache" / instance_name / f"{proto}.png"
+    if not icon_path.exists():
+        abort(404)
+    return send_file(icon_path, mimetype='image/png')

@@ -11,7 +11,7 @@ import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 import Text from 'ol/style/Text';
 import CircleStyle from 'ol/style/Circle';
-import { transformExtent } from 'ol/proj';
+import { fromLonLat } from 'ol/proj';
 import 'ol/ol.css';
 
 const mapDataTag = document.getElementById('map-data');
@@ -33,6 +33,7 @@ const tilemap = mapData.tilemap || {};
 const gridChunks = mapData.gridChunks || [];
 const entities = mapData.entities || [];
 const cacheKey = mapData.cacheKey || '';
+const entityTypes = mapData.entityTypes || {};
 const CHUNK_SIZE = 16;
 const TILE_SIZE_PX = 32;
 
@@ -40,82 +41,153 @@ console.log('Map data loaded:', {
   tilemapKeys: Object.keys(tilemap).length,
   gridChunks: gridChunks.length,
   entities: entities.length,
-  cacheKey: cacheKey
+  cacheKey: cacheKey,
+  entityTypes: Object.keys(entityTypes).length
 });
 
-// Calculate map bounds in SS14 coordinates (Y-up)
-let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-let hasData = false;
-
-let minCy = Infinity;
-let maxCy = -Infinity;
+// ---- Compute chunk bounds (world space) ----
+let minCx = Infinity, maxCx = -Infinity;
+let minCy = Infinity, maxCy = -Infinity;
 
 gridChunks.forEach(chunk => {
-  const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
-  const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
+  const cx = chunk.x ?? chunk.chunk_x ?? 0;
+  const cy = chunk.y ?? chunk.chunk_y ?? 0;
 
-  const left = cx * CHUNK_SIZE;
-  const bottom = cy * CHUNK_SIZE;
-
-  minX = Math.min(minX, left);
-  minY = Math.min(minY, bottom);
-  maxX = Math.max(maxX, left + CHUNK_SIZE);
-  maxY = Math.max(maxY, bottom + CHUNK_SIZE);
-
+  minCx = Math.min(minCx, cx);
+  maxCx = Math.max(maxCx, cx);
   minCy = Math.min(minCy, cy);
   maxCy = Math.max(maxCy, cy);
-
-  hasData = true;
 });
 
-// Store SS14 bounds for Y-flipping (unchanged)
-const ss14_minY = minY;
-const ss14_maxY = maxY;
-
-// Flip entity Y to match chunk coordinate system
+const xRange = maxCx - minCx;
 const yRange = maxCy - minCy;
 
-const flippedEntities = entities.map(ent => {
-  const worldY = ent.y || 0;
+// ---- Render-space bounds (AFTER flip) ----
+const minX = 0;
+const minY = 0;
+const maxX = (xRange + 1) * CHUNK_SIZE;
+const maxY = (yRange + 1) * CHUNK_SIZE;
 
-  // Convert world Y → chunk-relative tile space
-  const tileY = worldY;
+console.log("Render bounds:", { minX, minY, maxX, maxY });
+console.log("Chunk range: cx", minCx, "-", maxCx, "cy", minCy, "-", maxCy);
 
-  // Normalize to chunk space origin
-  const normalizedY = tileY - (minCy * CHUNK_SIZE);
-
-  // Flip in same space as chunks
-  const flippedY = (yRange * CHUNK_SIZE) - normalizedY;
-
-  return {
-    ...ent,
-    flippedY
-  };
+// ---- Group entities by type ----
+const entitiesByType = {};
+entities.forEach(ent => {
+  const proto = ent.proto || 'unknown';
+  const entType = entityTypes[proto] || 'other';
+  
+  if (!entitiesByType[entType]) {
+    entitiesByType[entType] = [];
+  }
+  entitiesByType[entType].push(ent);
 });
 
-console.log(`SS14 bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
+console.log('Entities by type:', Object.keys(entitiesByType).map(t => `${t}: ${entitiesByType[t].length}`));
 
-// Create layers array
+// ---- Create layer toggle controls ----
+function createLayerControls() {
+  const controlDiv = document.createElement('div');
+  controlDiv.className = 'map-layer-controls';
+  controlDiv.style.cssText = 'position:absolute; top:10px; right:10px; background:white; padding:10px; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,0.3); z-index:1000; max-height:400px; overflow-y:auto;';
+  
+  // Title
+  const title = document.createElement('h4');
+  title.textContent = 'Layers';
+  title.style.cssText = 'margin:0 0 8px 0; font-size:14px;';
+  controlDiv.appendChild(title);
+  
+  // Master toggle
+  const masterDiv = document.createElement('div');
+  masterDiv.style.cssText = 'margin-bottom:8px;';
+  const masterCheckbox = document.createElement('input');
+  masterCheckbox.type = 'checkbox';
+  masterCheckbox.checked = true;
+  masterCheckbox.id = 'master-toggle';
+  masterCheckbox.addEventListener('change', () => {
+    const checked = masterCheckbox.checked;
+    document.querySelectorAll('.layer-toggle').forEach(cb => {
+      cb.checked = checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+  });
+  const masterLabel = document.createElement('label');
+  masterLabel.textContent = 'Show All';
+  masterLabel.style.cssText = 'margin-left:4px; font-size:12px; cursor:pointer;';
+  masterLabel.prepend(masterCheckbox);
+  masterDiv.appendChild(masterLabel);
+  
+  controlDiv.appendChild(masterDiv);
+  
+  // Separator
+  const sep = document.createElement('hr');
+  sep.style.cssText = 'margin:8px 0; border:none; border-top:1px solid #ccc;';
+  controlDiv.appendChild(sep);
+  
+  // Entity type toggles
+  const typeColors = {
+    'walls': 'rgba(100,100,100,0.8)',
+    'doors': 'rgba(0,150,200,0.8)',
+    'cables': 'rgba(255,200,0,0.8)',
+    'power': 'rgba(200,200,0,0.8)',
+    'thrusters': 'rgba(255,100,0,0.8)',
+    'furniture': 'rgba(150,100,50,0.8)',
+    'lights': 'rgba(255,255,100,0.8)',
+    'medical': 'rgba(255,100,100,0.8)',
+    'weapons': 'rgba(255,50,50,0.8)',
+    'gas': 'rgba(100,200,255,0.8)',
+    'other': 'rgba(150,150,150,0.8)'
+  };
+  
+  Object.keys(entitiesByType).sort().forEach(entType => {
+    const count = entitiesByType[entType].length;
+    const div = document.createElement('div');
+    div.style.cssText = 'margin:4px 0;';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    checkbox.className = 'layer-toggle';
+    checkbox.dataset.layerType = entType;
+    checkbox.id = `toggle-${entType}`;
+    
+    const color = typeColors[entType] || typeColors['other'];
+    const colorBox = document.createElement('span');
+    colorBox.style.cssText = `display:inline-block; width:12px; height:12px; background:${color}; margin-right:4px; border-radius:2px; vertical-align:middle;`;
+    
+    const label = document.createElement('label');
+    label.textContent = `${entType} (${count})`;
+    label.style.cssText = 'margin-left:4px; font-size:12px; cursor:pointer;';
+    label.prepend(checkbox, colorBox);
+    
+    div.appendChild(label);
+    controlDiv.appendChild(div);
+  });
+  
+  return controlDiv;
+}
+
+// ---- Layers ----
 const layers = [];
+const entityLayers = {};
 
 // Add chunk image layers
-if (cacheKey && hasData && gridChunks.length > 0) {
+if (cacheKey && gridChunks.length > 0) {
   const baseUrl = '/maps/api/tiles/' + cacheKey;
 
-  const yRange = maxCy - minCy;
-
   gridChunks.forEach(chunk => {
-    const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
-    const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
+    const cx = chunk.x ?? chunk.chunk_x ?? 0;
+    const cy = chunk.y ?? chunk.chunk_y ?? 0;
 
-    // ✅ FIX: normalize → then flip (same as Python)
+    // SAME math as Python: normalize first, then flip
+    const cxIndex = cx - minCx;
     const cyIndex = cy - minCy;
     const cyFlipped = yRange - cyIndex;
 
-    const left = cx * CHUNK_SIZE;
-    const bottom = (cyFlipped - 1) * CHUNK_SIZE;
+    const left = cxIndex * CHUNK_SIZE;
+    const bottom = cyFlipped * CHUNK_SIZE;
 
-    const chunkExtent = [
+    const extent = [
       left,
       bottom,
       left + CHUNK_SIZE,
@@ -124,98 +196,134 @@ if (cacheKey && hasData && gridChunks.length > 0) {
 
     const tileUrl = `${baseUrl}/chunk_${cx}_${cy}.png`;
 
-    const chunkLayer = new ImageLayer({
+    layers.push(new ImageLayer({
       source: new Static({
         url: tileUrl,
-        imageExtent: chunkExtent,
+        imageExtent: extent,
         imageSize: [CHUNK_SIZE * TILE_SIZE_PX, CHUNK_SIZE * TILE_SIZE_PX]
       }),
-      zIndex: 1
-    });
-
-    layers.push(chunkLayer);
+      zIndex: 1,
+      properties: { layerType: 'chunks' }
+    }));
   });
 } else {
-  console.warn('Cannot add chunk layers - missing cacheKey or no chunks');
+  console.warn('No chunks to render');
 }
 
-// Entity layer (with flipped Y)
-const entitySource = new VectorSource();
+// ---- Entity layers (grouped by type) ----
+const typeColors = {
+  'walls': 'rgba(100,100,100,0.8)',
+  'doors': 'rgba(0,150,200,0.8)',
+  'cables': 'rgba(255,200,0,0.8)',
+  'power': 'rgba(200,200,0,0.8)',
+  'thrusters': 'rgba(255,100,0,0.8)',
+  'furniture': 'rgba(150,100,50,0.8)',
+  'lights': 'rgba(255,255,100,0.8)',
+  'medical': 'rgba(255,100,100,0.8)',
+  'weapons': 'rgba(255,50,50,0.8)',
+  'gas': 'rgba(100,200,255,0.8)',
+  'other': 'rgba(150,150,150,0.8)'
+};
 
-flippedEntities.forEach(ent => {
-  const x = ent.x || 0;
-  const y = ent.flippedY || 0;
-  const proto = ent.proto || 'unknown';
-  const entName = ent.name || proto;
+Object.keys(entitiesByType).forEach(entType => {
+  const typeEntities = entitiesByType[entType];
+  const source = new VectorSource();
+  const color = typeColors[entType] || typeColors['other'];
 
-  const point = new Point([x, y]);
-  const feature = new Feature({ geometry: point });
-  feature.set('proto', proto);
-  feature.set('type', ent.proto_type);
-  feature.set('name', entName);
-  feature.set('uid', ent.uid);
+  typeEntities.forEach(ent => {
+    const x = ent.x || 0;
+    const y = ent.y || 0;
 
-  let color = 'rgba(255, 50, 50, 0.8)';
-  const protoLower = proto.toLowerCase();
-  if (protoLower.includes('wall')) color = 'rgba(100, 100, 100, 0.8)';
-  else if (protoLower.includes('door') || protoLower.includes('airlock')) color = 'rgba(0, 150, 200, 0.8)';
-  else if (protoLower.includes('cable')) color = 'rgba(255, 200, 0, 0.8)';
-  else if (protoLower.includes('apc') || protoLower.includes('power')) color = 'rgba(200, 200, 0, 0.8)';
-  else if (protoLower.includes('thruster')) color = 'rgba(255, 100, 0, 0.8)';
-  else if (protoLower.includes('seat') || protoLower.includes('chair')) color = 'rgba(150, 100, 50, 0.8)';
-  else if (protoLower.includes('light')) color = 'rgba(255, 255, 100, 0.8)';
+    // Same transform as chunks: normalize, flip, convert back
+    const chunkX = Math.floor(x / CHUNK_SIZE);
+    const chunkY = Math.floor(y / CHUNK_SIZE);
 
-  feature.setStyle(new Style({
-    image: new CircleStyle({
-      radius: 4,
-      fill: new Fill({ color: color }),
-      stroke: new Stroke({ color: '#fff', width: 1 })
-    }),
-    text: new Text({
-      text: entName.length > 12 ? entName.substring(0, 12) : entName,
-      offsetY: -12,
-      font: '9px sans-serif',
-      fill: new Fill({ color: '#000' }),
-      stroke: new Stroke({ color: '#fff', width: 2 })
-    })
-  }));
+    // Handle negative modulo correctly
+    const localX = ((x % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const localY = ((y % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
 
-  entitySource.addFeature(feature);
+    // Apply same normalize+flip logic as chunks (no clamping)
+    const cxIndex = chunkX - minCx;
+    const cyIndex = chunkY - minCy;
+    const cyFlipped = yRange - cyIndex;
+
+    const flippedX = (cxIndex * CHUNK_SIZE) + localX;
+    const flippedY = (cyFlipped * CHUNK_SIZE) + localY;
+
+    const point = new Point([flippedX, flippedY]);
+
+    const feature = new Feature({ geometry: point });
+    feature.set('proto', ent.proto || 'unknown');
+    feature.set('name', ent.name || ent.proto || '');
+    feature.set('type', entType);
+
+    feature.setStyle(new Style({
+      image: new CircleStyle({
+        radius: 4,
+        fill: new Fill({ color: color }),
+        stroke: new Stroke({ color: '#fff', width: 1 })
+      })
+    }));
+
+    source.addFeature(feature);
+  });
+
+  const layer = new VectorLayer({
+    source: source,
+    zIndex: 3,
+    properties: { layerType: 'entity', entityType: entType }
+  });
+
+  entityLayers[entType] = layer;
+  layers.push(layer);
 });
 
-layers.push(new VectorLayer({ source: entitySource, zIndex: 3 }));
-
-// Create map
+// ---- Create map ----
 const map = new Map({
   target: 'map',
   layers: layers,
   view: new View({
-    center: [(minX + maxX) / 2, (minY + maxY) / 2],
+    center: [maxX / 2, maxY / 2],
     zoom: 2
   })
 });
 
-// Fit to extent if valid
-if (hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
-  try {
-    map.getView().fit([minX, minY, maxX, maxY], { padding: [50, 50, 50, 50] });
-    console.log(`Map fitted to extent: [${minX}, ${minY}, ${maxX}, ${maxY}]`);
-  } catch (e) {
-    console.warn('Fit failed, using default view:', e);
-  }
-} else {
-  console.warn('No valid map data to fit. Using default view.');
-}
-
-// Update map size after render
+// ---- Add layer controls ----
 setTimeout(() => {
-  map.updateSize();
-  console.log('Map size updated');
+  const mapDiv = document.getElementById('map');
+  const controls = createLayerControls();
+  mapDiv.appendChild(controls);
+
+  // Add event listeners for toggles
+  document.querySelectorAll('.layer-toggle').forEach(checkbox => {
+    checkbox.addEventListener('change', () => {
+      const layerType = checkbox.dataset.layerType;
+      const layer = entityLayers[layerType];
+      if (layer) {
+        layer.setVisible(checkbox.checked);
+      }
+    });
+  });
+
+  // Master toggle
+  const masterToggle = document.getElementById('master-toggle');
+  if (masterToggle) {
+    masterToggle.addEventListener('change', () => {
+      const checked = masterToggle.checked;
+      Object.values(entityLayers).forEach(layer => {
+        layer.setVisible(checked);
+      });
+    });
+  }
 }, 100);
 
-// Handle window resize
-window.addEventListener('resize', () => {
-  map.updateSize();
-});
+// ---- Fit using RENDER bounds ----
+map.getView().fit(
+  [minX, minY, maxX, maxY],
+  { padding: [50, 50, 50, 50] }
+);
 
-console.log(`Map rendered: ${gridChunks.length} chunks, ${entities.length} entities`);
+setTimeout(() => map.updateSize(), 200);
+window.addEventListener('resize', () => map.updateSize());
+
+console.log(`Map rendered correctly: ${gridChunks.length} chunks, ${entities.length} entities`);
