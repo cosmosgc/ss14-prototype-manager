@@ -1,9 +1,9 @@
 import Map from 'ol/Map';
 import View from 'ol/View';
-import TileLayer from 'ol/layer/Tile';
+import ImageLayer from 'ol/layer/Image';
+import Static from 'ol/source/ImageStatic';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import TileImage from 'ol/source/TileImage';
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
 import Style from 'ol/style/Style';
@@ -11,7 +11,7 @@ import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 import Text from 'ol/style/Text';
 import CircleStyle from 'ol/style/Circle';
-import { getCenter } from 'ol/extent';
+import { transformExtent } from 'ol/proj';
 import 'ol/ol.css';
 
 const mapDataTag = document.getElementById('map-data');
@@ -20,8 +20,19 @@ if (!mapDataTag) {
   throw new Error('Missing map data');
 }
 
-const mapData = JSON.parse(mapDataTag.textContent);
-const { tilemap = {}, gridChunks = [], entities = [], cacheKey = '' } = mapData;
+let mapData;
+try {
+  mapData = JSON.parse(mapDataTag.textContent);
+  console.log('Map data parsed successfully:', mapData);
+} catch (e) {
+  console.error('Failed to parse map data:', e);
+  throw e;
+}
+
+const tilemap = mapData.tilemap || {};
+const gridChunks = mapData.gridChunks || [];
+const entities = mapData.entities || [];
+const cacheKey = mapData.cacheKey || '';
 const CHUNK_SIZE = 16;
 
 console.log('Map data loaded:', {
@@ -31,13 +42,13 @@ console.log('Map data loaded:', {
   cacheKey: cacheKey
 });
 
+// Calculate map bounds in SS14 coordinates (Y-up)
 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 let hasData = false;
 
-// Calculate bounds from grid chunks
 gridChunks.forEach(chunk => {
-  const cx = chunk.x !== undefined ? chunk.x : chunk.chunk_x;
-  const cy = chunk.y !== undefined ? chunk.y : chunk.chunk_y;
+  const cx = chunk.x !== undefined ? chunk.x : (chunk.chunk_x || 0);
+  const cy = chunk.y !== undefined ? chunk.y : (chunk.chunk_y || 0);
   const left = cx * CHUNK_SIZE;
   const bottom = cy * CHUNK_SIZE;
   minX = Math.min(minX, left);
@@ -47,44 +58,50 @@ gridChunks.forEach(chunk => {
   hasData = true;
 });
 
-entities.forEach(ent => {
-  minX = Math.min(minX, ent.x);
-  minY = Math.min(minY, ent.y);
-  maxX = Math.max(maxX, ent.x);
-  maxY = Math.max(maxY, ent.y);
-  hasData = true;
-});
+// Store SS14 bounds for Y-flipping
+const ss14_minY = minY;
+const ss14_maxY = maxY;
 
-console.log(`Bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
+// Flip entity Y coordinates for OpenLayers (Y-down)
+// Formula: openlayers_y = ss14_maxY - (ent.y - ss14_minY)
+// Simplified: openlayers_y = ss14_minY + ss14_maxY - ent.y
+const flippedEntities = entities.map(ent => ({
+  ...ent,
+  flippedY: ss14_minY + ss14_maxY - ent.y
+}));
 
-// Create tile source using cached PNG tiles
-// Map chunk coordinates to tile URLs
-const chunkLookup = {};
-gridChunks.forEach(chunk => {
-  const cx = chunk.x !== undefined ? chunk.x : chunk.chunk_x;
-  const cy = chunk.y !== undefined ? chunk.y : chunk.chunk_y;
-  chunkLookup[`${cx},${cy}`] = true;
-});
+console.log(`SS14 bounds: minX=${minX}, minY=${minY}, maxX=${maxX}, maxY=${maxY}`);
+console.log('Sample flipped entity:', flippedEntities[0]);
 
-const tileSource = new TileImage({
-  tileUrlFunction: (tileCoord) => {
-    const z = tileCoord[0];
-    const x = tileCoord[1];
-    const y = tileCoord[2];
-    
-    // For simplicity, assume tile coords match chunk coords at zoom 0
-    // In production, you'd want a proper tile grid
-    const url = `/maps/api/tiles/${cacheKey}/${x}_${y}`;
-    return url;
-  }
-});
+// Create layers array
+const layers = [];
 
-// Entity layer
+// Add map preview image if available
+if (cacheKey && hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY)) {
+  const extent = [minX, minY, maxX, maxY];
+  const previewUrl = `/maps/api/preview?cache=${cacheKey}`;
+  
+  console.log('Adding preview layer with extent:', extent);
+  
+  const previewLayer = new ImageLayer({
+    source: new Static({
+      url: previewUrl,
+      imageExtent: extent,
+    }),
+    zIndex: 1
+  });
+  
+  layers.push(previewLayer);
+} else {
+  console.warn('Cannot add preview layer - missing cacheKey or invalid bounds');
+}
+
+// Entity layer (with flipped Y)
 const entitySource = new VectorSource();
 
-entities.forEach(ent => {
-  const x = ent.x;
-  const y = ent.y;
+flippedEntities.forEach(ent => {
+  const x = ent.x || 0;
+  const y = ent.flippedY || 0;
   const proto = ent.proto || 'unknown';
   const entName = ent.name || proto;
 
@@ -123,13 +140,12 @@ entities.forEach(ent => {
   entitySource.addFeature(feature);
 });
 
+layers.push(new VectorLayer({ source: entitySource, zIndex: 3 }));
+
 // Create map
 const map = new Map({
   target: 'map',
-  layers: [
-    new TileLayer({ source: tileSource, zIndex: 1 }),
-    new VectorLayer({ source: entitySource, zIndex: 3 })
-  ],
+  layers: layers,
   view: new View({
     center: [(minX + maxX) / 2, (minY + maxY) / 2],
     zoom: 2
@@ -148,4 +164,15 @@ if (hasData && isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(ma
   console.warn('No valid map data to fit. Using default view.');
 }
 
-console.log(`Map rendered: ${gridChunks.length} chunk tiles, ${entities.length} entities`);
+// Update map size after render
+setTimeout(() => {
+  map.updateSize();
+  console.log('Map size updated');
+}, 100);
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  map.updateSize();
+});
+
+console.log(`Map rendered: ${gridChunks.length} chunks, ${entities.length} entities`);

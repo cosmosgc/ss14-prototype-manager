@@ -100,7 +100,7 @@ def render_chunk_png(tiles, tilemap, output_path):
 
 
 def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
-    """Render the entire map as a single PNG image"""
+    """Render the entire map as a single PNG image (flipped Y for OpenLayers)"""
     if not grid_chunks:
         print("DEBUG: No chunks to render")
         return None
@@ -123,8 +123,10 @@ def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
     
     for (cx, cy), chunk in chunk_lookup.items():
         tiles = chunk["tiles"]
+        # Flip Y: SS14 Y-up -> OpenLayers Y-down
+        flipped_cy = max_cy - cy
         offset_x = (cx - min_cx) * CHUNK_SIZE
-        offset_y = (cy - min_cy) * CHUNK_SIZE
+        offset_y = (flipped_cy - min_cy) * CHUNK_SIZE
         
         for y in range(CHUNK_SIZE):
             for x in range(CHUNK_SIZE):
@@ -135,7 +137,7 @@ def render_full_map_png(tilemap, grid_chunks, output_path, scale=4):
                 draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
     
     img.save(output_path)
-    print(f"DEBUG: Saved full map preview: {output_path}")
+    print(f"DEBUG: Saved full map preview (flipped): {output_path}")
     return output_path
 
 
@@ -321,10 +323,10 @@ def map_view():
     )
 
 
-@map_bp.route("/api/tiles/<cache_key>/<int:cx>_<int:cy>")
-def get_tile(cache_key, cx, cy):
+@map_bp.route("/api/tiles/<cache_key>/<path:filename>")
+def get_tile(cache_key, filename):
     """Serve cached tile images"""
-    tile_path = Path("static") / "map_cache" / cache_key / "tiles" / f"chunk_{cx}_{cy}.png"
+    tile_path = Path("static") / "map_cache" / cache_key / "tiles" / filename
     print(f"DEBUG: Serving tile: {tile_path} - Exists: {tile_path.exists()}")
     if not tile_path.exists():
         abort(404)
