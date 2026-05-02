@@ -224,54 +224,86 @@ def render_chunk_png(tiles, tilemap, texture_cache: dict, output_path):
     img.save(output_path)
     return output_path
 
-
 def render_full_map_png(tilemap, grid_chunks, texture_cache: dict, output_path, scale=4):
     """Render the entire map as a single PNG image (flipped Y for OpenLayers)"""
+
     if not grid_chunks:
         print("DEBUG: No chunks to render")
         return None
-    
-    # Find map bounds
+
+    # ---- Bounds ----
     min_cx = min(c["x"] for c in grid_chunks)
     max_cx = max(c["x"] for c in grid_chunks)
     min_cy = min(c["y"] for c in grid_chunks)
     max_cy = max(c["y"] for c in grid_chunks)
-    
-    # Create chunk lookup
-    chunk_lookup = {(c["x"], c["y"]): c for c in grid_chunks}
-    
-    # Calculate image dimensions
-    map_width = (max_cx - min_cx + 1) * CHUNK_SIZE
-    map_height = (max_cy - min_cy + 1) * CHUNK_SIZE
-    
+
+    # Normalize range
+    x_range = max_cx - min_cx
+    y_range = max_cy - min_cy
+
+    # ---- Image size ----
+    map_width = (x_range + 1) * CHUNK_SIZE
+    map_height = (y_range + 1) * CHUNK_SIZE
+
     img = Image.new('RGBA', (map_width * scale, map_height * scale))
     draw = ImageDraw.Draw(img)
-    
-    for (cx, cy), chunk in chunk_lookup.items():
+
+    # ---- Pre-scale textures ONCE ----
+    scaled_texture_cache = {}
+
+    if scale == 1:
+        scaled_texture_cache = texture_cache
+    else:
+        for tile_name, tex in texture_cache.items():
+            scaled_texture_cache[tile_name] = tex.resize(
+                (scale, scale),
+                Image.Resampling.NEAREST
+            )
+
+    # ---- Pre-create fallback tiles (faster than draw each time) ----
+    fallback_cache = {}
+
+    def get_fallback(tile_name):
+        if tile_name not in fallback_cache:
+            color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
+            fallback = Image.new("RGBA", (scale, scale), color)
+            fallback_cache[tile_name] = fallback
+        return fallback_cache[tile_name]
+
+    # ---- Render ----
+    for chunk in grid_chunks:
+        cx = chunk["x"]
+        cy = chunk["y"]
         tiles = chunk["tiles"]
-        # Flip Y: SS14 Y-up -> OpenLayers Y-down
-        offset_x = (cx - min_cx) * CHUNK_SIZE
-        offset_y = (max_cy - cy) * CHUNK_SIZE
-        
+
+        # Normalize → flip (CORRECT ORDER)
+        cx_index = cx - min_cx
+        cy_index = cy - min_cy
+        cy_flipped = y_range - cy_index
+
+        offset_x = cx_index * CHUNK_SIZE
+        offset_y = cy_flipped * CHUNK_SIZE
+
         for y in range(CHUNK_SIZE):
             for x in range(CHUNK_SIZE):
                 tile_id = tiles[y][x]
                 tile_name = tilemap.get(tile_id, "Space")
-                
+
                 px = (offset_x + x) * scale
-                py = (offset_y + y) * scale
-                
-                texture = texture_cache.get(tile_name)
+                py = (offset_y + (CHUNK_SIZE - 1 - y)) * scale
+
+                # Fast path for space
+                if tile_name == "Space":
+                    continue
+
+                texture = scaled_texture_cache.get(tile_name)
+
                 if texture:
-                    if scale == 1:
-                        img.paste(texture, (px, py), texture)
-                    else:
-                        small = texture.resize((scale, scale), Image.Resampling.NEAREST)
-                        img.paste(small, (px, py), small)
+                    img.paste(texture, (px, py), texture)
                 else:
-                    color = TILE_COLORS.get(tile_name, (255, 0, 255, 255))
-                    draw.rectangle([px, py, px + scale - 1, py + scale - 1], fill=color)
-    
+                    fallback = get_fallback(tile_name)
+                    img.paste(fallback, (px, py))
+
     img.save(output_path)
     print(f"DEBUG: Saved full map preview (flipped): {output_path}")
     return output_path
