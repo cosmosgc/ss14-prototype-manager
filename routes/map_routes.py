@@ -5,6 +5,7 @@ import struct
 import json
 import hashlib
 import sqlite3
+import io
 from PIL import Image, ImageDraw, ImageFont
 import yaml
 import math
@@ -133,59 +134,154 @@ def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] 
     return None
 
 
-def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.Image | None:
-    """Load a tile texture image from RSI or direct PNG"""
-    print(f"[DEBUG extract_tile_texture] START: sprite={sprite}, state={state}")
-    
-    # Check for direct PNG first
+def extract_rsi_texture(textures_root: Path, sprite: str, state: str, direction: int = 0, scale: int = 1) -> tuple[Image.Image | None, str]:
+    """Extract texture from RSI - handles directions and animations
+    Returns: (image, mime_type) - image can be PNG or GIF for animations
+    """
+    print(f"Extracting RSI texture: sprite={sprite}, state={state}, direction={direction}, scale={scale}, textures_root={textures_root}")
     direct_png = textures_root / f"{sprite}.png"
-    print(f"[DEBUG extract_tile_texture] Checking direct PNG: {direct_png}")
     if direct_png.exists():
-        print(f"[DEBUG extract_tile_texture] Direct PNG found!")
+        with Image.open(direct_png) as im:
+            tex = im.convert("RGBA")
+            if scale > 1:
+                tex = tex.resize((tex.width * scale, tex.height * scale), Image.Resampling.NEAREST)
+            return tex, "image/png"
+    
+    rsi_dir = safe_join(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return None, "image/png"
+    
+    meta_path = rsi_dir / "meta.json"
+    meta = None
+    if meta_path.exists():
         try:
-            with Image.open(direct_png) as im:
-                return im.convert("RGBA")
-        except Exception as e:
-            print(f"[DEBUG extract_tile_texture] Direct PNG error: {e}")
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
             pass
     
-    # Try RSI folder
-    rsi_dir = safe_join(textures_root, sprite)
-    print(f"[DEBUG extract_tile_texture] RSI dir: {rsi_dir}, exists: {rsi_dir.exists() if rsi_dir else False}")
-    if not rsi_dir or not rsi_dir.exists():
-        print(f"[DEBUG extract_tile_texture] RSI dir not found")
-        return None
+    state_meta = None
+    if meta and "states" in meta:
+        for s in meta["states"]:
+            if isinstance(s, dict) and s.get("name") == state:
+                state_meta = s
+                break
     
-    # Check for meta.json states or fall back to PNG files
     available_states = list_rsi_states(rsi_dir)
-    print(f"[DEBUG extract_tile_texture] Available states: {available_states}")
-    
-    if state in available_states:
-        actual_state = state
-    elif "icon" in available_states:
-        actual_state = "icon"
-    elif available_states:
-        actual_state = available_states[0]
-    else:
-        print(f"[DEBUG extract_tile_texture] No valid state")
-        return None
-    
-    print(f"[DEBUG extract_tile_texture] Using state: {actual_state}")
-    
+    actual_state = state if state in available_states else "icon" if "icon" in available_states else (available_states[0] if available_states else None)
     if not actual_state:
-        return None
+        return None, "image/png"
     
-    png_path = rsi_dir / f"{actual_state}.png"
-    print(f"[DEBUG extract_tile_texture] PNG path: {png_path}, exists: {png_path.exists()}")
-    if not png_path.exists():
-        return None
+    image_path = rsi_dir / f"{actual_state}.png"
+    if not image_path.exists():
+        return None, "image/png"
     
-    try:
-        with Image.open(png_path) as im:
-            return im.convert("RGBA")
-    except Exception as e:
-        print(f"[DEBUG extract_tile_texture] PNG load error: {e}")
-        return None
+    with Image.open(image_path) as im:
+        im = im.convert("RGBA")
+        
+        if not state_meta or "delays" not in state_meta:
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
+        
+        delays = state_meta.get("delays", [])
+        directions = state_meta.get("directions", 1)
+        
+        if not delays:
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
+        
+        if direction < 0 or direction >= directions:
+            direction = 0
+        
+        if isinstance(delays, list) and len(delays) > 0:
+            if isinstance(delays[0], list):
+                if direction < len(delays):
+                    frame_delays = delays[direction]
+                else:
+                    frame_delays = delays[0]
+            else:
+                frame_delays = delays
+        else:
+            frame_delays = [0.1]
+        
+        frame_count = len(frame_delays)
+        if frame_count <= 1:
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
+        
+        if directions > 1:
+            frame_width = im.width // frame_count
+            frame_height = im.height // directions
+        else:
+            frame_width = im.width // frame_count
+            frame_height = im.height
+        
+        if frame_width <= 0 or frame_height <= 0:
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
+        
+        frames = []
+        for i in range(frame_count):
+            x1 = i * frame_width
+            y1 = direction * frame_height
+            x2 = (i + 1) * frame_width
+            y2 = (direction + 1) * frame_height
+            
+            x2 = min(x2, im.width)
+            y2 = min(y2, im.height)
+            
+            if x2 <= x1 or y2 <= y1:
+                continue
+            
+            try:
+                frame = im.crop((x1, y1, x2, y2))
+                if scale > 1:
+                    frame = frame.resize((frame.width * scale, frame.height * scale), Image.Resampling.NEAREST)
+                frames.append(frame)
+            except Exception:
+                continue
+        
+        if len(frames) <= 1:
+            if frames:
+                return frames[0], "image/png"
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
+        
+        durations = []
+        for delay in frame_delays:
+            try:
+                duration_ms = max(10, min(2000, int(float(delay) * 1000)))
+                durations.append(duration_ms)
+            except (ValueError, TypeError):
+                durations.append(100)
+        
+        while len(durations) < len(frames):
+            durations.append(100)
+        
+        try:
+            buffer = io.BytesIO()
+            frames[0].save(
+                buffer,
+                format="GIF",
+                save_all=True,
+                append_images=frames[1:],
+                duration=durations[:len(frames)],
+                loop=0
+            )
+            buffer.seek(0)
+            buffer.seek(0)
+            gif_im = Image.open(buffer)
+            return gif_im, "image/gif"
+        except Exception:
+            if frames:
+                return frames[0], "image/png"
+            if scale > 1:
+                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+            return im, "image/png"
 
 
 def get_entity_type(proto: str) -> str:
@@ -229,10 +325,38 @@ ENTITY_COLORS = {
 }
 
 
+def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.Image | None:
+    """Load a tile texture image from RSI or direct PNG"""
+    direct_png = textures_root / f"{sprite}.png"
+    if direct_png.exists():
+        try:
+            with Image.open(direct_png) as im:
+                return im.convert("RGBA")
+        except Exception:
+            pass
+    
+    rsi_dir = safe_join(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return None
+    
+    available_states = list_rsi_states(rsi_dir)
+    actual_state = state if state in available_states else "icon" if "icon" in available_states else (available_states[0] if available_states else None)
+    if not actual_state:
+        return None
+    
+    png_path = rsi_dir / f"{actual_state}.png"
+    if not png_path.exists():
+        return None
+    
+    try:
+        with Image.open(png_path) as im:
+            return im.convert("RGBA")
+    except Exception:
+        return None
+
+
 def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Image.Image | None:
     """Get or create cached entity icon - copies RSI folder structure"""
-    print(f"[DEBUG get_entity_icon] START: proto={proto}, instance={instance_name}")
-    
     instance_root = None
     with get_db() as conn:
         inst_row = conn.execute(
@@ -242,10 +366,8 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
             instance_root = Path(inst_row["root_path"])
     
     if not instance_root:
-        print(f"[DEBUG get_entity_icon] No instance_root found")
         return None
     
-    # Find proto file path
     with get_db() as conn:
         row = conn.execute(
             "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
@@ -253,43 +375,32 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
         ).fetchone()
     
     if not row:
-        print(f"[DEBUG get_entity_icon] No proto_path found for {proto}")
         return None
     
     proto_root = instance_root / "Resources" / "Prototypes"
     proto_path = safe_join(proto_root, row["rel_path"])
     
     if not proto_path or not proto_path.exists():
-        print(f"[DEBUG get_entity_icon] Proto file not found: {proto_path}")
         return None
     
-    # Lazy but solid: find first sprite in text
     text = proto_path.read_text(encoding="utf-8")
     sprite = find_first_sprite_in_text(text)
     if not sprite:
-        print(f"[DEBUG get_entity_icon] No sprite found in {proto_path}")
         return None
     
     state = find_first_state_in_text(text)
-    print(f"[DEBUG get_entity_icon] Found: sprite={sprite}, state={state}")
     
-    # Cleanup sprite path
     sprite = sprite.strip()
     if sprite.startswith("/"):
         sprite = sprite[1:]
     if sprite.endswith(".png"):
         sprite = sprite[:-4]
-    print(f"[DEBUG get_entity_icon] Sprite after cleanup: {sprite}")
     
     textures_root = instance_root / "Resources" / "Textures"
     rsi_dir = safe_join(textures_root, sprite)
-    print(f"[DEBUG get_entity_icon] RSI dir: {rsi_dir}, exists: {rsi_dir.exists() if rsi_dir else False}")
-    
     available_states = list_rsi_states(rsi_dir) if rsi_dir else []
-    print(f"[DEBUG get_entity_icon] Available states: {available_states}")
 
     chosen_state = None
-    
     if state in available_states:
         chosen_state = state
     elif "icon" in available_states:
@@ -299,56 +410,36 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
     elif rsi_dir and rsi_dir.exists():
         direct_png = textures_root / f"{sprite}.png"
         if direct_png.exists():
-            print(f"[DEBUG get_entity_icon] Using direct PNG: {direct_png}")
             try:
                 with Image.open(direct_png) as im:
-                    tex = im.convert("RGBA")
-            except Exception as e:
-                print(f"[DEBUG get_entity_icon] Direct PNG error: {e}")
-                tex = None
-            return tex
+                    return im.convert("RGBA")
+            except Exception:
+                pass
     
     if not chosen_state and not available_states:
-        print(f"[DEBUG get_entity_icon] No state or PNG found, returning None")
         return None
     
-    # Cache path: preserve RSI folder structure
-    # e.g., static/entity_cache/Andromeda-v/Structures/Furniture/chairs/chair.png
     cache_dir = Path("static") / "entity_cache" / instance_name / sprite
     cache_dir.mkdir(parents=True, exist_ok=True)
     icon_path = cache_dir / f"{chosen_state}.png"
     
-    # Check cache first
     if icon_path.exists():
-        print(f"[DEBUG get_entity_icon] Cache HIT: {icon_path}")
         try:
             with Image.open(icon_path) as im:
                 return im.convert("RGBA")
-        except Exception as e:
-            print(f"[DEBUG get_entity_icon] Cache read error: {e}")
+        except Exception:
             pass
     
-    print(f"[DEBUG get_entity_icon] Cache MISS, extracting texture...")
-    
-    # Extract texture from RSI
-    tex = extract_tile_texture(textures_root, sprite, chosen_state)
-    
+    tex, _ = extract_rsi_texture(textures_root, sprite, chosen_state, direction=0, scale=1)
     if not tex:
-        print(f"[DEBUG get_entity_icon] extract_tile_texture returned None")
         return None
     
-    print(f"[DEBUG get_entity_icon] Got texture: {tex.size}")
-    
-    # Resize to icon size
     if tex.size != (icon_size, icon_size):
         tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
     
-    # Save to cache
     try:
         tex.save(icon_path)
-        print(f"[DEBUG get_entity_icon] Saved to cache: {icon_path}")
-    except Exception as e:
-        print(f"[DEBUG get_entity_icon] Save error: {e}")
+    except Exception:
         pass
     
     return tex
@@ -362,13 +453,11 @@ def render_entity_layer(entities: list, instance_name: str,
     if not entities:
         return None
     
-    # Image dimensions
     map_width = (x_range + 1) * CHUNK_SIZE
     map_height = (y_range + 1) * CHUNK_SIZE
     
     img = Image.new('RGBA', (map_width * scale, map_height * scale))
     
-    # Cache for entity icons
     icon_cache = {}
     
     
@@ -377,10 +466,6 @@ def render_entity_layer(entities: list, instance_name: str,
         y = ent.get("y", 0)
         proto = ent.get("proto", "")
         
-        # SS14 has Y-up, images have Y-down
-        # Step 1: Get chunk indices (SS14 space)
-        
-                
         chunk_x = math.floor(x / CHUNK_SIZE)
         chunk_y = math.floor(y / CHUNK_SIZE)
 
@@ -396,26 +481,22 @@ def render_entity_layer(entities: list, instance_name: str,
 
         px = (offset_x + local_x) * scale
         py = (offset_y + (CHUNK_SIZE - 1 - local_y)) * scale
-        # Get entity icon
         if proto not in icon_cache:
-            
-            print(f"getting Entity icon {proto} → px={px}, py={py}")
             icon = get_entity_icon(instance_name, proto, scale)
             if icon:
                 icon_cache[proto] = icon
-                print(f"Cached icon for {proto}")
         
         icon = icon_cache.get(proto)
         if icon:
+            if icon.mode != 'RGBA':
+                icon = icon.convert('RGBA')
             img.paste(icon, (int(px), int(py)), icon)
         else:
-            # Fallback: colored circle
             ent_type = get_entity_type(proto)
             color = ENTITY_COLORS.get(ent_type, (255, 0, 255, 200))
             draw = ImageDraw.Draw(img)
             r = scale // 2
             draw.ellipse([px - r, py - r, px + r, py + r], fill=color)
-    print(f"DEBUG: Rendered {len(entities)} entities on layer")
     img.save(output_path)
     return output_path
 
