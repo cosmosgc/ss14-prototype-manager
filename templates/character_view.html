@@ -10,103 +10,235 @@
         ← Back
       </a>
       <h1 class="text-2xl font-bold">{{ meta.name }}</h1>
+      <span class="rounded bg-slate-200 px-2 py-1 text-sm">{{ meta.species }}</span>
     </div>
   </div>
 
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-    <div class="rounded-lg border bg-white p-6 shadow-sm">
-      <h2 class="mb-4 text-lg font-semibold">Character Info</h2>
-      <dl class="space-y-3">
-        <div>
-          <dt class="text-sm font-medium text-slate-500">ID</dt>
-          <dd class="font-mono">{{ char_data.id }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm font-medium text-slate-500">Type</dt>
-          <dd>{{ char_data.type }}</dd>
-        </div>
-        <div>
-          <dt class="text-sm font-medium text-slate-500">Species</dt>
-          <dd>{{ meta.species }}</dd>
-        </div>
-        {% if char_data.components %}
-        <div>
-          <dt class="text-sm font-medium text-slate-500">Components</dt>
-          <dd class="flex flex-wrap gap-1">
-            {% for comp in char_data.components.keys()|list %}
-            <span class="rounded bg-slate-100 px-2 py-0.5 text-xs">{{ comp }}</span>
-            {% endfor %}
-          </dd>
-        </div>
-        {% endif %}
-      </dl>
-    </div>
+    <div class="space-y-6">
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Basic Info</h2>
+        <dl class="space-y-3">
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Name</dt>
+            <dd class="font-medium">{{ char_data.name }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Species</dt>
+            <dd>{{ char_data.species }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Gender</dt>
+            <dd>{{ char_data.gender }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Sex</dt>
+            <dd>{{ char_data.sex }}</dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Age</dt>
+            <dd>{{ char_data.age }}</dd>
+          </div>
+          {% if char_data.weight and char_data.height %}
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Height / Weight</dt>
+            <dd>{{ char_data.height }}cm / {{ char_data.weight }}kg</dd>
+          </div>
+          {% endif %}
+          {% if char_data.version %}
+          <div>
+            <dt class="text-sm font-medium text-slate-500">Version</dt>
+            <dd>{{ char_data.version }} <span class="text-slate-400">({{ char_data.forkId }})</span></dd>
+          </div>
+          {% endif %}
+        </dl>
+      </div>
 
-    <div class="rounded-lg border bg-white p-6 shadow-sm lg:col-span-2">
-      <h2 class="mb-4 text-lg font-semibold">Dress Up</h2>
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Appearance</h2>
+        <dl class="space-y-3">
+          {% if char_data.appearance.skinColor %}
+          <div class="flex items-center gap-2">
+            <dt class="text-sm font-medium text-slate-500">Skin</dt>
+            <dd class="flex items-center gap-2">
+              <span class="h-4 w-4 rounded border" style="background-color: {{ char_data.appearance.skinColor }}"></span>
+              <code class="text-xs">{{ char_data.appearance.skinColor }}</code>
+            </dd>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.eyeColor %}
+          <div class="flex items-center gap-2">
+            <dt class="text-sm font-medium text-slate-500">Eyes</dt>
+            <dd class="flex items-center gap-2">
+              <span class="h-4 w-4 rounded border" style="background-color: {{ char_data.appearance.eyeColor }}"></span>
+              <code class="text-xs">{{ char_data.appearance.eyeColor }}</code>
+            </dd>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.hairColor %}
+          <div class="flex items-center gap-2">
+            <dt class="text-sm font-medium text-slate-500">Hair</dt>
+            <dd class="flex items-center gap-2">
+              <span class="h-4 w-4 rounded border" style="background-color: {{ char_data.appearance.hairColor }}"></span>
+              <code class="text-xs">{{ char_data.appearance.hair }} - {{ char_data.appearance.hairColor }}</code>
+            </dd>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.facialHair %}
+          <div class="flex items-center gap-2">
+            <dt class="text-sm font-medium text-slate-500">Facial</dt>
+            <dd class="flex items-center gap-2">
+              <span class="h-4 w-4 rounded border" style="background-color: {{ char_data.appearance.facialHairColor }}"></span>
+              <code class="text-xs">{{ char_data.appearance.facialHair }} - {{ char_data.appearance.facialHairColor }}</code>
+            </dd>
+          </div>
+          {% endif %}
+        </dl>
+      </div>
 
-      <form method="post" action="{{ url_for('character.character_dressup', char_id=char_id) }}" class="space-y-4">
-        <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {% for slot in meta.slots %}
-          <div class="rounded border p-3">
-            <label class="mb-2 block text-sm font-medium capitalize">{{ slot }}</label>
-            <select
-              name="slot"
-              onchange="this.form.querySelector('[name=item_id]').value = this.value; this.form.submit();"
-              class="w-full rounded border border-slate-300 px-2 py-1 text-sm"
-            >
-              <option value="">None</option>
-              {% set equipped = char_data.equipment.get(slot, '') %}
-              {% if equipped %}
-              <option value="{{ equipped }}" selected>{{ equipped }}</option>
-              {% endif %}
-            </select>
-            <input type="hidden" name="item_id" value="" />
+      {% if char_data.markingIds %}
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Markings</h2>
+        <div class="space-y-3">
+          {% for mark_id in char_data.markingIds %}
+          <div class="flex items-center justify-between rounded bg-slate-50 px-3 py-2">
+            <span class="font-mono text-sm">{{ mark_id }}</span>
+            {% if char_data.markingColors[mark_id] %}
+            <div class="flex gap-1">
+              {% for color in char_data.markingColors[mark_id] %}
+              <span class="h-4 w-4 rounded border" style="background-color: {{ color }}"></span>
+              {% endfor %}
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
+      </div>
+      {% endif %}
 
-        <div class="flex gap-2">
-          <select
-            name="slot"
-            class="rounded border border-slate-300 px-3 py-2"
-            required
-          >
-            <option value="">Select Slot</option>
-            {% for slot in meta.slots %}
-            <option value="{{ slot }}">{{ slot }}</option>
-            {% endfor %}
-          </select>
-          <input
-            type="text"
-            name="item_id"
-            placeholder="Item ID"
-            class="flex-1 rounded border border-slate-300 px-3 py-2"
-          />
-          <button
-            type="submit"
-            class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-          >
-            Equip
-          </button>
+      {% if char_data.traits %}
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Traits</h2>
+        <div class="flex flex-wrap gap-1">
+          {% for trait in char_data.traits %}
+          <span class="rounded bg-amber-100 px-2 py-0.5 text-xs">{{ trait }}</span>
+          {% endfor %}
         </div>
-      </form>
+      </div>
+      {% endif %}
+    </div>
 
-      {% if char_data.equipment %}
-      <div class="mt-6">
-        <h3 class="mb-3 font-medium">Currently Equipped</h3>
-        <div class="flex flex-wrap gap-2">
-          {% for slot, item in char_data.equipment.items() %}
-          <span class="flex items-center gap-1 rounded bg-slate-100 px-3 py-1">
-            <span class="text-sm font-medium capitalize">{{ slot }}:</span>
-            <span class="font-mono text-sm">{{ item }}</span>
-          </span>
+    <div class="lg:col-span-2 space-y-6">
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Dress Up</h2>
+
+        <form method="post" action="{{ url_for('character.character_dressup', char_id=char_id) }}" class="space-y-4">
+          <div class="flex gap-2">
+            <select
+              name="slot"
+              class="rounded border border-slate-300 px-3 py-2"
+              required
+            >
+              <option value="">Select Slot</option>
+              {% for slot in meta.slots %}
+              <option value="{{ slot }}">{{ slot }}</option>
+              {% endfor %}
+            </select>
+            <input
+              type="text"
+              name="item_id"
+              placeholder="Item ID"
+              list="item-ids"
+              class="flex-1 rounded border border-slate-300 px-3 py-2"
+            />
+            <datalist id="item-ids">
+              {% for item_id in char_data.allItemIds %}
+              <option value="{{ item_id }}">
+              {% endfor %}
+            </datalist>
+            <button
+              type="submit"
+              class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+            >
+              Equip
+            </button>
+          </div>
+        </form>
+
+        {% if char_data.equipment %}
+        <div class="mt-6">
+          <h3 class="mb-3 font-medium">Currently Equipped</h3>
+          <div class="flex flex-wrap gap-2">
+            {% for slot, item in char_data.equipment.items() %}
+            <span class="flex items-center gap-1 rounded bg-slate-100 px-3 py-1">
+              <span class="text-sm font-medium capitalize">{{ slot }}:</span>
+              <span class="font-mono text-sm">{{ item }}</span>
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if char_data.loadouts %}
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Loadouts by Job</h2>
+        <div class="space-y-4">
+          {% for job, loadout in char_data.loadouts.items() %}
+          <div class="rounded border p-4">
+            <h3 class="mb-2 font-medium">{{ job }}</h3>
+            {% if loadout.selectedLoadouts %}
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              {% for slot, items in loadout.selectedLoadouts.items() %}
+              {% if items %}
+              <div>
+                <span class="text-slate-500">{{ slot }}:</span>
+                <div class="flex flex-wrap gap-1">
+                  {% for item in items %}
+                  {% if item.prototype %}
+                  <span class="font-mono text-xs bg-slate-100 px-1 rounded">{{ item.prototype }}</span>
+                  {% elif item %}
+                  <span class="font-mono text-xs bg-slate-100 px-1 rounded">{{ item }}</span>
+                  {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if char_data.allItemIds %}
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">All Available Item IDs</h2>
+        <div class="flex flex-wrap gap-1 max-h-64 overflow-y-auto">
+          {% for item_id in char_data.allItemIds %}
+          <button
+            type="button"
+            onclick="copyItem('{{ item_id }}')"
+            class="font-mono text-xs rounded bg-slate-100 px-2 py-1 hover:bg-slate-200"
+            title="Click to copy"
+          >
+            {{ item_id }}
+          </button>
           {% endfor %}
         </div>
       </div>
       {% endif %}
     </div>
   </div>
+
+  {% if char_data.flavorText %}
+  <div class="rounded-lg border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold">Flavor Text</h2>
+    <p class="whitespace-pre-wrap text-slate-700">{{ char_data.flavorText }}</p>
+  </div>
+  {% endif %}
 
   <div class="rounded-lg border bg-white p-6 shadow-sm">
     <div class="flex items-center justify-between">
@@ -160,7 +292,14 @@
 
   <div class="rounded-lg border bg-white p-6 shadow-sm">
     <h2 class="mb-4 text-lg font-semibold">Raw Data</h2>
-    <pre class="overflow-x-auto rounded bg-slate-50 p-4 text-sm">{{ char_data|pprint }}</pre>
+    <pre class="overflow-x-auto rounded bg-slate-50 p-4 text-sm max-h-96 overflow-y-auto">{{ char_data|pprint }}</pre>
   </div>
 </div>
+
+<script>
+  function copyItem(itemId) {
+    navigator.clipboard.writeText(itemId);
+    alert('Copied: ' + itemId);
+  }
+</script>
 {% endblock %}

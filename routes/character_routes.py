@@ -2,11 +2,12 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from pathlib import Path
 import json
 import os
+import yaml
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
-    get_db, load_instances, get_instance_by_name,
+    get_db, load_instances, get_instance_by_name, load_instances,
 )
 
 character_bp = Blueprint("character", __name__, url_prefix="/characters")
@@ -50,36 +51,55 @@ def characters():
 @character_bp.route("/import", methods=["POST"])
 def character_import():
     selected = selected_instance_or_400()
-    char_id = request.form.get("char_id", "").strip()
 
-    if not char_id:
-        flash("Character ID is required.", "error")
-        return redirect(url_for("character.characters"))
+    file = request.files.get("file")
+    if not file or file.filename == "":
+        char_id = request.form.get("char_id", "").strip()
+        if not char_id:
+            flash("Character file or ID is required.", "error")
+            return redirect(url_for("character.characters"))
+    else:
+        char_id = Path(file.filename).stem
 
     cache_root = Path("static") / "character_cache" / selected["name"] / char_id
     cache_root.mkdir(parents=True, exist_ok=True)
 
-    proto_root = Path(selected["root_path"]) / "Resources" / "Prototypes"
-    char_data = _parse_character_from_prototypes(proto_root, char_id, selected["root_path"])
+    if file and file.filename != "":
+        content = file.read()
+        if content.startswith(b"\x89PNG"):
+            flash("Character file appears to be an image, not a YAML file.", "error")
+            return redirect(url_for("character.characters"))
 
-    if not char_data:
-        flash(f"Character '{char_id}' not found in prototypes.", "error")
+        try:
+            char_data = yaml.safe_load(content)
+        except yaml.YAMLError as e:
+            flash(f"Failed to parse YAML: {e}", "error")
+            return redirect(url_for("character.characters"))
+
+        parsed = _parse_character_file(char_data)
+
+        with open(cache_root / "original.yaml", "wb") as f:
+            f.write(content)
+    else:
+        flash("Import from prototypes not yet implemented. Please upload a character file.", "error")
         return redirect(url_for("character.characters"))
+
+    available_slots = _collect_all_slots(parsed.get("loadouts", {}))
 
     meta = {
         "id": char_id,
-        "name": char_data.get("name", char_id),
-        "species": char_data.get("species", "Human"),
-        "slots": char_data.get("available_slots", []),
+        "name": parsed.get("name", char_id),
+        "species": parsed.get("species", "Human"),
+        "slots": available_slots,
     }
 
     with open(cache_root / "meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
 
     with open(cache_root / "data.json", "w", encoding="utf-8") as f:
-        json.dump(char_data, f, indent=2)
+        json.dump(parsed, f, indent=2)
 
-    flash(f"Character '{char_id}' imported successfully.", "success")
+    flash(f"Character '{parsed.get('name', char_id)}' imported successfully.", "success")
     return redirect(url_for("character.character_view", char_id=char_id))
 
 
@@ -357,3 +377,138 @@ def _load_templates(cache_root: Path) -> list[dict]:
                 templates.append(tmpl)
 
     return templates
+
+
+def _parse_character_file(data: dict) -> dict:
+    profile = data.get("profile", {})
+    appearance = profile.get("appearance", {})
+
+    parsed = {
+        "name": profile.get("name", "Unknown"),
+        "species": profile.get("species", "Human"),
+        "gender": profile.get("gender", "Unknown"),
+        "sex": profile.get("sex", "Unknown"),
+        "age": profile.get("age", 0),
+        "flavorText": profile.get("flavorText", ""),
+        "version": data.get("version", 1),
+        "forkId": data.get("forkId", ""),
+    }
+
+    parsed["appearance"] = {
+        "skinColor": appearance.get("skinColor", "#000000"),
+        "eyeColor": appearance.get("eyeColor", "#000000"),
+        "hairColor": appearance.get("hairColor", "#000000"),
+        "facialHairColor": appearance.get("facialHairColor", "#000000"),
+        "hair": appearance.get("hair", ""),
+        "facialHair": appearance.get("facialHair", ""),
+    }
+
+    markings = []
+    for mark in appearance.get("markings", []):
+        mark_entry = {
+            "id": mark.get("markingId", ""),
+            "visible": mark.get("visible", True),
+            "colors": mark.get("markingColor", []),
+        }
+        markings.append(mark_entry)
+    parsed["appearance"]["markings"] = markings
+
+    parsed["markingIds"] = [m["id"] for m in markings if m["id"]]
+    parsed["markingColors"] = {}
+    for m in markings:
+        if m["id"]:
+            parsed["markingColors"][m["id"]] = m["colors"]
+
+    loadouts = profile.get("_loadouts", {})
+    parsed["loadouts"] = loadouts
+
+    all_item_ids = _collect_all_item_ids(loadouts)
+    parsed["allItemIds"] = all_item_ids
+
+    slots = _collect_all_slots(loadouts)
+    parsed["availableSlots"] = slots
+
+    parsed["equipment"] = {}
+    parsed["currentJob"] = "JobPassenger"
+
+    traits = profile.get("_traitPreferences", [])
+    parsed["traits"] = traits
+
+    job_priorities = profile.get("_jobPriorities", {})
+    parsed["jobPriorities"] = job_priorities
+
+    cosmatic_records = profile.get("cosmaticDriftCharacterRecords", {})
+
+    medical = cosmatic_records.get("medicalEntries", [])
+    parsed["medicalEntries"] = medical
+
+    security = cosmatic_records.get("securityEntries", [])
+    parsed["securityEntries"] = security
+
+    employment = cosmatic_records.get("employmentEntries", [])
+    parsed["employmentEntries"] = employment
+
+    parsed["weight"] = profile.get("weight", 0)
+    parsed["height"] = profile.get("height", 0)
+    parsed["identifyingFeatures"] = profile.get("identifyingFeatures", "")
+    parsed["allergies"] = profile.get("allergies", [])
+    parsed["drugAllergies"] = profile.get("drugAllergies", "")
+    parsed["emergencyContactName"] = profile.get("emergencyContactName", "")
+
+    return parsed
+
+
+def _collect_all_item_ids(loadouts: dict) -> list[str]:
+    item_ids = []
+    for job, loadout_data in loadouts.items():
+        selected = loadout_data.get("selectedLoadouts", {})
+        if isinstance(selected, dict):
+            for slot_name, items in selected.items():
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict) and "prototype" in item:
+                            pid = item["prototype"]
+                            if pid and pid not in item_ids:
+                                item_ids.append(pid)
+                        elif isinstance(item, str) and item:
+                            if item not in item_ids:
+                                item_ids.append(item)
+    return sorted(item_ids)
+
+
+def _collect_all_slots(loadouts: dict) -> list[str]:
+    slot_names = set()
+    slot_mapping = {
+        "Head": "head",
+        "OuterClothing": "outer",
+        "InnerClothing": "uniform",
+        "Backpack": "back",
+        "Belt": "belt",
+        "Gloves": "gloves",
+        "Shoes": "shoes",
+        "Neck": "neck",
+        "Mask": "mask",
+        "Eyewear": "eyes",
+        "PDA": "pda",
+        "Id": "id",
+        "Trinkets": "trinkets",
+        "Scarfs": "scarf",
+        "Jumpsuit": "jumpsuit",
+        "TankHarness": "tank",
+    }
+
+    for job, loadout_data in loadouts.items():
+        selected = loadout_data.get("selectedLoadouts", {})
+        if isinstance(selected, dict):
+            for slot_name in selected.keys():
+                normalized = slot_mapping.get(slot_name, slot_name.lower())
+                slot_names.add(normalized)
+
+    standard_slots = [
+        "head", "mask", "eyes", "neck", "uniform", "outer", "gloves",
+        "shoes", "belt", "back", "id", "pda", "hand1", "hand2", "trinkets", "scarf"
+    ]
+    for s in standard_slots:
+        slot_names.add(s)
+
+    return sorted(slot_names)

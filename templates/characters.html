@@ -9,28 +9,24 @@
   </div>
 
   <div class="rounded-lg border bg-white p-6 shadow-sm">
-    <h2 class="mb-4 text-lg font-semibold">Import Character</h2>
-
-    <div class="flex gap-4">
-      <input
-        type="text"
-        id="char-search"
-        placeholder="Search prototypes..."
-        class="flex-1 rounded border border-slate-300 px-3 py-2"
-      />
-      <button
-        type="button"
-        class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-        onclick="showImportModal()"
-      >
-        Import
+    <h2 class="mb-4 text-lg font-semibold">Import Character from File</h2>
+    <form method="post" action="{{ url_for('character.character_import') }}" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="mb-2 block text-sm font-medium">Upload Character File (.yml or .yaml)</label>
+        <input
+          type="file"
+          name="file"
+          accept=".yml,.yaml"
+          class="w-full rounded border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div class="text-sm text-slate-500">
+        Import character save files exported from Space Station 14
+      </div>
+      <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+        Import Character
       </button>
-    </div>
-
-    <div id="search-results" class="mt-4 hidden">
-      <h3 class="mb-2 font-medium">Search Results</h3>
-      <ul id="results-list" class="space-y-1"></ul>
-    </div>
+    </form>
   </div>
 
   {% if characters %}
@@ -42,12 +38,8 @@
         href="{{ url_for('character.character_view', char_id=char.id) }}"
         class="flex items-center gap-4 rounded border p-4 transition hover:bg-slate-50"
       >
-        <div class="flex h-16 w-16 items-center justify-center rounded bg-slate-200">
-          {% if char.preview %}
-          <img src="{{ char.preview }}" alt="{{ char.name }}" class="h-full w-full object-cover" />
-          {% else %}
-          <span class="text-2xl">👤</span>
-          {% endif %}
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 text-white text-xl font-bold">
+          {{ char.name[0] if char.name else '?' }}
         </div>
         <div>
           <h3 class="font-medium">{{ char.name }}</h3>
@@ -59,98 +51,8 @@
   </div>
   {% else %}
   <div class="rounded-lg border bg-white p-6 shadow-sm">
-    <p class="text-slate-600">No characters imported yet. Search and import a character to get started.</p>
+    <p class="text-slate-600">No characters imported yet. Upload a character file to get started.</p>
   </div>
   {% endif %}
 </div>
-
-<div id="import-modal" class="fixed inset-0 z-50 hidden">
-  <div class="absolute inset-0 bg-black/50" onclick="closeImportModal()"></div>
-  <div class="relative mx-auto mt-20 max-w-lg rounded-lg bg-white p-6">
-    <h2 class="mb-4 text-xl font-bold">Import Character</h2>
-    <form method="post" action="{{ url_for('character.character_import') }}">
-      <div class="mb-4">
-        <label class="mb-2 block font-medium">Character ID</label>
-        <input
-          type="text"
-          name="char_id"
-          id="modal-char-id"
-          required
-          class="w-full rounded border border-slate-300 px-3 py-2"
-        />
-      </div>
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="rounded border border-slate-300 px-4 py-2 hover:bg-slate-100"
-          onclick="closeImportModal()"
-        >
-          Cancel
-        </button>
-        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-          Import
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script>
-  let searchTimeout;
-
-  function showImportModal() {
-    document.getElementById("import-modal").classList.remove("hidden");
-  }
-
-  function closeImportModal() {
-    document.getElementById("import-modal").classList.add("hidden");
-  }
-
-  document.getElementById("char-search").addEventListener("input", function (e) {
-    clearTimeout(searchTimeout);
-    const query = e.target.value.trim();
-
-    if (query.length < 2) {
-      document.getElementById("search-results").classList.add("hidden");
-      return;
-    }
-
-    searchTimeout = setTimeout(async () => {
-      const resp = await fetch(
-        "{{ url_for('character.search_character_prototypes') }}?q=" +
-          encodeURIComponent(query)
-      );
-      const results = await resp.json();
-
-      const resultsList = document.getElementById("results-list");
-      resultsList.innerHTML = "";
-
-      if (results.length === 0) {
-        resultsList.innerHTML = '<li class="text-slate-500">No results found</li>';
-      } else {
-        results.forEach((item) => {
-          const li = document.createElement("li");
-          li.innerHTML = `
-            <button
-              type="button"
-              class="w-full rounded text-left px-3 py-2 hover:bg-slate-100"
-              onclick="selectCharacter('${item.id}')"
-            >
-              <span class="font-medium">${item.id}</span>
-              <span class="text-sm text-slate-500"> - ${item.type}</span>
-            </button>
-          `;
-          resultsList.appendChild(li);
-        });
-      }
-
-      document.getElementById("search-results").classList.remove("hidden");
-    }, 300);
-  });
-
-  function selectCharacter(id) {
-    document.getElementById("modal-char-id").value = id;
-    showImportModal();
-  }
-</script>
 {% endblock %}
