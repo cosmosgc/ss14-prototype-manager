@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SS14 Map Viewer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.2.4/ol.css">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; }
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="map-controls">
+        <button onclick="togglePreview()">Toggle Preview</button>
+        <button onclick="resetView()">Reset View</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ol@v9.2.4/dist/ol.js"></script>
+    <script>
+        let map;
+        let tileLayer;
+        let previewLayer;
+        let showPreview = false;
+
+        // Tile size in pixels
+        const TILE_SIZE_PX = 32;
+        const CHUNK_SIZE = 16;
+
+        // Map bounds
+        let mapBounds = {
+            minX: 0,
+            maxX: 0,
+            minY: 0,
+            maxY: 0
+        };
+
+        // Initialize the map
+        async function initMap() {
+            // Fetch map bounds
+            const boundsResponse = await fetch('/api/map-bounds');
+            mapBounds = await boundsResponse.json();
+            console.log('Map bounds:', mapBounds);
+
+            // Calculate extent
+            const extent = [
+                mapBounds.minX * CHUNK_SIZE * TILE_SIZE_PX,
+                mapBounds.minY * CHUNK_SIZE * TILE_SIZE_PX,
+                (mapBounds.maxX + 1) * CHUNK_SIZE * TILE_SIZE_PX,
+                (mapBounds.maxY + 1) * CHUNK_SIZE * TILE_SIZE_PX
+            ];
+
+            // Create custom projection
+            const projection = new ol.proj.Projection({
+                code: 'pixel-coordinates',
+                units: 'pixels',
+                extent: extent
+            });
+
+            // Create tile source
+            const tileSource = new ol.source.XYZ({
+                projection: projection,
+                tileUrlFunction: function(tileCoord, pixelRatio, projection) {
+                    const z = tileCoord[0];
+                    const x = tileCoord[1];
+                    const y = -tileCoord[2] - 1;
+                    
+                    // Convert to chunk coordinates
+                    const chunkX = mapBounds.minX + x;
+                    const chunkY = mapBounds.maxY - y;
+                    
+                    return '/api/tile/chunk_' + chunkX + '_' + chunkY + '.png';
+                }
+            });
+
+            tileLayer = new ol.layer.Tile({
+                source: tileSource
+            });
+
+            // Preview layer (full map image)
+            previewLayer = new ol.layer.Image({
+                source: new ol.source.ImageStatic({
+                    url: '/api/preview',
+                    projection: projection,
+                    imageExtent: extent
+                }),
+                visible: false
+            });
+
+            map = new ol.Map({
+                target: 'map',
+                layers: [previewLayer, tileLayer],
+                view: new ol.View({
+                    projection: projection,
+                    center: ol.extent.getCenter(extent),
+                    zoom: 0,
+                    maxZoom: 3
+                })
+            });
+        }
+
+        function togglePreview() {
+            showPreview = !showPreview;
+            previewLayer.setVisible(showPreview);
+            tileLayer.setVisible(!showPreview);
+        }
+
+        function resetView() {
+            const extent = [
+                mapBounds.minX * CHUNK_SIZE * TILE_SIZE_PX,
+                mapBounds.minY * CHUNK_SIZE * TILE_SIZE_PX,
+                (mapBounds.maxX + 1) * CHUNK_SIZE * TILE_SIZE_PX,
+                (mapBounds.maxY + 1) * CHUNK_SIZE * TILE_SIZE_PX
+            ];
+            map.getView().setCenter(ol.extent.getCenter(extent));
+            map.getView().setZoom(0);
+        }
+
+        // Initialize map when page loads
+        window.onload = initMap;
+    </script>
+</body>
+</html>

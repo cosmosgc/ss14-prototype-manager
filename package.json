@@ -1,13 +1,21 @@
 {
   "name": "ss14-prototype-manager",
-  "private": true,
   "version": "0.1.0",
-  "devDependencies": {
-    "@tailwindcss/cli": "^4.1.6",
-    "tailwindcss": "^4.1.6"
-  },
+  "private": true,
+  "type": "module",
   "scripts": {
     "build:css": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css",
-    "watch:css": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css --watch"
+    "watch:css": "npx @tailwindcss/cli -i ./static/src/input.css -o ./static/dist/output.css --watch",
+    "build:js": "vite build",
+    "dev:js": "vite",
+    "build": "npm run build:css && npm run build:js"
+  },
+  "dependencies": {
+    "ol": "^10.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.6",
+    "tailwindcss": "^4.1.6",
+    "vite": "^5.0.0"
   }
 }

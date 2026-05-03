@@ -50,6 +50,15 @@
           </div>
         </div>
 
+        <!-- Maps -->
+        <div class="relative" @mouseenter="menu = 'maps'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Maps</button>
+          <div x-show="menu === 'maps'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('map.maps') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Browse</a>
+          </div>
+        </div>
+
         <!-- Settings -->
         <a href="{{ url_for('instance.options') }}"
            class="font-medium text-slate-700 hover:text-sky-600">
@@ -109,6 +118,11 @@
         <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Media</p>
         <a href="{{ url_for('media.radio') }}" class="block py-1">Radio</a>
         <a href="{{ url_for('media.jukebox_manager') }}" class="block py-1">Jukebox</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Maps</p>
+        <a href="{{ url_for('map.maps') }}" class="block py-1">Browse</a>
       </div>
 
       <div>
