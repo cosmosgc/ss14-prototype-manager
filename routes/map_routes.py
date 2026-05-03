@@ -16,6 +16,14 @@ from app import (
     find_first_sprite_in_text, find_first_state_in_text, list_rsi_states, IgnoreUnknownTagLoader,
 )
 
+
+# some bugs to fix:
+# its not fetching direction from the map yml entities
+# extract_rsi_texture is not cutting the sprite sheet
+# i want to copy all the files inside the rsi to the cache to preserve animations and directions, instead of just cutting the first frame
+# entities looks off by 1 in y position, that can be an issue here or @main.js when placing the icons
+
+
 CHUNK_SIZE = 16
 TILE_SIZE_PX = 32
 TILE_DATA_SIZE = 7  # SS14 format 6/7: 7 bytes per tile
