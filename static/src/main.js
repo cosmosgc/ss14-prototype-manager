@@ -291,7 +291,7 @@ Object.keys(entitiesByType).forEach(entType => {
     
 // Dynamic scale based on resolution - icon always matches 1 tile
     feature.setStyle((feature, resolution) => {
-      const iconSizePx = 32;
+      const iconSizePx = 64;
       const desiredMapSize = 1;
       const scale = desiredMapSize / (iconSizePx * resolution);
       

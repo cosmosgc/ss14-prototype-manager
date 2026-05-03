@@ -230,24 +230,8 @@ ENTITY_COLORS = {
 
 
 def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Image.Image | None:
-    """Get or create cached entity icon"""
+    """Get or create cached entity icon - copies RSI folder structure"""
     print(f"[DEBUG get_entity_icon] START: proto={proto}, instance={instance_name}")
-    
-    # Check cache first
-    cache_dir = Path("static") / "entity_cache" / instance_name
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    icon_path = cache_dir / f"{proto}.png"
-    
-    if icon_path.exists():
-        print(f"[DEBUG get_entity_icon] Cache HIT: {icon_path}")
-        try:
-            with Image.open(icon_path) as im:
-                return im.convert("RGBA")
-        except Exception as e:
-            print(f"[DEBUG get_entity_icon] Cache read error: {e}")
-            pass
-    
-    print(f"[DEBUG get_entity_icon] Cache MISS, looking up prototype...")
     
     instance_root = None
     with get_db() as conn:
@@ -295,19 +279,15 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
         sprite = sprite[1:]
     if sprite.endswith(".png"):
         sprite = sprite[:-4]
-    # elif sprite.endswith(".rsi"):
-    #     sprite = sprite[:-4]
     print(f"[DEBUG get_entity_icon] Sprite after cleanup: {sprite}")
     
     textures_root = instance_root / "Resources" / "Textures"
-    # Robust state fallback
     rsi_dir = safe_join(textures_root, sprite)
     print(f"[DEBUG get_entity_icon] RSI dir: {rsi_dir}, exists: {rsi_dir.exists() if rsi_dir else False}")
     
     available_states = list_rsi_states(rsi_dir) if rsi_dir else []
     print(f"[DEBUG get_entity_icon] Available states: {available_states}")
 
-    # Robust state fallback: prefer explicit state, then icon/first, or try direct PNG
     chosen_state = None
     
     if state in available_states:
@@ -317,7 +297,6 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
     elif available_states:
         chosen_state = available_states[0]
     elif rsi_dir and rsi_dir.exists():
-        # No states found via list_rsi_states, try direct PNG
         direct_png = textures_root / f"{sprite}.png"
         if direct_png.exists():
             print(f"[DEBUG get_entity_icon] Using direct PNG: {direct_png}")
@@ -327,25 +306,31 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
             except Exception as e:
                 print(f"[DEBUG get_entity_icon] Direct PNG error: {e}")
                 tex = None
-            if tex:
-                # Resize and cache
-                if tex.size != (icon_size, icon_size):
-                    tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
-                try:
-                    tex.save(icon_path)
-                    print(f"[DEBUG get_entity_icon] Saved to cache: {icon_path}")
-                except Exception as e:
-                    print(f"[DEBUG get_entity_icon] Save error: {e}")
-                return tex
+            return tex
     
     if not chosen_state and not available_states:
         print(f"[DEBUG get_entity_icon] No state or PNG found, returning None")
-        print(available_states[0] if available_states else "No states available")
         return None
     
-    print(f"[DEBUG get_entity_icon] Final: sprite={sprite}, chosen_state={chosen_state or 'direct PNG'}")
-    print(f"[DEBUG get_entity_icon] RSI dir exists: {rsi_dir.exists() if rsi_dir else 'rsi_dir is None'}")
-
+    # Cache path: preserve RSI folder structure
+    # e.g., static/entity_cache/Andromeda-v/Structures/Furniture/chairs/chair.png
+    cache_dir = Path("static") / "entity_cache" / instance_name / sprite
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    icon_path = cache_dir / f"{chosen_state}.png"
+    
+    # Check cache first
+    if icon_path.exists():
+        print(f"[DEBUG get_entity_icon] Cache HIT: {icon_path}")
+        try:
+            with Image.open(icon_path) as im:
+                return im.convert("RGBA")
+        except Exception as e:
+            print(f"[DEBUG get_entity_icon] Cache read error: {e}")
+            pass
+    
+    print(f"[DEBUG get_entity_icon] Cache MISS, extracting texture...")
+    
+    # Extract texture from RSI
     tex = extract_tile_texture(textures_root, sprite, chosen_state)
     
     if not tex:
@@ -825,9 +810,8 @@ def map_view():
             if proto:
                 unique_protos.add(proto)
         for proto in unique_protos:
-            icon_path = Path("static") / "entity_cache" / selected["name"] / f"{proto}.png"
-            if not icon_path.exists():
-                get_entity_icon(selected["name"], proto, 32)
+            # Just call get_entity_icon - it handles new structure
+            get_entity_icon(selected["name"], proto, 32)
     
     return render_template(
         "map_view.html",
@@ -902,8 +886,71 @@ def get_entity_layer(cache_key):
 
 @map_bp.route("/api/entity-icon/<instance_name>/<proto>")
 def get_entity_icon_api(instance_name, proto):
-    """Serve cached entity icon"""
-    icon_path = Path("static") / "entity_cache" / instance_name / f"{proto}.png"
+    """Serve cached entity icon - find it in RSI folder structure"""
+    # First try the new structure (sprite-based)
+    # Need to look up sprite path from proto
+    instance_root = None
+    with get_db() as conn:
+        inst_row = conn.execute(
+            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
+        ).fetchone()
+        if inst_row:
+            instance_root = Path(inst_row["root_path"])
+    
+    if not instance_root:
+        abort(404)
+    
+    # Find proto file
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
+            (proto, instance_name)
+        ).fetchone()
+    
+    if not row:
+        abort(404)
+    
+    proto_path = safe_join(instance_root / "Resources" / "Prototypes", row["rel_path"])
+    if not proto_path or not proto_path.exists():
+        abort(404)
+    
+    # Find sprite path
+    text = proto_path.read_text(encoding="utf-8")
+    sprite = find_first_sprite_in_text(text)
+    if not sprite:
+        abort(404)
+    
+    state = find_first_state_in_text(text)
+    
+    # Cleanup
+    sprite = sprite.strip()
+    if sprite.startswith("/"):
+        sprite = sprite[1:]
+    if sprite.endswith(".png"):
+        sprite = sprite[:-4]
+    
+    # Get states and find chosen
+    textures_root = instance_root / "Resources" / "Textures"
+    rsi_dir = safe_join(textures_root, sprite)
+    available_states = list_rsi_states(rsi_dir) if rsi_dir else []
+    
+    chosen_state = None
+    if state in available_states:
+        chosen_state = state
+    elif "icon" in available_states:
+        chosen_state = "icon"
+    elif available_states:
+        chosen_state = available_states[0]
+    
+    if not chosen_state:
+        # Try direct PNG
+        direct_png = textures_root / f"{sprite}.png"
+        if direct_png.exists():
+            return send_file(direct_png, mimetype='image/png')
+        abort(404)
+    
+    # New cache path
+    icon_path = Path("static") / "entity_cache" / instance_name / sprite / f"{chosen_state}.png"
     if not icon_path.exists():
         abort(404)
     return send_file(icon_path, mimetype='image/png')
