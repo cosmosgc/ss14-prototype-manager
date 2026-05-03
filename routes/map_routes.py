@@ -12,7 +12,7 @@ import math
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, validate_yaml_text, get_db, load_yaml_documents,
-    find_first_sprite_in_text, list_rsi_states, IgnoreUnknownTagLoader,
+    find_first_sprite_in_text, find_first_state_in_text, list_rsi_states, IgnoreUnknownTagLoader,
 )
 
 CHUNK_SIZE = 16
@@ -135,22 +135,31 @@ def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] 
 
 def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.Image | None:
     """Load a tile texture image from RSI or direct PNG"""
+    print(f"[DEBUG extract_tile_texture] START: sprite={sprite}, state={state}")
+    
     # Check for direct PNG first
     direct_png = textures_root / f"{sprite}.png"
+    print(f"[DEBUG extract_tile_texture] Checking direct PNG: {direct_png}")
     if direct_png.exists():
+        print(f"[DEBUG extract_tile_texture] Direct PNG found!")
         try:
             with Image.open(direct_png) as im:
                 return im.convert("RGBA")
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG extract_tile_texture] Direct PNG error: {e}")
             pass
     
     # Try RSI folder
     rsi_dir = safe_join(textures_root, sprite)
+    print(f"[DEBUG extract_tile_texture] RSI dir: {rsi_dir}, exists: {rsi_dir.exists() if rsi_dir else False}")
     if not rsi_dir or not rsi_dir.exists():
+        print(f"[DEBUG extract_tile_texture] RSI dir not found")
         return None
     
     # Check for meta.json states or fall back to PNG files
     available_states = list_rsi_states(rsi_dir)
+    print(f"[DEBUG extract_tile_texture] Available states: {available_states}")
+    
     if state in available_states:
         actual_state = state
     elif "icon" in available_states:
@@ -158,20 +167,24 @@ def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.
     elif available_states:
         actual_state = available_states[0]
     else:
+        print(f"[DEBUG extract_tile_texture] No valid state")
         return None
-    print(f"Entity {proto} → px={px}, py={py}")
+    
+    print(f"[DEBUG extract_tile_texture] Using state: {actual_state}")
     
     if not actual_state:
         return None
     
     png_path = rsi_dir / f"{actual_state}.png"
+    print(f"[DEBUG extract_tile_texture] PNG path: {png_path}, exists: {png_path.exists()}")
     if not png_path.exists():
         return None
     
     try:
         with Image.open(png_path) as im:
             return im.convert("RGBA")
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG extract_tile_texture] PNG load error: {e}")
         return None
 
 
@@ -218,27 +231,23 @@ ENTITY_COLORS = {
 
 def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Image.Image | None:
     """Get or create cached entity icon"""
+    print(f"[DEBUG get_entity_icon] START: proto={proto}, instance={instance_name}")
+    
     # Check cache first
     cache_dir = Path("static") / "entity_cache" / instance_name
     cache_dir.mkdir(parents=True, exist_ok=True)
     icon_path = cache_dir / f"{proto}.png"
     
     if icon_path.exists():
+        print(f"[DEBUG get_entity_icon] Cache HIT: {icon_path}")
         try:
             with Image.open(icon_path) as im:
                 return im.convert("RGBA")
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG get_entity_icon] Cache read error: {e}")
             pass
     
-    # Try to get sprite from prototype
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
-            (proto, instance_name)
-        ).fetchone()
-    
-    if not row:
-        return None
+    print(f"[DEBUG get_entity_icon] Cache MISS, looking up prototype...")
     
     instance_root = None
     with get_db() as conn:
@@ -249,92 +258,101 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
             instance_root = Path(inst_row["root_path"])
     
     if not instance_root:
+        print(f"[DEBUG get_entity_icon] No instance_root found")
+        return None
+    
+    # Find proto file path
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
+            (proto, instance_name)
+        ).fetchone()
+    
+    if not row:
+        print(f"[DEBUG get_entity_icon] No proto_path found for {proto}")
         return None
     
     proto_root = instance_root / "Resources" / "Prototypes"
     proto_path = safe_join(proto_root, row["rel_path"])
     
     if not proto_path or not proto_path.exists():
+        print(f"[DEBUG get_entity_icon] Proto file not found: {proto_path}")
         return None
     
-    try:
-        docs = load_yaml_documents(proto_path)
-    except Exception:
+    # Lazy but solid: find first sprite in text
+    text = proto_path.read_text(encoding="utf-8")
+    sprite = find_first_sprite_in_text(text)
+    if not sprite:
+        print(f"[DEBUG get_entity_icon] No sprite found in {proto_path}")
         return None
     
-    sprite = None
-    state = None
-
-    for doc in docs:
-        if isinstance(doc, dict) and doc.get("id") == proto:
-            components = doc.get("components", [])
-
-            if isinstance(components, list):
-                for comp in components:
-                    if not isinstance(comp, dict):
-                        continue
-
-                    if comp.get("type") == "Icon":
-                        sprite = comp.get("sprite")
-                        state = comp.get("state")
-                        break
-
-                    if comp.get("type") == "Sprite":
-                        sprite = comp.get("sprite")
-
-                        # Try direct state
-                        if isinstance(comp.get("state"), str):
-                            state = comp["state"]
-                            break
-
-                        # Try layers
-                        layers = comp.get("layers")
-                        if isinstance(layers, list) and layers:
-                            layer = layers[0]
-                            if isinstance(layer, dict):
-                                state = layer.get("state")
-                            break
-
-            # fallback to root
-            if not sprite:
-                sprite = doc.get("sprite")
-                state = doc.get("state")
-
-            break
+    state = find_first_state_in_text(text)
+    print(f"[DEBUG get_entity_icon] Found: sprite={sprite}, state={state}")
     
-    if not sprite or not isinstance(sprite, str):
-        return None
-    
+    # Cleanup sprite path
     sprite = sprite.strip()
     if sprite.startswith("/"):
         sprite = sprite[1:]
     if sprite.endswith(".png"):
         sprite = sprite[:-4]
-    elif sprite.endswith(".rsi"):
-        sprite = sprite[:-4]
+    # elif sprite.endswith(".rsi"):
+    #     sprite = sprite[:-4]
+    print(f"[DEBUG get_entity_icon] Sprite after cleanup: {sprite}")
     
     textures_root = instance_root / "Resources" / "Textures"
     # Robust state fallback
     rsi_dir = safe_join(textures_root, sprite)
+    print(f"[DEBUG get_entity_icon] RSI dir: {rsi_dir}, exists: {rsi_dir.exists() if rsi_dir else False}")
+    
     available_states = list_rsi_states(rsi_dir) if rsi_dir else []
+    print(f"[DEBUG get_entity_icon] Available states: {available_states}")
 
+    # Robust state fallback: prefer explicit state, then icon/first, or try direct PNG
+    chosen_state = None
+    
     if state in available_states:
         chosen_state = state
     elif "icon" in available_states:
         chosen_state = "icon"
     elif available_states:
         chosen_state = available_states[0]
-    else:
-        chosen_state = None
-
-    if not chosen_state:
+    elif rsi_dir and rsi_dir.exists():
+        # No states found via list_rsi_states, try direct PNG
+        direct_png = textures_root / f"{sprite}.png"
+        if direct_png.exists():
+            print(f"[DEBUG get_entity_icon] Using direct PNG: {direct_png}")
+            try:
+                with Image.open(direct_png) as im:
+                    tex = im.convert("RGBA")
+            except Exception as e:
+                print(f"[DEBUG get_entity_icon] Direct PNG error: {e}")
+                tex = None
+            if tex:
+                # Resize and cache
+                if tex.size != (icon_size, icon_size):
+                    tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
+                try:
+                    tex.save(icon_path)
+                    print(f"[DEBUG get_entity_icon] Saved to cache: {icon_path}")
+                except Exception as e:
+                    print(f"[DEBUG get_entity_icon] Save error: {e}")
+                return tex
+    
+    if not chosen_state and not available_states:
+        print(f"[DEBUG get_entity_icon] No state or PNG found, returning None")
+        print(available_states[0] if available_states else "No states available")
         return None
-    print(f"{proto} → sprite={sprite}, state={state}, available={available_states}")
+    
+    print(f"[DEBUG get_entity_icon] Final: sprite={sprite}, chosen_state={chosen_state or 'direct PNG'}")
+    print(f"[DEBUG get_entity_icon] RSI dir exists: {rsi_dir.exists() if rsi_dir else 'rsi_dir is None'}")
 
     tex = extract_tile_texture(textures_root, sprite, chosen_state)
     
     if not tex:
+        print(f"[DEBUG get_entity_icon] extract_tile_texture returned None")
         return None
+    
+    print(f"[DEBUG get_entity_icon] Got texture: {tex.size}")
     
     # Resize to icon size
     if tex.size != (icon_size, icon_size):
@@ -343,7 +361,9 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
     # Save to cache
     try:
         tex.save(icon_path)
-    except Exception:
+        print(f"[DEBUG get_entity_icon] Saved to cache: {icon_path}")
+    except Exception as e:
+        print(f"[DEBUG get_entity_icon] Save error: {e}")
         pass
     
     return tex
@@ -771,10 +791,10 @@ def map_view():
         unique_protos = set()
         for ent in entities:
             proto = ent.get("proto", "")
-            print(f"DEBUG: Found entity proto: {proto}")
             if proto:
                 unique_protos.add(proto)
         for proto in unique_protos:
+            print(f"Pre-caching icon for {proto}...")
             get_entity_icon(instance_name, proto, 32)
         
         # Save metadata
