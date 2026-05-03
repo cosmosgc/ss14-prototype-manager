@@ -126,22 +126,13 @@ function createLayerControls() {
   namesDiv.style.cssText = 'margin-bottom:8px;';
   const namesCheckbox = document.createElement('input');
   namesCheckbox.type = 'checkbox';
-  namesCheckbox.checked = true;
+  namesCheckbox.checked = false;
   namesCheckbox.id = 'names-toggle';
   namesCheckbox.addEventListener('change', () => {
-    const checked = namesCheckbox.checked;
-    // Update all entity layer styles
+    showNames = namesCheckbox.checked;
+    // Force redraw all entity layers
     Object.values(entityLayers).forEach(layer => {
-      const source = layer.getSource();
-      source.forEachFeature(feature => {
-        const style = feature.getStyle();
-        if (style) {
-          const textStyle = style.getText();
-          if (textStyle) {
-            textStyle.setText(checked ? (feature.get('name') || '') : '');
-          }
-        }
-      });
+      layer.changed();
     });
   });
   const namesLabel = document.createElement('label');
@@ -257,6 +248,9 @@ const typeColors = {
   'other': 'rgba(150,150,150,0.8)'
 };
 
+// Global state for toggles
+let showNames = false;
+
 Object.keys(entitiesByType).forEach(entType => {
   const typeEntities = entitiesByType[entType];
   const source = new VectorSource();
@@ -309,8 +303,8 @@ Object.keys(entitiesByType).forEach(entType => {
           crossOrigin: 'anonymous'
         }),
         text: new Text({
-          text: entName.substring(0, 12),
-          offsetY: -desiredMapSize - 0.3,
+          text: showNames ? entName.substring(0, 12) : '',
+          offsetY: -20,
           font: '10px sans-serif',
           fill: new Fill({ color: '#000' }),
           stroke: new Stroke({ color: '#fff', width: 2 })
