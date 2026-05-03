@@ -1,130 +1,100 @@
 {% extends "base.html" %}
 {% block title %}Map Detail | SS14 Prototype Manager{% endblock %}
+{% block main_class %}w-full max-w-none px-0 py-0{% endblock %}
+{% block extra_styles %}
+<style>
+  #map-container { position: relative; width: 100%; height: calc(100vh - 120px); min-height: 400px; }
+  #map-container.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; }
+  .map-controls { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.95); padding: 12px; border-radius: 6px; box-shadow: 0 2px 12px rgba(0,0,0,0.15); z-index: 1000; max-height: calc(100vh - 160px); overflow-y: auto; min-width: 180px; }
+  .map-toolbar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(15,23,42,0.9); padding: 8px 16px; border-radius: 6px; display: flex; gap: 8px; align-items: center; z-index: 1000; }
+  .map-toolbar button { background: rgba(255,255,255,0.15); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+  .map-toolbar button:hover { background: rgba(255,255,255,0.3); }
+  .map-toolbar .divider { width: 1px; height: 24px; background: rgba(255,255,255,0.3); }
+  .map-toast { position: absolute; top: 10px; left: 10px; background: rgba(15,23,42,0.9); color: white; padding: 8px 14px; border-radius: 4px; font-size: 13px; z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; display: none; }
+  .map-toast.visible { display: block; opacity: 1; }
+  #btn-help { background: rgba(255,255,255,0.25); width: 28px; height: 28px; padding: 0; border-radius: 50%; text-align: center; line-height: 28px; }
+  #btn-fullscreen-map { background: rgba(255,255,255,0.15); border: none; color: white; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  #btn-fullscreen-map:hover { background: rgba(255,255,255,0.3); }
+  .header-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: white; border-bottom: 1px solid #e2e8f0; }
+  .header-bar h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  .header-bar .actions { display: flex; gap: 8px; }
+  .header-bar a, .header-bar button { padding: 6px 12px; font-size: 13px; border-radius: 4px; text-decoration: none; cursor: pointer; }
+  .header-bar a.primary { background: #2563eb; color: white; }
+  .header-bar a.secondary { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+  .header-bar a.secondary:hover { background: #e2e8f0; }
+</style>
+{% endblock %}
 {% block content %}
-<div class="mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+<div class="header-bar">
   <div>
-    <h1 class="text-xl font-semibold">Map Detail</h1>
-    <p class="font-mono text-xs text-slate-600">{{ rel_file }}</p>
+    <h1>Map Detail</h1>
+    <p class="font-mono text-xs text-slate-500 mt-1">{{ rel_file }}</p>
   </div>
-  <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-    <a
-      href="{{ url_for('api.open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}"
-      class="w-full sm:w-auto rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700 text-center"
-    >Open YML in VS Code</a>
-    <a
-      href="{{ url_for('api.open_explorer', target='yml', file=rel_file, back=request.full_path) }}"
-      class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center"
-    >Open YML in Explorer</a>
-    <a href="{{ url_for('map.maps') }}" class="w-full sm:w-auto rounded border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 text-center">Back</a>
+  <div class="actions">
+    <button id="btn-fullscreen-map" onclick="toggleFullscreen()">Fullscreen</button>
+    <a href="{{ url_for('api.open_explorer', target='yml-vscode', file=rel_file, back=request.full_path) }}" class="primary">Open in VS Code</a>
+    <a href="{{ url_for('map.maps') }}" class="secondary">Back</a>
   </div>
 </div>
 
 {% if parse_error %}
-  <div class="mb-4 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
-    YAML parse error: {{ parse_error }}
-  </div>
+<div class="mx-4 mt-4 rounded border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+  YAML parse error: {{ parse_error }}
+</div>
 {% endif %}
 
-<div class="space-y-4">
-
-    <section class="rounded-xl border border-slate-200 bg-white p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="font-semibold">Map Viewer</h3>
-        <div class="flex gap-2">
-          <a href="/maps/api/preview?cache={{ cache_key }}" target="_blank" 
-             class="px-3 py-1 text-xs rounded border border-slate-300 hover:bg-slate-50">
-            View Full Preview
-          </a>
-        </div>
+<div class="p-4">
+  <section class="rounded-xl border border-slate-200 bg-white p-4">
+    <div class="flex items-center justify-between mb-2">
+      <h3 class="font-semibold">Map Viewer</h3>
+      <div class="flex gap-2">
+        <a href="/maps/api/preview?cache={{ cache_key }}" target="_blank" 
+           class="px-3 py-1 text-xs rounded border border-slate-300 hover:bg-slate-50">
+          View Full Preview
+        </a>
       </div>
-      <div id="map" class="w-full h-[600px] rounded border border-slate-200"></div>
-      <p class="mt-2 text-xs text-slate-500">Rendered from YAML map data</p>
-    </section>
-
-    <div class="grid gap-4 lg:grid-cols-2">
-      
-      <section x-data="{ open: true }" class="rounded-xl border border-slate-200 bg-white p-4">
-        <button @click="open = !open" class="flex w-full items-center justify-between">
-          <h3 class="font-semibold">Map Info</h3>
-          <span class="text-xs text-slate-500" x-text="open ? 'Hide' : 'Show'"></span>
-        </button>
-        <div x-show="open" class="mt-3 space-y-2">
-          <p class="text-xs text-slate-600">Documents: {{ docs | length }}</p>
-          <p class="text-xs {{ 'text-emerald-700' if parse_ok else 'text-rose-700' }}">
-            {{ 'Valid YAML' if parse_ok else 'Invalid YAML' }}
-          </p>
-        </div>
-      </section>
-
-      <section class="rounded-xl border border-slate-200 bg-white p-4">
-        <h3 class="font-semibold mb-2">Map Stats</h3>
-        <p class="text-xs text-slate-600">Tilemap entries: {{ tilemap | length }}</p>
-        <p class="text-xs text-slate-600">Grid chunks: {{ grid_chunks | length }}</p>
-        <p class="text-xs text-slate-600">Entities: {{ entities | length }}</p>
-      </section>
     </div>
+    <div id="map-container">
+      <div id="map" class="w-full h-full rounded border border-slate-200"></div>
+    </div>
+    <p class="mt-2 text-xs text-slate-500">WASD/Arrows: move | +/-: zoom | Home: fit | F: fullscreen | ?: help</p>
+  </section>
 
-    <script type="application/json" id="map-data">
-      {
-        "tilemap": {{ tilemap | tojson }},
-        "gridChunks": {{ grid_chunks | tojson }},
-        "entities": {{ entities | tojson }},
-        "entityTypes": {{ entity_types | tojson }},
-        "cacheKey": "{{ cache_key }}",
-        "instanceName": "{{ selected_instance_name }}"
-      }
-    </script>
+  <div class="grid gap-4 lg:grid-cols-2 mt-4">
+    <section class="rounded-xl border border-slate-200 bg-white p-4">
+      <h3 class="font-semibold mb-2">Map Stats</h3>
+      <p class="text-xs text-slate-600">Tilemap entries: {{ tilemap | length }}</p>
+      <p class="text-xs text-slate-600">Grid chunks: {{ grid_chunks | length }}</p>
+      <p class="text-xs text-slate-600">Entities: {{ entities | length }}</p>
+      <p class="text-xs {{ 'text-emerald-700 mt-2' if parse_ok else 'text-rose-700 mt-2' }}">
+        {{ 'Valid YAML' if parse_ok else 'Invalid YAML' }}
+      </p>
+    </section>
+  </div>
 </div>
+
+<script type="application/json" id="map-data">
+  {
+    "tilemap": {{ tilemap | tojson }},
+    "gridChunks": {{ grid_chunks | tojson }},
+    "entities": {{ entities | tojson }},
+    "entityTypes": {{ entity_types | tojson }},
+    "cacheKey": "{{ cache_key }}",
+    "instanceName": "{{ selected_instance_name }}",
+    "relFile": {{ rel_file | tojson }}
+  }
+</script>
 
 <script type="module" src="{{ url_for('static', filename='dist/main.js') }}"></script>
 
 <script>
-function yamlEditor() {
-  return {
-    init() { this.syncGutter(); },
-    syncGutter() {
-      const editor = this.$refs.editor;
-      const gutter = this.$refs.gutter;
-      const lines = editor.value.split("\n").length;
-      let text = "";
-      for (let i = 1; i <= lines; i++) text += i + "\n";
-      gutter.textContent = text;
-      this.syncScroll();
-    },
-    syncScroll() { this.$refs.gutter.scrollTop = this.$refs.editor.scrollTop; },
-    tabIndent(evt) {
-      const editor = this.$refs.editor;
-      const start = editor.selectionStart;
-      if (start === editor.selectionEnd) {
-        editor.value = editor.value.slice(0, start) + "  " + editor.value.slice(start);
-        editor.selectionStart = editor.selectionEnd = start + 2;
-      } else this.indentSelection();
-      this.syncGutter();
-    },
-    indentSelection() { this.modifySelection("indent"); },
-    outdentSelection() { this.modifySelection("outdent"); },
-    modifySelection(mode) {
-      const editor = this.$refs.editor;
-      const value = editor.value;
-      const start = editor.selectionStart;
-      const end = editor.selectionEnd;
-      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-      const lineEndIdx = value.indexOf("\n", end);
-      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
-      const block = value.slice(lineStart, lineEnd);
-      const lines = block.split("\n");
-      const updated = lines.map(line => {
-        if (mode === "indent") return "  " + line;
-        if (line.startsWith("  ")) return line.slice(2);
-        if (line.startsWith("\t")) return line.slice(1);
-        return line;
-      }).join("\n");
-      editor.value = value.slice(0, lineStart) + updated + value.slice(lineEnd);
-      editor.selectionStart = lineStart;
-      editor.selectionEnd = lineStart + updated.length;
-      this.syncGutter();
-    }
-  };
+function toggleFullscreen() {
+  document.getElementById('map-container').classList.toggle('fullscreen');
+  setTimeout(() => {
+    const mapDiv = document.getElementById('map');
+    if (mapDiv._ol_map) mapDiv._ol_map.updateSize();
+  }, 100);
 }
+window.toggleFullscreen = toggleFullscreen;
 </script>
 {% endblock %}

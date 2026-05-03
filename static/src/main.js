@@ -326,6 +326,47 @@ Object.keys(entitiesByType).forEach(entType => {
 });
 
 // ---- Create map ----
+// Wrap map in container
+const mapContainer = document.createElement('div');
+mapContainer.id = 'map-container';
+
+const mapDiv = document.getElementById('map');
+if (mapDiv) {
+  mapDiv.parentNode.insertBefore(mapContainer, mapDiv);
+  mapContainer.appendChild(mapDiv);
+}
+
+// Add toast for shortcuts info
+const mapToast = document.createElement('div');
+mapToast.className = 'map-toast';
+mapToast.id = 'shortcuts-toast';
+mapToast.textContent = 'Press ? for shortcuts';
+mapToast.style.display = 'none';
+mapContainer.appendChild(mapToast);
+
+// Expose showToast globally
+window.showMapToast = function(msg) {
+  mapToast.textContent = msg;
+  mapToast.classList.add('visible');
+  setTimeout(() => mapToast.classList.remove('visible'), 2000);
+};
+
+// Create toolbar
+const toolbar = document.createElement('div');
+toolbar.className = 'map-toolbar';
+toolbar.innerHTML = `
+  <button id="btn-home" title="Go to start (Home)">Home</button>
+  <button id="btn-fullscreen" title="Toggle fullscreen (F)">Fullscreen</button>
+  <button id="btn-zoom-in" title="Zoom in (+)">+</button>
+  <button id="btn-zoom-out" title="Zoom out (-)">−</button>
+  <button id="btn-reset-zoom" title="Reset zoom (0)">1:1</button>
+  <span class="divider"></span>
+  <button id="btn-layers" title="Toggle layers panel">Layers</button>
+  <button id="btn-help" title="Show shortcuts (?)">?</button>
+`;
+toolbar.style.display = 'none'; // Hidden until map loads
+mapContainer.appendChild(toolbar);
+
 const map = new Map({
   target: 'map',
   layers: layers,
@@ -333,6 +374,128 @@ const map = new Map({
     center: [maxX / 2, maxY / 2],
     zoom: 2
   })
+});
+
+// Store map reference on div for keyboard handler
+mapDiv._ol_map = map;
+
+function getComputedMapBounds() {
+  if (gridChunks.length === 0) return null;
+  return [minX, minY, maxX, maxY];
+}
+
+// ---- Keyboard shortcuts ----
+function showToast(msg) {
+  const toast = document.getElementById('shortcuts-toast');
+  if (toast) {
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    setTimeout(() => toast.classList.remove('visible'), 2000);
+  }
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  if (!map || !map.getView()) return;
+  
+  const view = map.getView();
+  const step = e.shiftKey ? 8 : 2;
+  const center = view.getCenter();
+  const res = view.getResolution();
+  
+  switch(e.key) {
+    case 'ArrowUp':
+    case 'w':
+    case 'W':
+      e.preventDefault();
+      view.animate({ center: [center[0], center[1] + step * res] }, { duration: 100 });
+      break;
+    case 'ArrowDown':
+    case 's':
+    case 'S':
+      e.preventDefault();
+      view.animate({ center: [center[0], center[1] - step * res] }, { duration: 100 });
+      break;
+    case 'ArrowLeft':
+    case 'a':
+    case 'A':
+      e.preventDefault();
+      view.animate({ center: [center[0] - step * res, center[1]] }, { duration: 100 });
+      break;
+    case 'ArrowRight':
+    case 'd':
+    case 'D':
+      e.preventDefault();
+      view.animate({ center: [center[0] + step * res, center[1]] }, { duration: 100 });
+      break;
+    case 'Home':
+      e.preventDefault();
+      const bounds = getComputedMapBounds();
+      if (bounds) view.fit(bounds, { duration: 300, padding: [50, 50, 50, 50] });
+      break;
+    case 'f':
+    case 'F':
+      e.preventDefault();
+      document.getElementById('map-container').classList.toggle('fullscreen');
+      setTimeout(() => map.updateSize(), 100);
+      break;
+    case '+':
+    case '=':
+      e.preventDefault();
+      view.animate({ resolution: view.getResolution() / 1.5 }, { duration: 100 });
+      break;
+    case '-':
+    case '_':
+      e.preventDefault();
+      view.animate({ resolution: view.getResolution() * 1.5 }, { duration: 100 });
+      break;
+    case '0':
+      e.preventDefault();
+      view.animate({ resolution: 1 }, { duration: 200 });
+      break;
+    case '?':
+      e.preventDefault();
+      showToast('WASD/Arrows: move | +/-: zoom | 0: reset | Home: fit | F: fullscreen');
+      break;
+  }
+});
+
+// Expose for external use
+window.getComputedMapBounds = getComputedMapBounds;
+
+// Button handlers
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('click', (e) => {
+    const id = e.target.id;
+    const view = map.getView();
+    
+    switch(id) {
+      case 'btn-home':
+        const bounds = getComputedMapBounds();
+        if (bounds) view.fit(bounds, { duration: 300, padding: [50, 50, 50, 50] });
+        break;
+      case 'btn-fullscreen':
+        document.getElementById('map-container').classList.toggle('fullscreen');
+        setTimeout(() => map.updateSize(), 100);
+        break;
+      case 'btn-zoom-in':
+        view.animate({ resolution: view.getResolution() / 1.5 }, { duration: 100 });
+        break;
+      case 'btn-zoom-out':
+        view.animate({ resolution: view.getResolution() * 1.5 }, { duration: 100 });
+        break;
+      case 'btn-reset-zoom':
+        view.animate({ resolution: 1 }, { duration: 200 });
+        break;
+      case 'btn-layers':
+        const controls = document.querySelector('.map-controls');
+        if (controls) controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+        break;
+      case 'btn-help':
+        showToast('WASD/Arrows: move | +/-: zoom | 0: reset | F: fullscreen | Home: fit');
+        break;
+    }
+  });
 });
 
 // ---- Add layer controls ----
