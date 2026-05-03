@@ -295,21 +295,28 @@ Object.keys(entitiesByType).forEach(entType => {
     // Try to load entity icon, fallback to circle
     const iconUrl = `/maps/api/entity-icon/${instanceName}/${encodeURIComponent(proto)}`;
     
-    // Try icon first
-    feature.setStyle(new Style({
-      image: new Icon({
-        src: iconUrl,
-        scale: 0.5,
-        crossOrigin: 'anonymous'
-      }),
-      text: new Text({
-        text: entName.substring(0, 12),
-        offsetY: -20,
-        font: '9px sans-serif',
-        fill: new Fill({ color: '#000' }),
-        stroke: new Stroke({ color: '#fff', width: 2 })
-      })
-    }));
+// Dynamic scale based on resolution - icon always matches 1 tile
+    feature.setStyle((feature, resolution) => {
+      const iconSizePx = 32;
+      const desiredMapSize = 1;
+      const scale = desiredMapSize / (iconSizePx * resolution);
+      
+      return new Style({
+        image: new Icon({
+          src: iconUrl,
+          scale: scale,
+          anchor: [0.5, 0.5],
+          crossOrigin: 'anonymous'
+        }),
+        text: new Text({
+          text: entName.substring(0, 12),
+          offsetY: -desiredMapSize - 0.3,
+          font: '10px sans-serif',
+          fill: new Fill({ color: '#000' }),
+          stroke: new Stroke({ color: '#fff', width: 2 })
+        })
+      });
+    });
 
     source.addFeature(feature);
   });
