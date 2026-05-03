@@ -3,9 +3,11 @@ data/
 data/instances.json
 node_modules/
 static/map_cache/
+static/entity_cache/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .env.local
 ss14_debug_log.txt
+static/dist/main.js

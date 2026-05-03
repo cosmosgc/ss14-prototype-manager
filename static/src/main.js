@@ -10,6 +10,7 @@ import Style from 'ol/style/Style';
 import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 import Text from 'ol/style/Text';
+import Icon from 'ol/style/Icon';
 import CircleStyle from 'ol/style/Circle';
 import { fromLonLat } from 'ol/proj';
 import 'ol/ol.css';
@@ -34,6 +35,7 @@ const gridChunks = mapData.gridChunks || [];
 const entities = mapData.entities || [];
 const cacheKey = mapData.cacheKey || '';
 const entityTypes = mapData.entityTypes || {};
+const instanceName = mapData.instanceName || '';
 const CHUNK_SIZE = 16;
 const TILE_SIZE_PX = 32;
 
@@ -42,7 +44,8 @@ console.log('Map data loaded:', {
   gridChunks: gridChunks.length,
   entities: entities.length,
   cacheKey: cacheKey,
-  entityTypes: Object.keys(entityTypes).length
+  entityTypes: Object.keys(entityTypes).length,
+  instanceName: instanceName
 });
 
 // ---- Compute chunk bounds (world space) ----
@@ -282,21 +285,26 @@ Object.keys(entitiesByType).forEach(entType => {
     const point = new Point([flippedX, flippedY]);
 
     const feature = new Feature({ geometry: point });
-    feature.set('proto', ent.proto || 'unknown');
-    feature.set('name', ent.name || ent.proto || '');
+    const proto = ent.proto || 'unknown';
+    feature.set('proto', proto);
+    feature.set('name', ent.name || proto);
     feature.set('type', entType);
 
-    const entName = ent.name || ent.proto || '';
+    const entName = ent.name || proto;
     
+    // Try to load entity icon, fallback to circle
+    const iconUrl = `/maps/api/entity-icon/${instanceName}/${encodeURIComponent(proto)}`;
+    
+    // Try icon first
     feature.setStyle(new Style({
-      image: new CircleStyle({
-        radius: 4,
-        fill: new Fill({ color: color }),
-        stroke: new Stroke({ color: '#fff', width: 1 })
+      image: new Icon({
+        src: iconUrl,
+        scale: 0.5,
+        crossOrigin: 'anonymous'
       }),
       text: new Text({
         text: entName.substring(0, 12),
-        offsetY: -12,
+        offsetY: -20,
         font: '9px sans-serif',
         fill: new Fill({ color: '#000' }),
         stroke: new Stroke({ color: '#fff', width: 2 })
