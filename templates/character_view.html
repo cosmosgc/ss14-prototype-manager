@@ -103,7 +103,7 @@
           {% for mark_id in char_data.markingIds %}
           {% set preview = preview_map.get(mark_id) %}
           <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
-            {% if preview %}
+            {% if preview and preview[0] %}
             <img
               loading="lazy"
               src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
@@ -179,7 +179,7 @@
           <h3 class="mb-3 font-medium">Currently Equipped</h3>
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {% for slot, item in char_data.equipment.items() %}
-            {% if item and preview_map.get(item) %}
+            {% if item and preview_map.get(item) and preview_map[item][0] %}
             {% set preview = preview_map[item] %}
             <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
               <img
@@ -248,7 +248,7 @@
             class="flex flex-col items-center rounded-lg border bg-slate-50 p-2 hover:bg-slate-100"
             title="Click to copy"
           >
-            {% if preview %}
+            {% if preview and preview[0] %}
             <img
               loading="lazy"
               src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
