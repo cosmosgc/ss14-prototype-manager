@@ -128,25 +128,29 @@ def rsi_preview():
                 if direction < 0 or direction >= directions:
                     direction = 0
 
-                # Get size from meta.json or calculate from image
-                size_x = 32
-                size_y = 32
-                if meta and "size" in meta:
-                    size_x = meta["size"].get("x", 32)
-                    size_y = meta["size"].get("y", 32)
+                # Get size from meta.json ALWAYS
+                size_x = meta.get("size", {}).get("x", 32) if meta else 32
+                size_y = meta.get("size", {}).get("y", 32) if meta else 32
 
-                # Calculate frame height based on directions
-                frame_height = im.height // directions
+                # Calculate grid dimensions
+                columns = im.width // size_x
+                rows = im.height // size_y
 
-                # Extract the direction row
-                y1 = direction * frame_height
-                y2 = y1 + frame_height
+                # Clamp direction to valid range
+                direction = max(0, min(direction, directions - 1))
+
+                # Calculate tile position in grid
+                x1 = (direction % columns) * size_x
+                y1 = (direction // columns) * size_y
+                x2 = x1 + size_x
+                y2 = y1 + size_y
 
                 # Ensure within bounds
+                x2 = min(x2, im.width)
                 y2 = min(y2, im.height)
 
-                if y2 > y1:
-                    frame = im.crop((0, y1, im.width, y2))
+                if x2 > x1 and y2 > y1:
+                    frame = im.crop((x1, y1, x2, y2))
                     # Scale to the correct size
                     frame = frame.resize((size_x * scale, size_y * scale), Image.Resampling.NEAREST)
                     buffer = io.BytesIO()
@@ -203,14 +207,16 @@ def rsi_preview():
         frame_count = len(frame_delays)
         print(f"Frame count: {frame_count}, Frame delays: {frame_delays}")
 
-        # Calculate frame dimensions - assume frames are horizontal, directions vertical
-        if directions > 1:
-            frame_width = im.width // frame_count
-            frame_height = im.height // directions
-        else:
-            # Single direction, all frames horizontal
-            frame_width = im.width // frame_count
-            frame_height = im.height
+        # Calculate frame dimensions using grid based on meta size
+        size_x = meta.get("size", {}).get("x", 32) if meta else 32
+        size_y = meta.get("size", {}).get("y", 32) if meta else 32
+
+        # Calculate how many frames fit in the grid
+        columns = im.width // size_x
+        rows = im.height // size_y
+
+        frame_width = size_x
+        frame_height = size_y
 
         print(f"Frame dimensions: {frame_width}x{frame_height}, Image: {im.width}x{im.height}")
 
@@ -225,13 +231,17 @@ def rsi_preview():
 
         frames = []
 
-        # Extract frames for the specified direction
+        # Extract frames for the specified direction using grid-based approach
         for i in range(frame_count):
             try:
-                x1 = i * frame_width
-                y1 = direction * frame_height
-                x2 = (i + 1) * frame_width
-                y2 = (direction + 1) * frame_height
+                # Calculate global frame index in the grid
+                frame_index = direction * frame_count + i
+
+                # Calculate position in grid
+                x1 = (frame_index % columns) * size_x
+                y1 = (frame_index // columns) * size_y
+                x2 = x1 + size_x
+                y2 = y1 + size_y
 
                 # Ensure coordinates are within image bounds
                 x2 = min(x2, im.width)

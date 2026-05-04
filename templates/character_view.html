@@ -16,9 +16,9 @@
       <label class="text-sm font-medium">Direction:</label>
       <select id="directionSelect" class="rounded border border-slate-300 px-2 py-1" onchange="updateDirection()">
         <option value="0">South (0)</option>
-        <option value="1">West (1)</option>
-        <option value="2">North (2)</option>
-        <option value="3">East (3)</option>
+        <option value="1">North (1)</option>
+        <option value="2">East (2)</option>
+        <option value="3">West (3)</option>
       </select>
     </div>
   </div>
@@ -120,7 +120,7 @@
               data-sprite="{{ preview[0] }}"
               data-state="{{ preview[1] }}"
               data-directions="{{ dirs }}"
-              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
               class="rsi-preview h-12 w-12 rounded object-contain pixelated"
               onerror="this.style.display='none'"
             />
@@ -164,11 +164,11 @@
             {% endif %}
             {% for region, items in character_viewer.regions.items() %}
               {% for item in items %}
-              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=3, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
               {% endfor %}
             {% endfor %}
             {% for mark in character_viewer.markings %}
-            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=3, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" onerror="this.style.display='none'" />
             {% endfor %}
           </div>
         </div>
@@ -194,7 +194,7 @@
           <div class="grid grid-cols-3 gap-2 text-sm">
             {% for mark in character_viewer.markings %}
             <div class="flex flex-col items-center rounded bg-slate-50 p-2">
-              <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=2, direction=0) }}" class="rsi-preview h-8 w-8 rounded pixelated" onerror="this.style.display='none'" />
+              <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview h-8 w-8 rounded pixelated" onerror="this.style.display='none'" />
               <span class="font-mono text-xs mt-1">{{ mark.item }}</span>
               {% if mark.colors %}
               <div class="flex gap-0.5 mt-0.5">
@@ -264,7 +264,7 @@
                 data-sprite="{{ preview[0] }}"
                 data-state="{{ preview[1] }}"
                 data-directions="{{ dirs }}"
-                src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+                src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
                 class="rsi-preview h-12 w-12 rounded object-contain pixelated"
                 onerror="this.style.display='none'"
               />
@@ -336,7 +336,7 @@
               data-sprite="{{ preview[0] }}"
               data-state="{{ preview[1] }}"
               data-directions="{{ dirs }}"
-              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
               class="rsi-preview h-10 w-10 rounded object-contain pixelated"
               onerror="this.style.display='none'"
             />
@@ -427,7 +427,7 @@
       const dirs = parseInt(img.getAttribute('data-directions') || '1');
       if (sprite && state) {
         const actualDirection = direction < dirs ? direction : '0';
-        img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=2&direction=' + actualDirection;
+        img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=6&direction=' + actualDirection;
       }
     });
   }
