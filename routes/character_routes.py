@@ -9,6 +9,7 @@ from app import (
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
     get_db, load_instances, get_instance_by_name, load_instances,
     resolve_preview_batch, get_rsi_state_info,
+    find_first_prototype_path_by_id,
 )
 
 character_bp = Blueprint("character", __name__, url_prefix="/characters")
@@ -79,6 +80,8 @@ def character_import():
 
         parsed = _parse_character_file(char_data)
 
+        enriched = _enrich_character_data_with_paths(parsed, selected["name"], selected["root_path"])
+
         with open(cache_root / "original.yaml", "wb") as f:
             f.write(content)
     else:
@@ -98,7 +101,7 @@ def character_import():
         json.dump(meta, f, indent=2)
 
     with open(cache_root / "data.json", "w", encoding="utf-8") as f:
-        json.dump(parsed, f, indent=2)
+        json.dump(enriched, f, indent=2)
 
     flash(f"Character '{parsed.get('name', char_id)}' imported successfully.", "success")
     return redirect(url_for("character.character_view", char_id=char_id))
@@ -121,18 +124,24 @@ def character_view(char_id: str):
     with open(data_path, "r", encoding="utf-8") as f:
         char_data = json.load(f)
 
+    enriched_data = _enrich_character_data_with_paths(char_data, selected["name"], selected["root_path"])
+
     templates = _load_templates(cache_root)
 
-    all_proto_ids = _collect_all_proto_ids_from_character(char_data)
+    all_proto_ids = _collect_all_proto_ids_from_character(enriched_data)
+    proto_data_map = _build_proto_data_map(selected["name"], all_proto_ids)
     preview_map = resolve_preview_batch(selected["name"], selected["root_path"], all_proto_ids)
 
     direction_info = {}
     for proto_id, preview in preview_map.items():
         if preview and preview[0]:
             state_info = get_rsi_state_info(selected, preview[0], preview[1])
+            state_info["proto_paths"] = proto_data_map.get(proto_id, {}).get("proto_paths", [])
             direction_info[proto_id] = state_info
 
     equipment_layers = _build_equipment_layers(char_data.get("equipment", {}), preview_map, direction_info)
+
+    character_viewer = _build_character_viewer(char_data, preview_map, direction_info)
 
     return render_template(
         "character_view.html",
@@ -144,6 +153,8 @@ def character_view(char_id: str):
         preview_map=preview_map,
         direction_info=direction_info,
         equipment_layers=equipment_layers,
+        character_viewer=character_viewer,
+        proto_data_map=proto_data_map,
     )
 
 
@@ -166,8 +177,10 @@ def character_dressup(char_id: str):
         char_data["equipment"] = char_data.get("equipment", {})
         char_data["equipment"][slot] = item_id
 
+        enriched = _enrich_character_data_with_paths(char_data, selected["name"], selected["root_path"])
+
         with open(data_path, "w", encoding="utf-8") as f:
-            json.dump(char_data, f, indent=2)
+            json.dump(enriched, f, indent=2)
 
         flash(f"Equipped {item_id} in {slot}.", "success")
 
@@ -231,8 +244,10 @@ def load_template(char_id: str):
 
     char_data["equipment"] = template.get("equipment", {})
 
+    enriched = _enrich_character_data_with_paths(char_data, selected["name"], selected["root_path"])
+
     with open(data_path, "w", encoding="utf-8") as f:
-        json.dump(char_data, f, indent=2)
+        json.dump(enriched, f, indent=2)
 
     flash(f"Template '{template_name}' loaded.", "success")
     return redirect(url_for("character.character_view", char_id=char_id))
@@ -421,6 +436,57 @@ def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
     return list(ids)
 
 
+def _build_proto_data_map(instance_name: str, proto_ids: list[str]) -> dict[str, dict]:
+    if not proto_ids:
+        return {}
+
+    with get_db() as conn:
+        placeholders = ",".join("?" * len(proto_ids))
+        rows = conn.execute(
+            f"SELECT proto_id, rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id IN ({placeholders})",
+            (instance_name, *proto_ids),
+        ).fetchall()
+
+    proto_data = {}
+    for r in rows:
+        pid = r["proto_id"]
+        if pid not in proto_data:
+            proto_data[pid] = {"proto_paths": [], "rsi_path": None}
+        proto_data[pid]["proto_paths"].append(r["rel_path"])
+
+    return proto_data
+
+
+def _enrich_character_data_with_paths(char_data: dict, instance_name: str, root_path: str) -> dict:
+    all_proto_ids = _collect_all_proto_ids_from_character(char_data)
+    if not all_proto_ids:
+        return char_data
+
+    proto_data_map = _build_proto_data_map(instance_name, all_proto_ids)
+    preview_map = resolve_preview_batch(instance_name, root_path, all_proto_ids)
+
+    enriched = dict(char_data)
+
+    if "equipment" not in enriched:
+        enriched["equipment"] = {}
+    enriched["_proto_paths"] = {}
+    enriched["_rsi_paths"] = {}
+
+    for proto_id in all_proto_ids:
+        proto_paths = proto_data_map.get(proto_id, {}).get("proto_paths", [])
+        if proto_paths:
+            enriched["_proto_paths"][proto_id] = proto_paths
+
+        preview = preview_map.get(proto_id)
+        if preview and preview[0]:
+            enriched["_rsi_paths"][proto_id] = {
+                "sprite": preview[0],
+                "state": preview[1],
+            }
+
+    return enriched
+
+
 def _build_equipment_layers(equipment: dict, preview_map: dict, direction_info: dict) -> list[dict]:
     slot_order = [
         "inner", "uniform", "neck", "head", "mask", "eyes",
@@ -448,10 +514,94 @@ def _build_equipment_layers(equipment: dict, preview_map: dict, direction_info: 
             "state": preview[1],
             "layer": layer_index,
             "directions": state_info.get("directions", 1),
+            "proto_paths": state_info.get("proto_paths", []),
         })
 
     layers.sort(key=lambda x: x["layer"])
     return layers
+
+
+def _build_character_viewer(char_data: dict, preview_map: dict, direction_info: dict) -> dict:
+    slot_regions = {
+        "head": ["head", "hair", "facialHair"],
+        "eyes": ["eyes", "mask"],
+        "neck": ["neck", "scarf"],
+        "body": ["uniform", "inner"],
+        "outer": ["outer"],
+        "back": ["back"],
+        "belt": ["belt"],
+        "hands": ["gloves", "hand1", "hand2"],
+        "feet": ["shoes"],
+        "id": ["id", "pda"],
+    }
+
+    regions = {}
+    for region, slots in slot_regions.items():
+        region_items = []
+        for slot in slots:
+            if slot == "hair" and char_data.get("appearance", {}).get("hair"):
+                hair_id = char_data["appearance"]["hair"]
+                preview = preview_map.get(hair_id, ("", ""))
+                if preview and preview[0]:
+                    state_info = direction_info.get(hair_id, {})
+                    region_items.append({
+                        "slot": "hair",
+                        "item": hair_id,
+                        "sprite": preview[0],
+                        "state": preview[1],
+                        "directions": state_info.get("directions", 1),
+                        "proto_paths": state_info.get("proto_paths", []),
+                        "color": char_data.get("appearance", {}).get("hairColor", "#000000"),
+                    })
+            elif slot == "facialHair" and char_data.get("appearance", {}).get("facialHair"):
+                fh_id = char_data["appearance"]["facialHair"]
+                preview = preview_map.get(fh_id, ("", ""))
+                if preview and preview[0]:
+                    state_info = direction_info.get(fh_id, {})
+                    region_items.append({
+                        "slot": "facialHair",
+                        "item": fh_id,
+                        "sprite": preview[0],
+                        "state": preview[1],
+                        "directions": state_info.get("directions", 1),
+                        "proto_paths": state_info.get("proto_paths", []),
+                        "color": char_data.get("appearance", {}).get("facialHairColor", "#000000"),
+                    })
+            elif slot in char_data.get("equipment", {}):
+                item = char_data["equipment"][slot]
+                if item:
+                    preview = preview_map.get(item, ("", ""))
+                    if preview and preview[0]:
+                        state_info = direction_info.get(item, {})
+                        region_items.append({
+                            "slot": slot,
+                            "item": item,
+                            "sprite": preview[0],
+                            "state": preview[1],
+                            "directions": state_info.get("directions", 1),
+                            "proto_paths": state_info.get("proto_paths", []),
+                        })
+        regions[region] = region_items
+
+    markings_list = []
+    for mark_id in char_data.get("markingIds", []):
+        preview = preview_map.get(mark_id, ("", ""))
+        if preview and preview[0]:
+            state_info = direction_info.get(mark_id, {})
+            markings_list.append({
+                "item": mark_id,
+                "sprite": preview[0],
+                "state": preview[1],
+                "directions": state_info.get("directions", 1),
+                "proto_paths": state_info.get("proto_paths", []),
+                "colors": char_data.get("markingColors", {}).get(mark_id, []),
+            })
+
+    return {
+        "regions": regions,
+        "base_layer": char_data.get("appearance", {}),
+        "markings": markings_list,
+    }
 
 
 def _parse_character_file(data: dict) -> dict:

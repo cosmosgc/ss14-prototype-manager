@@ -580,5 +580,187 @@
   "identifyingFeatures": "",
   "allergies": [],
   "drugAllergies": "",
-  "emergencyContactName": ""
+  "emergencyContactName": "",
+  "_proto_paths": {
+    "ChemistSatchel": [
+      "Loadouts/Jobs/Medical/chemist.yml"
+    ],
+    "ClothingUniformNightclubSuitSkirt": [
+      "_Impstation/Entities/Clothing/Uniforms/jumpskirts.yml"
+    ],
+    "TowelColorDarkBlue": [
+      "Entities/Clothing/Multiple/towel.yml"
+    ],
+    "TowelColorLightBlue": [
+      "Entities/Clothing/Multiple/towel.yml"
+    ],
+    "Lighter": [
+      "Catalog/Fills/Lockers/misc.yml"
+    ],
+    "WinterBoots": [
+      "Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "EmergencyOxygenMedical": [
+      "Loadouts/Miscellaneous/survival.yml"
+    ],
+    "ChemistWintercoat": [
+      "Loadouts/Jobs/Medical/chemist.yml"
+    ],
+    "MedicalDoctorSatchel": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "PassengerWintercoat": [
+      "Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "ThreeCandles": [
+      "Loadouts/Miscellaneous/trinkets.yml"
+    ],
+    "TowelColorWhite": [
+      "Entities/Clothing/Multiple/towel.yml"
+    ],
+    "SeniorPhysicianPDA": [
+      "Entities/Objects/Devices/pda.yml"
+    ],
+    "EmergencyOxygen": [
+      "Loadouts/Miscellaneous/survival.yml"
+    ],
+    "LibrarianJumpsuit": [
+      "Loadouts/loadout_groups.yml"
+    ],
+    "ChemistJumpskirt": [
+      "Loadouts/Jobs/Medical/chemist.yml"
+    ],
+    "SeniorPhysicianJumpskirt": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "VulpPointsCrestLegs": [
+      "_DV/Entities/Mobs/Customization/Markings/vulpkanin.yml"
+    ],
+    "Mantle": [
+      "Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "BartenderWintercoat": [
+      "Loadouts/Jobs/Civilian/bartender.yml"
+    ],
+    "WhiteShoes": [
+      "Loadouts/Jobs/Engineering/atmospheric_technician.yml"
+    ],
+    "TapeRecorder": [
+      "_DV/Catalog/Fills/Boxes/security.yml"
+    ],
+    "MedicalDoctorWintercoat": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "TealJumpskirt": [
+      "_DV/Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "PlushieLizard": [
+      "tags.yml"
+    ],
+    "CommonSatchel": [
+      "Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "VulpBellyFull": [
+      "_DV/Entities/Mobs/Customization/Markings/vulpkanin.yml"
+    ],
+    "VulpEar": [
+      "_DV/Entities/Mobs/Customization/Markings/vulpkanin.yml"
+    ],
+    "NitrileGloves": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "NurseHat": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "BartenderPDA": [
+      "Entities/Objects/Devices/pda.yml"
+    ],
+    "MedicalHud": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "ChemistGloves": [
+      "_DV/Loadouts/loadout_groups.yml"
+    ],
+    "VulpSnoutSharp": [
+      "_DV/Entities/Mobs/Customization/Markings/vulpkanin.yml"
+    ],
+    "Hairflower": [
+      "Loadouts/Miscellaneous/trinkets.yml"
+    ],
+    "LizardPlushieMedicalDoctor": [
+      "Loadouts/Miscellaneous/jobtrinkets.yml"
+    ],
+    "ChemistryPDA": [
+      "Entities/Objects/Devices/pda.yml"
+    ],
+    "GreenJumpsuit": [
+      "_DV/Loadouts/Jobs/Civilian/passenger.yml"
+    ],
+    "OffDutyCrewPDA": [
+      "_DV/Entities/Objects/Devices/pda.yml"
+    ],
+    "MedicalWinterBoots": [
+      "Loadouts/Jobs/Medical/medical_doctor.yml"
+    ],
+    "VulpTailWag": [
+      "_DV/Entities/Mobs/Customization/Markings/vulpkanin.yml"
+    ],
+    "ScarfPurple": [
+      "_DV/Loadouts/Miscellaneous/scarfs.yml"
+    ]
+  },
+  "_rsi_paths": {
+    "ClothingUniformNightclubSuitSkirt": {
+      "sprite": "_Impstation/Clothing/Uniforms/Jumpskirt/nightclubsuit.rsi",
+      "state": "icon"
+    },
+    "TowelColorDarkBlue": {
+      "sprite": "Clothing/Multiple/towel.rsi",
+      "state": "icon"
+    },
+    "TowelColorLightBlue": {
+      "sprite": "Clothing/Multiple/towel.rsi",
+      "state": "icon"
+    },
+    "TowelColorWhite": {
+      "sprite": "Clothing/Multiple/towel.rsi",
+      "state": "icon"
+    },
+    "SeniorPhysicianPDA": {
+      "sprite": "_DV/Objects/Devices/pda.rsi",
+      "state": "pda-seniorphysician"
+    },
+    "VulpPointsCrestLegs": {
+      "sprite": "_DV/Mobs/Customization/Vulpkanin/facial_hair.rsi",
+      "state": "kita"
+    },
+    "TapeRecorder": {
+      "sprite": "_DV/Objects/Storage/boxes.rsi",
+      "state": "recorder"
+    },
+    "VulpBellyFull": {
+      "sprite": "_DV/Mobs/Customization/Vulpkanin/facial_hair.rsi",
+      "state": "kita"
+    },
+    "VulpEar": {
+      "sprite": "_DV/Mobs/Customization/Vulpkanin/facial_hair.rsi",
+      "state": "kita"
+    },
+    "BartenderPDA": {
+      "sprite": "_DV/Objects/Devices/pda.rsi",
+      "state": "pda-bartender"
+    },
+    "VulpSnoutSharp": {
+      "sprite": "_DV/Mobs/Customization/Vulpkanin/facial_hair.rsi",
+      "state": "kita"
+    },
+    "ChemistryPDA": {
+      "sprite": "_DV/Objects/Devices/pda.rsi",
+      "state": "pda-chemistry"
+    },
+    "VulpTailWag": {
+      "sprite": "_DV/Mobs/Customization/Vulpkanin/facial_hair.rsi",
+      "state": "kita"
+    }
+  }
 }

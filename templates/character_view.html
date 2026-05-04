@@ -151,38 +151,66 @@
       {% endif %}
     </div>
 
-      {% if equipment_layers %}
-      <div class="rounded-lg border bg-white p-6 shadow-sm">
-        <h2 class="mb-4 text-lg font-semibold">Character Preview</h2>
-        <div class="relative inline-block" style="width: 64px; height: 64px;">
-          {% for layer in equipment_layers %}
-          <img
-            loading="lazy"
-            data-sprite="{{ layer.sprite }}"
-            data-state="{{ layer.state }}"
-            data-directions="{{ layer.directions }}"
-            src="{{ url_for('rsi.rsi_preview', sprite=layer.sprite, state=layer.state, scale=2, direction=0) }}"
-            class="rsi-preview absolute left-0 top-0 pixelated"
-            style="z-index: {{ layer.layer }}"
-            onerror="this.style.display='none'"
-          />
-          {% endfor %}
-        </div>
-        <div class="mt-4">
-          <h3 class="mb-2 font-medium">Equipped Layers</h3>
-          <div class="space-y-1 text-sm">
-            {% for layer in equipment_layers %}
-            <div class="flex items-center justify-between rounded bg-slate-50 px-2 py-1">
-              <span class="text-slate-500">Layer {{ layer.layer }}</span>
-              <span class="font-mono">{{ layer.slot }}</span>
-              <span class="font-mono text-xs">{{ layer.item }}</span>
+{% if character_viewer %}
+    <div class="rounded-lg border bg-white p-6 shadow-sm">
+      <h2 class="mb-4 text-lg font-semibold">Character Preview</h2>
+      <div class="flex gap-6">
+        <div class="flex-shrink-0">
+          <div class="relative bg-slate-900 rounded-lg overflow-hidden" style="width: 96px; height: 128px;">
+            {% if character_viewer.base_layer.skinColor %}
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-16 h-24 rounded" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.3;"></div>
             </div>
+            {% endif %}
+            {% for region, items in character_viewer.regions.items() %}
+              {% for item in items %}
+              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=3, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+              {% endfor %}
+            {% endfor %}
+            {% for mark in character_viewer.markings %}
+            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=3, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" onerror="this.style.display='none'" />
             {% endfor %}
           </div>
         </div>
+        <div class="flex-1">
+          <h3 class="mb-3 font-medium">Equipped Items</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            {% for region, items in character_viewer.regions.items() %}
+              {% if items %}
+            <div class="rounded bg-slate-50 p-2">
+              <span class="text-xs font-medium text-slate-500 uppercase">{{ region }}</span>
+              {% for item in items %}
+              <div class="flex items-center gap-1 mt-1">
+                <span class="font-mono text-xs">{{ item.slot }}</span>
+                <span class="font-mono text-xs text-slate-600">{{ item.item }}</span>
+              </div>
+              {% endfor %}
+            </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+          {% if character_viewer.markings %}
+          <h3 class="mt-4 mb-3 font-medium">Markings</h3>
+          <div class="grid grid-cols-3 gap-2 text-sm">
+            {% for mark in character_viewer.markings %}
+            <div class="flex flex-col items-center rounded bg-slate-50 p-2">
+              <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=2, direction=0) }}" class="rsi-preview h-8 w-8 rounded pixelated" onerror="this.style.display='none'" />
+              <span class="font-mono text-xs mt-1">{{ mark.item }}</span>
+              {% if mark.colors %}
+              <div class="flex gap-0.5 mt-0.5">
+                {% for color in mark.colors %}
+                <span class="h-2 w-2 rounded" style="background-color: {{ color }}"></span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
       </div>
-      {% endif %}
     </div>
+    {% endif %}
 
     <div class="lg:col-span-2 space-y-6">
       <div class="rounded-lg border bg-white p-6 shadow-sm">
