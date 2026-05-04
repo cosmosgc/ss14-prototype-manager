@@ -128,18 +128,32 @@ def character_view(char_id: str):
 
     templates = _load_templates(cache_root)
 
-    all_proto_ids = _collect_all_proto_ids_from_character(enriched_data)
-    proto_data_map = _build_proto_data_map(selected["name"], all_proto_ids)
-    preview_map = resolve_preview_batch(selected["name"], selected["root_path"], all_proto_ids)
+    all_proto_ids, loadout_entity_map = _collect_all_proto_ids_from_character(enriched_data)
+    entity_ids_for_preview = set(all_proto_ids)
+    for loadout_id, entity_id in loadout_entity_map.items():
+        if entity_id:
+            entity_ids_for_preview.add(entity_id)
+
+    proto_data_map = _build_proto_data_map(selected["name"], list(entity_ids_for_preview))
+    preview_map = resolve_preview_batch(selected["name"], selected["root_path"], list(entity_ids_for_preview))
+
+    extended_preview_map = dict(preview_map)
+    for loadout_id, entity_id in loadout_entity_map.items():
+        if entity_id and entity_id in preview_map:
+            extended_preview_map[loadout_id] = preview_map[entity_id]
 
     direction_info = {}
-    for proto_id, preview in preview_map.items():
+    for proto_id in all_proto_ids:
+        preview = extended_preview_map.get(proto_id)
+        entity_id = loadout_entity_map.get(proto_id, proto_id)
+        if entity_id and entity_id in preview_map:
+            preview = preview_map[entity_id]
         if preview and preview[0]:
             state_info = get_rsi_state_info(selected, preview[0], preview[1])
-            state_info["proto_paths"] = proto_data_map.get(proto_id, {}).get("proto_paths", [])
+            state_info["proto_paths"] = proto_data_map.get(entity_id, {}).get("proto_paths", [])
             direction_info[proto_id] = state_info
 
-    equipment_layers = _build_equipment_layers(char_data.get("equipment", {}), preview_map, direction_info)
+    equipment_layers = _build_equipment_layers(char_data.get("equipment", {}), extended_preview_map, direction_info)
 
     character_viewer = _build_character_viewer(char_data, preview_map, direction_info)
 
@@ -417,15 +431,20 @@ def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
         if item:
             ids.add(item)
 
+    loadout_entity_map = {}
     loadouts = char_data.get("loadouts", {})
     for job, loadout_data in loadouts.items():
         selected = loadout_data.get("selectedLoadouts", {})
         if isinstance(selected, dict):
-            for items in selected.values():
+            for slot_name, items in selected.items():
                 if isinstance(items, list):
                     for item in items:
                         if isinstance(item, dict) and item.get("prototype"):
-                            ids.add(item["prototype"])
+                            proto = item.get("prototype")
+                            loadout_id = item.get("id", "")
+                            if loadout_id:
+                                loadout_entity_map[loadout_id] = proto
+                            ids.add(proto)
                         elif isinstance(item, str) and item:
                             ids.add(item)
 
@@ -433,7 +452,7 @@ def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
         if mark_id:
             ids.add(mark_id)
 
-    return list(ids)
+    return list(ids), loadout_entity_map
 
 
 def _build_proto_data_map(instance_name: str, proto_ids: list[str]) -> dict[str, dict]:
@@ -458,12 +477,17 @@ def _build_proto_data_map(instance_name: str, proto_ids: list[str]) -> dict[str,
 
 
 def _enrich_character_data_with_paths(char_data: dict, instance_name: str, root_path: str) -> dict:
-    all_proto_ids = _collect_all_proto_ids_from_character(char_data)
+    all_proto_ids, loadout_entity_map = _collect_all_proto_ids_from_character(char_data)
     if not all_proto_ids:
         return char_data
 
-    proto_data_map = _build_proto_data_map(instance_name, all_proto_ids)
-    preview_map = resolve_preview_batch(instance_name, root_path, all_proto_ids)
+    entity_ids_for_preview = set(all_proto_ids)
+    for loadout_id, entity_id in loadout_entity_map.items():
+        if entity_id:
+            entity_ids_for_preview.add(entity_id)
+
+    proto_data_map = _build_proto_data_map(instance_name, list(entity_ids_for_preview))
+    preview_map = resolve_preview_batch(instance_name, root_path, list(entity_ids_for_preview))
 
     enriched = dict(char_data)
 
@@ -471,13 +495,15 @@ def _enrich_character_data_with_paths(char_data: dict, instance_name: str, root_
         enriched["equipment"] = {}
     enriched["_proto_paths"] = {}
     enriched["_rsi_paths"] = {}
+    enriched["_loadout_entity_map"] = loadout_entity_map
 
     for proto_id in all_proto_ids:
         proto_paths = proto_data_map.get(proto_id, {}).get("proto_paths", [])
         if proto_paths:
             enriched["_proto_paths"][proto_id] = proto_paths
 
-        preview = preview_map.get(proto_id)
+        entity_id = loadout_entity_map.get(proto_id, proto_id)
+        preview = preview_map.get(entity_id) or preview_map.get(proto_id)
         if preview and preview[0]:
             enriched["_rsi_paths"][proto_id] = {
                 "sprite": preview[0],

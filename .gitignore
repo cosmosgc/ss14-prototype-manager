@@ -2,9 +2,6 @@
 data/
 data/instances.json
 node_modules/
-static/map_cache/
-static/entity_cache/
-static/dist/*
 __pycache__/
 *.pyc
 *.pyo

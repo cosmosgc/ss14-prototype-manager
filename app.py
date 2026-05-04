@@ -157,6 +157,7 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    print("Initializing database...")
     with get_db() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instances (
@@ -164,30 +165,53 @@ def init_db() -> None:
             root_path TEXT NOT NULL
         )
         """)
+        print("Ensuring tables...")
 
-        # 🔹 Main prototype table (now WITH type)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_ids (
             instance_name TEXT NOT NULL,
             proto_id TEXT NOT NULL,
             proto_type TEXT NOT NULL,
             rel_path TEXT NOT NULL,
+            content TEXT,
             PRIMARY KEY (instance_name, proto_id)
         )
         """)
+        print("Ensured prototype_ids table.")
 
-        # 🔹 Component entries (each "type: X" inside components)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS rsi_records (
+            instance_name TEXT NOT NULL,
+            rsi_name TEXT NOT NULL,
+            rel_path TEXT NOT NULL,
+            meta_json TEXT,
+            PRIMARY KEY (instance_name, rsi_name)
+        )
+        """)
+        print("Ensured rsi_records table.")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prototype_rsi (
+            instance_name TEXT NOT NULL,
+            proto_id TEXT NOT NULL,
+            rsi_name TEXT NOT NULL,
+            rsi_rel_path TEXT,
+            PRIMARY KEY (instance_name, proto_id, rsi_name)
+        )
+        """)
+        print("Ensured prototype_rsi table.")
+
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_components (
             instance_name TEXT NOT NULL,
             proto_id TEXT NOT NULL,
             component_type TEXT NOT NULL,
-            data TEXT, -- JSON blob for flexibility
+            data TEXT,
             PRIMARY KEY (instance_name, proto_id, component_type)
         )
         """)
+        print("Ensured prototype_components table.")
 
-        # 🔹 Optional: extracted known fields (indexed)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_component_fields (
             instance_name TEXT NOT NULL,
@@ -198,6 +222,7 @@ def init_db() -> None:
             PRIMARY KEY (instance_name, proto_id, component_type, field_name)
         )
         """)
+        print("Ensured prototype_component_fields table.")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instance_scan (
@@ -206,6 +231,7 @@ def init_db() -> None:
             id_count INTEGER NOT NULL
         )
         """)
+        print("Ensured instance_scan table.")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instance_settings (
@@ -213,6 +239,7 @@ def init_db() -> None:
             custom_dir TEXT NOT NULL DEFAULT ''
         )
         """)
+        print("Ensured instance_settings table.")
 
 
 def save_instance(name: str, root_path: str) -> None:
@@ -1038,6 +1065,8 @@ def scan_instance_ids(instance_name: str, root_path: str):
     proto_root = Path(root_path) / "Resources" / "Prototypes"
     print("Scanning:", proto_root, proto_root.exists())
 
+    SKIP_FILES = {"tags.yml", "tags.yaml"}
+
     with get_db() as conn:
         conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (instance_name,))
         conn.execute("DELETE FROM prototype_components WHERE instance_name = ?", (instance_name,))
@@ -1048,6 +1077,9 @@ def scan_instance_ids(instance_name: str, root_path: str):
 
         for path in proto_root.rglob("*.yml"):
             rel_path = path.relative_to(proto_root).as_posix()
+
+            if path.name.lower() in SKIP_FILES:
+                continue
 
             try:
                 text = path.read_text(encoding="utf-8")
@@ -1242,6 +1274,29 @@ def find_first_prototype_path_by_id(instance_name: str, proto_id: str) -> str | 
             (instance_name, proto_id),
         ).fetchone()
     return row["rel_path"] if row else None
+
+
+def load_prototype_content(instance_name: str, proto_id: str) -> dict | None:
+    """Load prototype content (full YAML) by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT content FROM prototype_ids WHERE instance_name = ? AND proto_id = ?",
+            (instance_name, proto_id),
+        ).fetchone()
+    if row and row["content"]:
+        import json
+        return json.loads(row["content"])
+    return None
+
+
+def find_rsi_for_prototype(instance_name: str, proto_id: str) -> list[dict]:
+    """Find RSI files used by a prototype."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT rsi_name, rsi_rel_path FROM prototype_rsi WHERE instance_name = ? AND proto_id = ?",
+            (instance_name, proto_id),
+        ).fetchall()
+    return [{"name": r["rsi_name"], "path": r["rsi_rel_path"]} for r in rows]
 
 
 def get_instance_custom_dir(instance_name: str) -> str:
