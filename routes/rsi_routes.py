@@ -115,8 +115,46 @@ def rsi_preview():
     with Image.open(image_path) as im:
         im = im.convert("RGBA")
 
-        # No animation → just return scaled image
+        # Get state-specific directions and delays
+        directions = 1
+        if state_meta and "directions" in state_meta:
+            directions = state_meta["directions"]
+
+        # No animation → just return scaled image, handling direction if present
         if not state_meta or "delays" not in state_meta:
+            # Handle directions without animation
+            if directions > 1:
+                # Validate direction parameter
+                if direction < 0 or direction >= directions:
+                    direction = 0
+
+                # Get size from meta.json or calculate from image
+                size_x = 32
+                size_y = 32
+                if meta and "size" in meta:
+                    size_x = meta["size"].get("x", 32)
+                    size_y = meta["size"].get("y", 32)
+
+                # Calculate frame height based on directions
+                frame_height = im.height // directions
+
+                # Extract the direction row
+                y1 = direction * frame_height
+                y2 = y1 + frame_height
+
+                # Ensure within bounds
+                y2 = min(y2, im.height)
+
+                if y2 > y1:
+                    frame = im.crop((0, y1, im.width, y2))
+                    # Scale to the correct size
+                    frame = frame.resize((size_x * scale, size_y * scale), Image.Resampling.NEAREST)
+                    buffer = io.BytesIO()
+                    frame.save(buffer, format="PNG")
+                    buffer.seek(0)
+                    return send_file(buffer, mimetype="image/png")
+
+            # No directions or single direction
             out = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
             buffer = io.BytesIO()
             out.save(buffer, format="PNG")
@@ -308,6 +346,33 @@ def api_rsi_states():
     if not states:
         states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
     return jsonify(sorted(set(states)))
+
+
+@rsi_bp.route("/api/state-info")
+def api_rsi_state_info():
+    selected = selected_instance_or_400()
+    sprite = request.args.get("sprite", "").strip()
+    state = request.args.get("state", "icon").strip()
+    if not sprite:
+        return jsonify({})
+    textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join_or_none(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return jsonify({})
+    meta_path = rsi_dir / "meta.json"
+    result = {"directions": 1, "delays": None, "size": None}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            result["size"] = meta.get("size")
+            for s in meta.get("states", []):
+                if isinstance(s, dict) and s.get("name") == state:
+                    result["directions"] = s.get("directions", 1)
+                    result["delays"] = s.get("delays")
+                    break
+        except Exception:
+            pass
+    return jsonify(result)
 
 
 def safe_join_or_none(base: Path, relative: str):

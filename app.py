@@ -783,6 +783,29 @@ def safe_join_or_none(base: Path, relative: str) -> Path | None:
         return None
 
 
+def get_rsi_state_info(instance: dict[str, str], sprite: str, state: str) -> dict:
+    result = {"directions": 1, "delays": None, "size": {"x": 32, "y": 32}}
+    if not sprite:
+        return result
+    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join_or_none(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return result
+    meta_path = rsi_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            result["size"] = meta.get("size", {"x": 32, "y": 32})
+            for s in meta.get("states", []):
+                if isinstance(s, dict) and s.get("name") == state:
+                    result["directions"] = s.get("directions", 1)
+                    result["delays"] = s.get("delays")
+                    break
+        except Exception:
+            pass
+    return result
+
+
 def find_vscode_cli() -> str | None:
     local_appdata = os.getenv("LOCALAPPDATA", "")
     program_files = os.getenv("ProgramFiles", r"C:\Program Files")

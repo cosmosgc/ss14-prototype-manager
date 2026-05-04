@@ -12,6 +12,15 @@
       <h1 class="text-2xl font-bold">{{ meta.name }}</h1>
       <span class="rounded bg-slate-200 px-2 py-1 text-sm">{{ meta.species }}</span>
     </div>
+    <div class="flex items-center gap-2">
+      <label class="text-sm font-medium">Direction:</label>
+      <select id="directionSelect" class="rounded border border-slate-300 px-2 py-1" onchange="updateDirection()">
+        <option value="0">South (0)</option>
+        <option value="1">West (1)</option>
+        <option value="2">North (2)</option>
+        <option value="3">East (3)</option>
+      </select>
+    </div>
   </div>
 
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -102,12 +111,17 @@
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {% for mark_id in char_data.markingIds %}
           {% set preview = preview_map.get(mark_id) %}
+          {% set state_info = direction_info.get(mark_id, {}) %}
+          {% set dirs = state_info.get('directions', 1) %}
           <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
             {% if preview and preview[0] %}
             <img
               loading="lazy"
-              src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
-              class="h-12 w-12 rounded object-contain pixelated"
+              data-sprite="{{ preview[0] }}"
+              data-state="{{ preview[1] }}"
+              data-directions="{{ dirs }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+              class="rsi-preview h-12 w-12 rounded object-contain pixelated"
               onerror="this.style.display='none'"
             />
             {% endif %}
@@ -132,6 +146,39 @@
           {% for trait in char_data.traits %}
           <span class="rounded bg-amber-100 px-2 py-0.5 text-xs">{{ trait }}</span>
           {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+      {% if equipment_layers %}
+      <div class="rounded-lg border bg-white p-6 shadow-sm">
+        <h2 class="mb-4 text-lg font-semibold">Character Preview</h2>
+        <div class="relative inline-block" style="width: 64px; height: 64px;">
+          {% for layer in equipment_layers %}
+          <img
+            loading="lazy"
+            data-sprite="{{ layer.sprite }}"
+            data-state="{{ layer.state }}"
+            data-directions="{{ layer.directions }}"
+            src="{{ url_for('rsi.rsi_preview', sprite=layer.sprite, state=layer.state, scale=2, direction=0) }}"
+            class="rsi-preview absolute left-0 top-0 pixelated"
+            style="z-index: {{ layer.layer }}"
+            onerror="this.style.display='none'"
+          />
+          {% endfor %}
+        </div>
+        <div class="mt-4">
+          <h3 class="mb-2 font-medium">Equipped Layers</h3>
+          <div class="space-y-1 text-sm">
+            {% for layer in equipment_layers %}
+            <div class="flex items-center justify-between rounded bg-slate-50 px-2 py-1">
+              <span class="text-slate-500">Layer {{ layer.layer }}</span>
+              <span class="font-mono">{{ layer.slot }}</span>
+              <span class="font-mono text-xs">{{ layer.item }}</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
       </div>
       {% endif %}
@@ -181,11 +228,16 @@
             {% for slot, item in char_data.equipment.items() %}
             {% if item and preview_map.get(item) and preview_map[item][0] %}
             {% set preview = preview_map[item] %}
+            {% set state_info = direction_info.get(item, {}) %}
+            {% set dirs = state_info.get('directions', 1) %}
             <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
               <img
                 loading="lazy"
-                src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
-                class="h-12 w-12 rounded object-contain pixelated"
+                data-sprite="{{ preview[0] }}"
+                data-state="{{ preview[1] }}"
+                data-directions="{{ dirs }}"
+                src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+                class="rsi-preview h-12 w-12 rounded object-contain pixelated"
                 onerror="this.style.display='none'"
               />
               <span class="mt-1 text-xs font-medium capitalize">{{ slot }}</span>
@@ -242,6 +294,8 @@
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 max-h-96 overflow-y-auto">
           {% for item_id in char_data.allItemIds %}
           {% set preview = preview_map.get(item_id) %}
+          {% set state_info = direction_info.get(item_id, {}) %}
+          {% set dirs = state_info.get('directions', 1) %}
           <button
             type="button"
             onclick="copyItem('{{ item_id }}')"
@@ -251,8 +305,11 @@
             {% if preview and preview[0] %}
             <img
               loading="lazy"
-              src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
-              class="h-10 w-10 rounded object-contain pixelated"
+              data-sprite="{{ preview[0] }}"
+              data-state="{{ preview[1] }}"
+              data-directions="{{ dirs }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=2, direction=0) }}"
+              class="rsi-preview h-10 w-10 rounded object-contain pixelated"
               onerror="this.style.display='none'"
             />
             {% endif %}
@@ -332,6 +389,19 @@
   function copyItem(itemId) {
     navigator.clipboard.writeText(itemId);
     alert('Copied: ' + itemId);
+  }
+
+  function updateDirection() {
+    const direction = document.getElementById('directionSelect').value;
+    document.querySelectorAll('.rsi-preview').forEach(img => {
+      const sprite = img.getAttribute('data-sprite');
+      const state = img.getAttribute('data-state');
+      const dirs = parseInt(img.getAttribute('data-directions') || '1');
+      if (sprite && state) {
+        const actualDirection = direction < dirs ? direction : '0';
+        img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=2&direction=' + actualDirection;
+      }
+    });
   }
 </script>
 {% endblock %}

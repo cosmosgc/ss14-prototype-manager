@@ -8,7 +8,7 @@ from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
     get_db, load_instances, get_instance_by_name, load_instances,
-    resolve_preview_batch,
+    resolve_preview_batch, get_rsi_state_info,
 )
 
 character_bp = Blueprint("character", __name__, url_prefix="/characters")
@@ -126,6 +126,14 @@ def character_view(char_id: str):
     all_proto_ids = _collect_all_proto_ids_from_character(char_data)
     preview_map = resolve_preview_batch(selected["name"], selected["root_path"], all_proto_ids)
 
+    direction_info = {}
+    for proto_id, preview in preview_map.items():
+        if preview and preview[0]:
+            state_info = get_rsi_state_info(selected, preview[0], preview[1])
+            direction_info[proto_id] = state_info
+
+    equipment_layers = _build_equipment_layers(char_data.get("equipment", {}), preview_map, direction_info)
+
     return render_template(
         "character_view.html",
         char_id=char_id,
@@ -134,6 +142,8 @@ def character_view(char_id: str):
         templates=templates,
         selected=selected,
         preview_map=preview_map,
+        direction_info=direction_info,
+        equipment_layers=equipment_layers,
     )
 
 
@@ -409,6 +419,39 @@ def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
             ids.add(mark_id)
 
     return list(ids)
+
+
+def _build_equipment_layers(equipment: dict, preview_map: dict, direction_info: dict) -> list[dict]:
+    slot_order = [
+        "inner", "uniform", "neck", "head", "mask", "eyes",
+        "outer", "back", "belt", "gloves", "shoes",
+        "id", "pda", "hand1", "hand2", "trinkets", "scarf"
+    ]
+
+    slot_layer_map = {slot: i for i, slot in enumerate(slot_order)}
+
+    layers = []
+    for slot, item in equipment.items():
+        if not item:
+            continue
+        preview = preview_map.get(item, ("", ""))
+        if not preview or not preview[0]:
+            continue
+
+        state_info = direction_info.get(item, {})
+        layer_index = slot_layer_map.get(slot, 999)
+
+        layers.append({
+            "slot": slot,
+            "item": item,
+            "sprite": preview[0],
+            "state": preview[1],
+            "layer": layer_index,
+            "directions": state_info.get("directions", 1),
+        })
+
+    layers.sort(key=lambda x: x["layer"])
+    return layers
 
 
 def _parse_character_file(data: dict) -> dict:
