@@ -3,11 +3,15 @@ from pathlib import Path
 import json
 import os
 import yaml
+import io
+import re
+from PIL import Image
+import hashlib
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
-    get_db, load_instances, get_instance_by_name, load_instances,
+    get_db, load_instances, get_instance_by_name, load_instances, list_rsi_states,
 )
 
 character_bp = Blueprint("character", __name__, url_prefix="/characters")
@@ -130,6 +134,132 @@ def character_view(char_id: str):
         templates=templates,
         selected=selected,
     )
+
+
+@character_bp.route("/<char_id>/preview")
+def character_preview(char_id: str):
+    selected = selected_instance_or_400()
+    direction = int(request.args.get("direction", "0"))
+    scale = int(request.args.get("scale", "4"))
+
+    cache_root = Path("static") / "character_cache" / selected["name"] / char_id
+    meta_path = cache_root / "meta.json"
+    data_path = cache_root / "data.json"
+
+    if not meta_path.exists() or not data_path.exists():
+        abort(404)
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+
+    with open(data_path, "r", encoding="utf-8") as f:
+        char_data = json.load(f)
+
+    instance_root = Path(selected["root_path"])
+    textures_root = instance_root / "Resources" / "Textures"
+
+    layers = get_character_layers(
+        char_data, char_data.get("equipment", {}),
+        textures_root, selected["name"]
+    )
+
+    preview_img = compose_layers(layers, direction, scale)
+
+    if not preview_img:
+        preview_img = Image.new("RGBA", (32 * scale, 32 * scale), (128, 128, 128, 255))
+
+    buffer = io.BytesIO()
+    preview_img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+@character_bp.route("/<char_id>/layers")
+def character_layers(char_id: str):
+    """Return list of all character layers as JSON"""
+    selected = selected_instance_or_400()
+
+    cache_root = Path("static") / "character_cache" / selected["name"] / char_id
+    data_path = cache_root / "data.json"
+
+    if not data_path.exists():
+        abort(404)
+
+    with open(data_path, "r", encoding="utf-8") as f:
+        char_data = json.load(f)
+
+    instance_root = Path(selected["root_path"])
+    textures_root = instance_root / "Resources" / "Textures"
+
+    layers = get_character_layers(
+        char_data, char_data.get("equipment", {}),
+        textures_root, selected["name"]
+    )
+
+    layer_info = []
+    for name, sprite, state in layers:
+        layer_info.append({
+            "name": name,
+            "sprite": sprite,
+            "state": state,
+        })
+
+    return jsonify(layer_info)
+
+
+@character_bp.route("/<char_id>/sprite")
+def character_sprite(char_id: str):
+    """Return a single sprite image"""
+    selected = selected_instance_or_400()
+    sprite_path = request.args.get("sprite", "").strip()
+    state = request.args.get("state", "icon").strip()
+    direction = int(request.args.get("direction", "0"))
+    scale = int(request.args.get("scale", "6"))
+
+    if not sprite_path:
+        abort(400)
+
+    instance_root = Path(selected["root_path"])
+    textures_root = instance_root / "Resources" / "Textures"
+
+    img = extract_rsi_frame(textures_root, sprite_path, state, direction, scale)
+
+    if not img:
+        img = Image.new("RGBA", (32 * scale, 32 * scale), (200, 100, 100, 255))
+
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")
+
+
+@character_bp.route("/<char_id>/api/item-sprite")
+def character_api_item_sprite(char_id: str):
+    """Return sprite URL and info for an item ID"""
+    selected = selected_instance_or_400()
+    item_id = request.args.get("item_id", "").strip()
+    direction = int(request.args.get("direction", "0"))
+    scale = int(request.args.get("scale", "6"))
+
+    if not item_id:
+        return jsonify({"error": "No item_id provided"}), 400
+
+    instance_root = Path(selected["root_path"])
+    sprite, state = find_item_sprite(instance_root, selected["name"], item_id)
+
+    if not sprite:
+        return jsonify({"sprite": None, "state": None})
+
+    return jsonify({
+        "sprite": sprite,
+        "state": state or "icon",
+        "url": url_for("character.character_sprite",
+                       char_id=char_id,
+                       sprite=sprite,
+                       state=state or "icon",
+                       direction=direction,
+                       scale=scale)
+    })
 
 
 @character_bp.route("/<char_id>/dressup", methods=["POST"])
@@ -512,3 +642,360 @@ def _collect_all_slots(loadouts: dict) -> list[str]:
         slot_names.add(s)
 
     return sorted(slot_names)
+
+
+def find_item_sprite(instance_root: Path, instance_name: str, item_id: str) -> tuple[str | None, str | None]:
+    """Find sprite and state for an item prototype - handles multiple sprite formats"""
+    print(f"[DEBUG] find_item_sprite: item={item_id}, instance={instance_name}")
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
+            (item_id, instance_name)
+        ).fetchone()
+
+    if not row:
+        print(f"[DEBUG] find_item_sprite: no proto found for {item_id}")
+        return None, None
+
+    proto_path = instance_root / "Resources" / "Prototypes" / row["rel_path"]
+    if not proto_path.exists():
+        return None, None
+
+    try:
+        docs = load_yaml_documents(proto_path)
+        for doc in docs:
+            if isinstance(doc, dict):
+                for proto in _extract_prototypes(doc):
+                    sprite = None
+                    state = None
+
+                    # Format 1: Marking-style sprites (sprites: [{sprite: ..., state: ...}])
+                    sprites = proto.get("sprites")
+                    if isinstance(sprites, list) and sprites:
+                        first = sprites[0]
+                        if isinstance(first, dict):
+                            sprite = first.get("sprite")
+                            state = first.get("state")
+                            if sprite and isinstance(sprite, str):
+                                sprite = sprite.strip("/")
+                                if sprite.endswith(".png"):
+                                    sprite = sprite[:-4]
+                                if sprite.endswith(".rsi"):
+                                    sprite = sprite[:-4]
+                                print(f"[DEBUG] find_item_sprite: marking format sprite={sprite}, state={state}")
+                                return sprite, state
+
+                    # Format 2: Root-level sprite (items, entities)
+                    sprite = proto.get("sprite")
+                    if sprite and isinstance(sprite, str):
+                        if sprite.startswith("/"):
+                            sprite = sprite[1:]
+                        if sprite.endswith(".png"):
+                            sprite = sprite[:-4]
+                        if sprite.endswith(".rsi"):
+                            sprite = sprite[:-4]
+
+                        state = proto.get("state")
+                        print(f"[DEBUG] find_item_sprite: root format sprite={sprite}, state={state}")
+                        return sprite, state
+
+    except Exception as e:
+        print(f"[DEBUG] find_item_sprite error: {e}")
+
+    return None, None
+
+
+def find_rsi_dir(textures_root: Path, sprite: str) -> Path | None:
+    """Find RSI directory by searching recursively - handles mod prefixes like _DV"""
+    if not sprite:
+        return None
+
+    direct = safe_join(textures_root, sprite)
+    if direct and direct.exists():
+        return direct
+
+    sprite_name = Path(sprite).name.lower().replace(".rsi", "")
+
+    for path in textures_root.rglob("*.rsi"):
+        stem = path.stem.lower()
+        if stem == sprite_name:
+            return path.parent
+
+    return None
+
+
+def extract_rsi_frame(textures_root: Path, sprite: str, state: str, direction: int = 0, scale: int = 1) -> Image.Image | None:
+    """Extract a single frame from an RSI file"""
+    if not sprite:
+        return None
+
+    print(f"[DEBUG RSI] sprite={sprite}, state={state}, direction={direction}")
+
+    direct_png = textures_root / f"{sprite}.png"
+    if direct_png.exists():
+        print(f"[DEBUG RSI] found direct PNG: {direct_png}")
+        try:
+            with Image.open(direct_png) as im:
+                tex = im.convert("RGBA")
+                if scale > 1:
+                    tex = tex.resize((tex.width * scale, tex.height * scale), Image.Resampling.NEAREST)
+                return tex
+        except Exception as e:
+            print(f"[DEBUG RSI] direct PNG error: {e}")
+
+    rsi_dir = find_rsi_dir(textures_root, sprite)
+    print(f"[DEBUG RSI] rsi_dir={rsi_dir}, exists={rsi_dir.exists() if rsi_dir else False}")
+    if not rsi_dir or not rsi_dir.exists():
+        return None
+
+    meta_path = rsi_dir / "meta.json"
+    meta = None
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    available_states = list_rsi_states(rsi_dir)
+    if state and state in available_states:
+        actual_state = state
+    elif "icon" in available_states:
+        actual_state = "icon"
+    elif available_states:
+        actual_state = available_states[0]
+    else:
+        actual_state = None
+    if not actual_state:
+        return None
+
+
+    image_path = rsi_dir / f"{actual_state}.png"
+
+    if not image_path.exists():
+        # 🔥 fallback: grab ANY png in folder
+        pngs = list(rsi_dir.glob("*.png"))
+        if not pngs:
+            print(f"[DEBUG RSI] No PNG files in {rsi_dir}")
+            return None
+
+        image_path = pngs[0]
+        print(f"[DEBUG RSI] fallback PNG: {image_path}")
+
+    try:
+        with Image.open(image_path) as im:
+            im = im.convert("RGBA")
+
+            state_meta = None
+            if meta and "states" in meta:
+                for s in meta["states"]:
+                    if isinstance(s, dict) and s.get("name") == actual_state:
+                        state_meta = s
+                        break
+
+            directions = state_meta.get("directions", 1) if state_meta else 1
+
+            if direction < 0 or direction >= directions:
+                direction = 0
+
+            delays = state_meta.get("delays", []) if state_meta else []
+
+            if not delays:
+                if scale > 1:
+                    im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+                return im
+
+            if isinstance(delays, list) and len(delays) > 0:
+                if isinstance(delays[0], list):
+                    if direction < len(delays):
+                        frame_delays = delays[direction]
+                    else:
+                        frame_delays = delays[0]
+                else:
+                    frame_delays = delays
+            else:
+                frame_delays = [0.1]
+
+            frame_count = len(frame_delays)
+            if frame_count <= 1:
+                if scale > 1:
+                    im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+                return im
+
+            if directions > 1:
+                frame_width = im.width // frame_count
+                frame_height = im.height // directions
+            else:
+                frame_width = im.width // frame_count
+                frame_height = im.height
+
+            if frame_width <= 0 or frame_height <= 0:
+                if scale > 1:
+                    im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
+                return im
+
+            x1 = 0
+            y1 = direction * frame_height
+            x2 = frame_width
+            y2 = (direction + 1) * frame_height
+
+            frame = im.crop((x1, y1, x2, y2))
+            if scale > 1:
+                frame = frame.resize((frame.width * scale, frame.height * scale), Image.Resampling.NEAREST)
+            return frame
+
+    except Exception:
+        return None
+
+
+def get_species_base_sprite(species: str, textures_root: Path) -> str:
+    """Get base sprite for a species - uses search to handle mod prefixes"""
+    species_lower = species.lower()
+    species_key = species_lower.replace(" ", "").replace("-", "")
+
+    base_candidates = [
+        f"Mobs/Species/{species}/parts",
+        f"Mobs/Species/{species_key}/parts",
+        f"Mobs/{species}/parts",
+        f"Mobs/{species_key}/parts",
+    ]
+
+    for path in base_candidates:
+        if (textures_root / path).exists():
+            print(f"[DEBUG] get_species_base_sprite: found {path}")
+            return path
+
+    search_terms = [species_key, "human", species_lower]
+    for term in search_terms:
+        for path in textures_root.rglob("parts.rsi"):
+            if term in str(path).lower():
+                result = str(path.parent.relative_to(textures_root)).replace("\\", "/")
+                print(f"[DEBUG] get_species_base_sprite: search found {result}")
+                return result
+
+    for path in textures_root.rglob("human*.rsi"):
+        if "base" in path.name.lower() or "parts" in path.name.lower():
+            result = str(path.parent.relative_to(textures_root)).replace("\\", "/")
+            print(f"[DEBUG] get_species_base_sprite: fallback search found {result}")
+            return result
+
+    print(f"[DEBUG] get_species_base_sprite: no valid path found")
+    return "Mobs/Species/Human/parts"
+
+
+def get_character_layers(char_data: dict, equipment: dict, textures_root: Path, instance_name: str = "") -> list[tuple[str, str, str]]:
+    """Get all character layers as (name, sprite, state) tuples"""
+    instance_root = textures_root.parent.parent
+    layers = []
+    added_items = set()
+
+    species = char_data.get("species", "Human")
+    base_sprite = get_species_base_sprite(species, textures_root)
+    if base_sprite:
+        print(f"[DEBUG] Adding base layer: {base_sprite}")
+        layers.append(("base", base_sprite, "icon"))
+
+    appearance = char_data.get("appearance", {})
+    marking_ids = char_data.get("markingIds", [])
+
+    print(f"[DEBUG] Looking for {len(marking_ids)} markings: {marking_ids}")
+
+    marking_candidates = {
+        "VulpBellyFull": ["Mobs/Vulpkanin/Markings/belly", "Mobs/Vulpkanin/belly"],
+        "VulpEar": ["Mobs/Vulpkanin/Markings/ears", "Mobs/Vulpkanin/ears"],
+        "VulpSnoutSharp": ["Mobs/Vulpkanin/Markings/snout", "Mobs/Vulpkanin/snout"],
+        "VulpPointsCrestLegs": ["Mobs/Vulpkanin/Markings/points", "Mobs/Vulpkanin/points"],
+        "VulpTailWag": ["Mobs/Vulpkanin/Markings/tail", "Mobs/Vulpkanin/tail"],
+    }
+
+    for mark_id in marking_ids:
+        found = False
+        candidate_paths = marking_candidates.get(mark_id, [])
+        print(f"[DEBUG] Checking marking {mark_id} candidates: {candidate_paths}")
+        for sprite_path in candidate_paths:
+            rsi = find_rsi_dir(textures_root, sprite_path)
+            print(f"[DEBUG]   candidate {sprite_path} -> rsi: {rsi}")
+            if rsi:
+                layers.append((f"mark_{mark_id}", sprite_path, "icon"))
+                found = True
+                break
+
+        if not found:
+            for path in textures_root.rglob("*.rsi"):
+                if mark_id.lower() in path.stem.lower():
+                    sprite = str(path.parent.relative_to(textures_root)).replace("\\", "/")
+                    print(f"[DEBUG]   search found marking {mark_id}: {sprite}")
+                    layers.append((f"mark_{mark_id}", sprite, "icon"))
+                    break
+
+    hair_style = appearance.get("hair", "")
+    print(f"[DEBUG] Hair style: {hair_style}")
+    if hair_style:
+        sprite, state = find_item_sprite(instance_root, instance_name, hair_style)
+        print(f"[DEBUG] Hair sprite: {sprite}, state: {state}")
+        if sprite:
+            layers.append(("hair", sprite, state or "icon"))
+
+    loadouts = char_data.get("loadouts", {})
+    print(f"[DEBUG] Checking loadouts: {list(loadouts.keys())}")
+    for job, loadout_data in loadouts.items():
+        selected = loadout_data.get("selectedLoadouts", {})
+        if isinstance(selected, dict):
+            for slot_name, items in selected.items():
+                if isinstance(items, list):
+                    for item in items:
+                        item_id = None
+                        if isinstance(item, dict) and "prototype" in item:
+                            item_id = item["prototype"]
+                        elif isinstance(item, str):
+                            item_id = item
+
+                        if item_id and item_id not in added_items:
+                            sprite, state = find_item_sprite(instance_root, instance_name, item_id)
+                            print(f"[DEBUG] Loadout item {item_id}: sprite={sprite}, state={state}")
+                            if sprite:
+                                slot_key = slot_name.lower().replace(" ", "_")
+                                layers.append((f"{slot_key}_{item_id}", sprite, state or "icon"))
+                                added_items.add(item_id)
+
+    for slot, item_id in equipment.items():
+        if item_id and item_id != "None" and item_id not in added_items:
+            sprite, state = find_item_sprite(instance_root, instance_name, item_id)
+            print(f"[DEBUG] Equipment item {item_id}: sprite={sprite}, state={state}")
+            if sprite:
+                layers.append((f"equip_{slot}", sprite, state or "icon"))
+                added_items.add(item_id)
+
+    print(f"[DEBUG] Total layers found: {len(layers)}")
+    return layers
+
+
+def compose_layers(layers: list[tuple[str, str, str]], direction: int, scale: int, textures_root: Path = None) -> Image.Image | None:
+    """Compose layers into a single image"""
+    if not layers:
+        return None
+
+    layer_images = []
+    for name, sprite, state in layers:
+        img = extract_rsi_frame(textures_root, sprite, state, direction, scale)
+        if img:
+            layer_images.append(img)
+
+    if not layer_images:
+        return None
+
+    max_width = max(img.width for img in layer_images)
+    max_height = max(img.height for img in layer_images)
+
+    result = Image.new("RGBA", (max_width, max_height), (0, 0, 0, 0))
+
+    for layer_img in layer_images:
+        result.paste(layer_img, (0, 0), layer_img)
+
+    return result
+
+
+def compose_character_preview(char_data: dict, equipment: dict, textures_root: Path, direction: int = 0, scale: int = 4, instance_name: str = "") -> Image.Image | None:
+    """Compose character preview from layers - legacy function"""
+    layers = get_character_layers(char_data, equipment, textures_root, instance_name)
+    return compose_layers(layers, direction, scale, textures_root)

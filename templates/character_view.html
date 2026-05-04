@@ -14,6 +14,56 @@
     </div>
   </div>
 
+  <div class="rounded-lg border bg-white p-6 shadow-sm" id="preview">
+    <h2 class="mb-4 text-lg font-semibold">Character Sprites</h2>
+
+    <div class="flex items-center gap-4 mb-4">
+      <span class="text-sm font-medium">Direction:</span>
+      <div class="flex gap-1">
+        <button type="button" onclick="setDirection(0)" class="dir-btn rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700">S</button>
+        <button type="button" onclick="setDirection(1)" class="dir-btn rounded bg-slate-200 px-3 py-1 text-xs hover:bg-slate-300">W</button>
+        <button type="button" onclick="setDirection(2)" class="dir-btn rounded bg-slate-200 px-3 py-1 text-xs hover:bg-slate-300">N</button>
+        <button type="button" onclick="setDirection(3)" class="dir-btn rounded bg-slate-200 px-3 py-1 text-xs hover:bg-slate-300">E</button>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h3 class="font-medium mb-2">Base & Appearance</h3>
+      <div id="base-layers" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+    </div>
+
+    <div>
+      <h3 class="font-medium mb-2">Loadout Items (click to preview)</h3>
+      <div id="loadout-container" class="space-y-4">
+        {% for job, loadout in char_data.loadouts.items() %}
+        <div class="job-container border rounded p-3">
+          <div class="font-medium text-sm mb-2">{{ job }}</div>
+          <div class="flex flex-wrap gap-2">
+            {% if loadout.selectedLoadouts %}
+              {% for slot, items in loadout.selectedLoadouts.items() %}
+                {% for item in items %}
+                  {% if item.prototype %}
+                    <button type="button" onclick="fetchItemSprite('{{ item.prototype }}', this)"
+                            class="item-btn rounded border px-2 py-1 text-xs font-mono hover:bg-blue-50">
+                      {{ item.prototype }}
+                    </button>
+                  {% elif item %}
+                    <button type="button" onclick="fetchItemSprite('{{ item }}', this)"
+                            class="item-btn rounded border px-2 py-1 text-xs font-mono hover:bg-blue-50">
+                      {{ item }}
+                    </button>
+                  {% endif %}
+                {% endfor %}
+                {% endfor %}
+            {% endif %}
+          </div>
+          <div class="item-sprite-container mt-2 hidden"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <div class="space-y-6">
       <div class="rounded-lg border bg-white p-6 shadow-sm">
@@ -297,9 +347,82 @@
 </div>
 
 <script>
+  let currentDirection = 0;
+
+  async function loadBaseLayers() {
+    const container = document.getElementById('base-layers');
+    try {
+      const resp = await fetch("{{ url_for('character.character_layers', char_id=char_id) }}");
+      const layers = await resp.json();
+      container.innerHTML = layers.map(layer => `
+        <div class="rounded border bg-slate-50 p-2 text-center">
+          <div class="text-xs font-medium mb-1 capitalize">${layer.name.replace('_', ' ')}</div>
+          <img
+            src="{{ url_for('character.character_sprite', char_id=char_id, scale=6) }}&sprite=${encodeURIComponent(layer.sprite)}&state=${layer.state}&direction=${currentDirection}"
+            alt="${layer.name}"
+            class="w-full h-auto rounded bg-white"
+            onerror="this.style.display='none'"
+          />
+          <div class="mt-1 text-xs text-slate-400 truncate" title="${layer.sprite}">${layer.sprite.split('/').pop()}</div>
+        </div>
+      `).join('');
+    } catch (e) {
+      container.innerHTML = '<div class="text-red-500">Failed to load</div>';
+    }
+  }
+
+  async function fetchItemSprite(itemId, btn) {
+    const parent = btn.closest('.job-container');
+    const container = parent ? parent.querySelector('.item-sprite-container') : null;
+    if (!container) {
+      console.error('Container not found for', itemId);
+      return;
+    }
+    container.classList.remove('hidden');
+    container.innerHTML = '<div class="text-sm text-slate-500">Loading...</div>';
+
+    try {
+      const resp = await fetch("{{ url_for('character.character_api_item_sprite', char_id=char_id) }}?item_id=" + encodeURIComponent(itemId) + "&direction=" + currentDirection + "&scale=6");
+      const data = await resp.json();
+
+      if (data.sprite) {
+        container.innerHTML = `
+          <div class="flex items-start gap-3 p-2 bg-blue-50 rounded">
+            <img src="${data.url}" class="w-16 h-16 rounded bg-white" />
+            <div>
+              <div class="text-xs font-medium">${itemId}</div>
+              <div class="text-xs text-slate-500">${data.sprite} / ${data.state || 'icon'}</div>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = '<div class="text-xs text-red-500">No sprite found</div>';
+      }
+    } catch (e) {
+      container.innerHTML = '<div class="text-xs text-red-500">Error: ' + e.message + '</div>';
+    }
+  }
+
+  function setDirection(dir) {
+    currentDirection = dir;
+    document.querySelectorAll('.dir-btn').forEach((btn, idx) => {
+      if (idx === dir) {
+        btn.classList.remove('bg-slate-200');
+        btn.classList.add('bg-blue-600', 'text-white');
+      } else {
+        btn.classList.add('bg-slate-200');
+        btn.classList.remove('bg-blue-600', 'text-white');
+      }
+    });
+    loadBaseLayers();
+    document.querySelectorAll('.item-sprite-container').forEach(c => c.classList.add('hidden'));
+  }
+
   function copyItem(itemId) {
     navigator.clipboard.writeText(itemId);
     alert('Copied: ' + itemId);
   }
+
+  loadBaseLayers();
 </script>
 {% endblock %}

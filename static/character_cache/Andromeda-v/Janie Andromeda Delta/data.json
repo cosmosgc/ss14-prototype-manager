@@ -1,0 +1,584 @@
+{
+  "name": "Janie Smith Coelho da Silva",
+  "species": "Vulpkanin",
+  "gender": "Female",
+  "sex": "Female",
+  "age": 24,
+  "flavorText": "Medica S\u00eanior Excelente, Ja atuou como CMO e Chem, Possui Habilidades Basicas Fora da Med como Salvage, Zeladora.\n\nPossui Cegueira e Narcolapsia\n\n\"Ver o que os outros n\u00e3o v\u00eaem\"\n\nPossui olhos Azuis, Pelo Cinza com Barriga , Focinho, Orelha Interna e Pernas Pacialmente Brancas.\nAos Olhas o seu Rosto voc\u00ea percebe o olhar sem foco, como se tive-se ou n\u00e3o vendo voc\u00ea.",
+  "version": 1,
+  "forkId": "custom",
+  "appearance": {
+    "skinColor": "#C5BAAEFF",
+    "eyeColor": "#9BCCD4FF",
+    "hairColor": "#6D6D6DFF",
+    "facialHairColor": "#FAF2A1FF",
+    "hair": "HumanHairLong2",
+    "facialHair": "FacialHairShaved",
+    "markings": [
+      {
+        "id": "VulpBellyFull",
+        "visible": true,
+        "colors": [
+          "#F5F5F5FF"
+        ]
+      },
+      {
+        "id": "VulpEar",
+        "visible": true,
+        "colors": [
+          "#C5BAAEFF",
+          "#F5F5F5FF"
+        ]
+      },
+      {
+        "id": "VulpSnoutSharp",
+        "visible": true,
+        "colors": [
+          "#F5F5F5FF",
+          "#C5BAAEFF"
+        ]
+      },
+      {
+        "id": "VulpPointsCrestLegs",
+        "visible": true,
+        "colors": [
+          "#F5F5F5FF"
+        ]
+      },
+      {
+        "id": "VulpTailWag",
+        "visible": true,
+        "colors": [
+          "#C5BAAEFF",
+          "#C5BAAEFF"
+        ]
+      }
+    ]
+  },
+  "markingIds": [
+    "VulpBellyFull",
+    "VulpEar",
+    "VulpSnoutSharp",
+    "VulpPointsCrestLegs",
+    "VulpTailWag"
+  ],
+  "markingColors": {
+    "VulpBellyFull": [
+      "#F5F5F5FF"
+    ],
+    "VulpEar": [
+      "#C5BAAEFF",
+      "#F5F5F5FF"
+    ],
+    "VulpSnoutSharp": [
+      "#F5F5F5FF",
+      "#C5BAAEFF"
+    ],
+    "VulpPointsCrestLegs": [
+      "#F5F5F5FF"
+    ],
+    "VulpTailWag": [
+      "#C5BAAEFF",
+      "#C5BAAEFF"
+    ]
+  },
+  "loadouts": {
+    "JobChemist": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "GroupSpeciesBreathToolMedical": [],
+        "Trinkets": [
+          {
+            "prototype": "PlushieLizard"
+          },
+          {
+            "prototype": "Hairflower"
+          },
+          {
+            "prototype": "TowelColorLightBlue"
+          }
+        ],
+        "SurvivalMedical": [
+          {
+            "prototype": "EmergencyOxygenMedical"
+          }
+        ],
+        "ChemistOuterClothing": [
+          {
+            "prototype": "ChemistWintercoat"
+          }
+        ],
+        "ChemistBackpack": [
+          {
+            "prototype": "ChemistSatchel"
+          }
+        ],
+        "ChemistJumpsuit": [
+          {
+            "prototype": "ChemistJumpskirt"
+          }
+        ],
+        "MedicalMask": [],
+        "ChemistJobTrinkets": [],
+        "ChemistGloves": [
+          {
+            "prototype": "ChemistGloves"
+          }
+        ],
+        "ChemistShoes": [
+          {
+            "prototype": "WhiteShoes"
+          }
+        ],
+        "GroupTankHarness": [],
+        "ChemistHead": [],
+        "ChemistNeck": [],
+        "ChemistryPDA": [
+          {
+            "prototype": "ChemistryPDA"
+          }
+        ]
+      },
+      "role": "JobChemist"
+    },
+    "JobBartender": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "Trinkets": [
+          {
+            "prototype": "Hairflower"
+          }
+        ],
+        "Survival": [
+          {
+            "prototype": "EmergencyOxygen"
+          }
+        ],
+        "BartenderOuterClothing": [
+          {
+            "prototype": "BartenderWintercoat"
+          }
+        ],
+        "CommonBackpack": [
+          {
+            "prototype": "CommonSatchel"
+          }
+        ],
+        "BartenderJumpsuit": [
+          {
+            "prototype": "ClothingUniformNightclubSuitSkirt"
+          }
+        ],
+        "BartenderHead": [],
+        "BartenderJobTrinkets": [],
+        "GroupTankHarness": [],
+        "BartenderNeck": [],
+        "BartenderPDADelta": [
+          {
+            "prototype": "BartenderPDA"
+          }
+        ],
+        "BartenderGlasses": [],
+        "GroupSpeciesBreathTool": []
+      },
+      "role": "JobBartender"
+    },
+    "JobLibrarian": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "GroupSpeciesBreathTool": [],
+        "Trinkets": [
+          {
+            "prototype": "TowelColorDarkBlue"
+          },
+          {
+            "prototype": "TapeRecorder"
+          },
+          {
+            "prototype": "Hairflower"
+          }
+        ],
+        "Survival": [
+          {
+            "prototype": "EmergencyOxygen"
+          }
+        ],
+        "Glasses": [],
+        "CommonBackpack": [
+          {
+            "prototype": "CommonSatchel"
+          }
+        ],
+        "LibrarianJumpsuit": [
+          {
+            "prototype": "LibrarianJumpsuit"
+          }
+        ],
+        "LibrarianJobTrinkets": [],
+        "LibrarianNeck": [],
+        "GroupTankHarness": []
+      },
+      "role": "JobLibrarian"
+    },
+    "JobServiceWorker": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "GroupSpeciesBreathTool": [],
+        "Trinkets": [
+          {
+            "prototype": "Hairflower"
+          },
+          {
+            "prototype": "TapeRecorder"
+          },
+          {
+            "prototype": "TowelColorWhite"
+          }
+        ],
+        "Survival": [
+          {
+            "prototype": "EmergencyOxygen"
+          }
+        ],
+        "Glasses": [],
+        "CommonBackpack": [
+          {
+            "prototype": "CommonSatchel"
+          }
+        ],
+        "ServiceWorkerJobTrinkets": [],
+        "ServiceWorkerHead": [],
+        "Scarfs": [],
+        "ServiceWorkerJumpsuit": [
+          {
+            "prototype": "GreenJumpsuit"
+          }
+        ],
+        "GroupTankHarness": []
+      },
+      "role": "JobServiceWorker"
+    },
+    "JobMedicalDoctor": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "GroupSpeciesBreathToolMedical": [],
+        "Trinkets": [
+          {
+            "prototype": "TowelColorWhite"
+          },
+          {
+            "prototype": "Lighter"
+          },
+          {
+            "prototype": "ThreeCandles"
+          }
+        ],
+        "SurvivalMedical": [
+          {
+            "prototype": "EmergencyOxygenMedical"
+          }
+        ],
+        "MedicalDoctorPDA": [
+          {
+            "prototype": "SeniorPhysicianPDA"
+          }
+        ],
+        "MedicalShoes": [
+          {
+            "prototype": "MedicalWinterBoots"
+          }
+        ],
+        "MedicalDoctorOuterClothing": [
+          {
+            "prototype": "MedicalDoctorWintercoat"
+          }
+        ],
+        "MedicalBackpack": [
+          {
+            "prototype": "MedicalDoctorSatchel"
+          }
+        ],
+        "MedicalGloves": [
+          {
+            "prototype": "NitrileGloves"
+          }
+        ],
+        "MedicalDoctorJumpsuit": [
+          {
+            "prototype": "SeniorPhysicianJumpskirt"
+          }
+        ],
+        "MedicalMask": [],
+        "MedicalDoctorHead": [
+          {
+            "prototype": "NurseHat"
+          }
+        ],
+        "MedicalDoctorJobTrinkets": [
+          {
+            "prototype": "LizardPlushieMedicalDoctor"
+          }
+        ],
+        "GroupTankHarness": [],
+        "MedicalDoctorNeck": [],
+        "MedicalEyewear": [
+          {
+            "prototype": "MedicalHud"
+          }
+        ]
+      },
+      "role": "JobMedicalDoctor"
+    },
+    "JobPassenger": {
+      "entityName": null,
+      "selectedLoadouts": {
+        "GroupSpeciesBreathTool": [],
+        "Trinkets": [
+          {
+            "prototype": "Hairflower"
+          },
+          {
+            "prototype": "TowelColorWhite"
+          },
+          {
+            "prototype": "ThreeCandles"
+          }
+        ],
+        "Survival": [
+          {
+            "prototype": "EmergencyOxygen"
+          }
+        ],
+        "Glasses": [],
+        "PassengerShoes": [
+          {
+            "prototype": "WinterBoots"
+          }
+        ],
+        "PassengerOuterClothing": [
+          {
+            "prototype": "PassengerWintercoat"
+          }
+        ],
+        "PassengerGloves": [],
+        "PassengerFace": [],
+        "PassengerNeck": [
+          {
+            "prototype": "Mantle"
+          }
+        ],
+        "CommonBackpack": [
+          {
+            "prototype": "CommonSatchel"
+          }
+        ],
+        "PassengerJumpsuit": [
+          {
+            "prototype": "TealJumpskirt"
+          }
+        ],
+        "PassengerJobTrinkets": [],
+        "Scarfs": [
+          {
+            "prototype": "ScarfPurple"
+          }
+        ],
+        "GroupTankHarness": [],
+        "AssistantHead": [],
+        "PassengerPDADelta": [
+          {
+            "prototype": "OffDutyCrewPDA"
+          }
+        ]
+      },
+      "role": "JobPassenger"
+    }
+  },
+  "allItemIds": [
+    "BartenderPDA",
+    "BartenderWintercoat",
+    "ChemistGloves",
+    "ChemistJumpskirt",
+    "ChemistSatchel",
+    "ChemistWintercoat",
+    "ChemistryPDA",
+    "ClothingUniformNightclubSuitSkirt",
+    "CommonSatchel",
+    "EmergencyOxygen",
+    "EmergencyOxygenMedical",
+    "GreenJumpsuit",
+    "Hairflower",
+    "LibrarianJumpsuit",
+    "Lighter",
+    "LizardPlushieMedicalDoctor",
+    "Mantle",
+    "MedicalDoctorSatchel",
+    "MedicalDoctorWintercoat",
+    "MedicalHud",
+    "MedicalWinterBoots",
+    "NitrileGloves",
+    "NurseHat",
+    "OffDutyCrewPDA",
+    "PassengerWintercoat",
+    "PlushieLizard",
+    "ScarfPurple",
+    "SeniorPhysicianJumpskirt",
+    "SeniorPhysicianPDA",
+    "TapeRecorder",
+    "TealJumpskirt",
+    "ThreeCandles",
+    "TowelColorDarkBlue",
+    "TowelColorLightBlue",
+    "TowelColorWhite",
+    "WhiteShoes",
+    "WinterBoots"
+  ],
+  "availableSlots": [
+    "assistanthead",
+    "back",
+    "bartenderglasses",
+    "bartenderhead",
+    "bartenderjobtrinkets",
+    "bartenderjumpsuit",
+    "bartenderneck",
+    "bartenderouterclothing",
+    "bartenderpdadelta",
+    "belt",
+    "chemistbackpack",
+    "chemistgloves",
+    "chemisthead",
+    "chemistjobtrinkets",
+    "chemistjumpsuit",
+    "chemistneck",
+    "chemistouterclothing",
+    "chemistrypda",
+    "chemistshoes",
+    "commonbackpack",
+    "eyes",
+    "glasses",
+    "gloves",
+    "groupspeciesbreathtool",
+    "groupspeciesbreathtoolmedical",
+    "grouptankharness",
+    "hand1",
+    "hand2",
+    "head",
+    "id",
+    "librarianjobtrinkets",
+    "librarianjumpsuit",
+    "librarianneck",
+    "mask",
+    "medicalbackpack",
+    "medicaldoctorhead",
+    "medicaldoctorjobtrinkets",
+    "medicaldoctorjumpsuit",
+    "medicaldoctorneck",
+    "medicaldoctorouterclothing",
+    "medicaldoctorpda",
+    "medicaleyewear",
+    "medicalgloves",
+    "medicalmask",
+    "medicalshoes",
+    "neck",
+    "outer",
+    "passengerface",
+    "passengergloves",
+    "passengerjobtrinkets",
+    "passengerjumpsuit",
+    "passengerneck",
+    "passengerouterclothing",
+    "passengerpdadelta",
+    "passengershoes",
+    "pda",
+    "scarf",
+    "serviceworkerhead",
+    "serviceworkerjobtrinkets",
+    "serviceworkerjumpsuit",
+    "shoes",
+    "survival",
+    "survivalmedical",
+    "trinkets",
+    "uniform"
+  ],
+  "equipment": {},
+  "currentJob": "JobPassenger",
+  "traits": [
+    "Addicted",
+    "Depression",
+    "ChronicPain",
+    "Narcolepsy",
+    "LightweightDrunk",
+    "MarkedAsProtected",
+    "Hemophilia",
+    "Blindness",
+    "Deuteranopia"
+  ],
+  "jobPriorities": {},
+  "medicalEntries": [
+    {
+      "description": "Nome de c\u00f3digo do Quadrante NT: 'Pirata'\n\nProblemas de vis\u00e3o/Cegueira\n\nPor um tempo, ela ficou completamente cega, mas com o tratamento do M\u00e9dico NT, ela pode ou n\u00e3o voltar a enxergar.\n\nApesar do que lhe foi oferecido, ela se recusa a enxergar novamente ou pede para ficar cega devido \u00e0s fortes luzes das esta\u00e7\u00f5es\ne aos flashes que a fazem se sentir muito mal devido \u00e0 tontura.\n\nAo olhar para o rosto dele, voc\u00ea percebe seu olhar desfocado, como se ele estivesse ou n\u00e3o te vendo.",
+      "involved": "Quadrante NanoTrasen Pirata/Andr\u00f4meda",
+      "title": "Medbay/Medicina"
+    },
+    {
+      "description": "Cegueira, ela Usa e Transporta uma Bengala Branca com Listra Vermelha.\n\nNarcolapsia, ela Dorme do Nada quando ocorre.\n\nOdeia Implantes e Principalmente o Mindshield por Medo Canino.",
+      "involved": "Equipe Medica do Comando Central.",
+      "title": "Informa\u00e7\u00f5es Medicas"
+    },
+    {
+      "description": "Possui o Medo Vulp de Implantes e Vacinas",
+      "involved": "Equipe Medica do Comando Central.",
+      "title": "Medo de Vacinas e Implantes"
+    },
+    {
+      "description": "Possui Momentos Raivozos no qual fica Agressiva quase retornando a sua Forma Selvagem de Vulpkanin, at\u00e9 o Momento Causa desconhecida mas talvez seja algo Relacionado por ser Femea e ter os Momentos de \"In Heat\" Animal.\n\nTalvez seja necess\u00e1rio Remedios ou Drogas Calmantes ou Meios mais Extremos de Prevenir ela de se Ferir ou Ferir os Outros.",
+      "involved": "Logs de Seguran\u00e7a.",
+      "title": "Poblemas Com Raiva"
+    }
+  ],
+  "securityEntries": [
+    {
+      "description": "J\u00e1 teve sua posi\u00e7\u00e3o de M\u00e9dica removida uma vez devido a\num desentendimento entre o Chefe de Pol\u00edcia e um Oficial de Comando/CC.\nEla retornou ao cargo devido ao seu bom comportamento durante o per\u00edodo de suspens\u00e3o. (Este caso \u00e9 muito antigo)\n\nExcelente M\u00e9dica S\u00eanior, j\u00e1 trabalhou como CMO e Qu\u00edmica, possui habilidades b\u00e1sicas fora da \u00e1rea m\u00e9dica, como Salvamento.\n\nEla possui habilidades em Arrombamento em Caso de Emerg\u00eancia\ne Transporte de Ferramentas\n\n\"Enxergando o que os outros n\u00e3o veem\"",
+      "involved": "Quadrante Pirata/Andr\u00f4meda de NanoTrasen",
+      "title": "Registro e Anota\u00e7\u00f5es de Suspens\u00e3o"
+    },
+    {
+      "description": "Ela precisa de medica\u00e7\u00e3o para sua dor cr\u00f4nica (analg\u00e9sico) e antidepressivo e, se poss\u00edvel, medica\u00e7\u00e3o para ajudar com a narcolepsia.\n\nEla tem depress\u00e3o, dor cr\u00f4nica e narcolepsia.\n\nEla precisa consultar um psic\u00f3logo periodicamente.\n\nSua depress\u00e3o pode ser muito delicada e requer cuidado.\n\nSua dor cr\u00f4nica pode ser muito intensa se n\u00e3o for tratada.\n\nO intervalo entre os epis\u00f3dios de narcolepsia pode ser exatamente o mesmo, mas o tempo em que ela permanece inconsciente pode variar.\n\nEla precisa de medica\u00e7\u00e3o para sua dor cr\u00f4nica (analg\u00e9sico) e antidepressivo e, se poss\u00edvel, medica\u00e7\u00e3o para ajudar com a narcolepsia.\n\n=============================================================\nBons Antidepressivos:\nNeurozenium ou Serenitol\n\nAntidepressivo N\u00e3o Totalmente Recomendado:\nEquilibrazina\n\n\u00daltimo Recurso Antidepressivo:\nBlissifylovene\n\n=============================================================\nBom Analg\u00e9sico:\nStubantazina\n\nAnalg\u00e9sico Razo\u00e1vel:\nSoretizona\n\nAnalg\u00e9sico N\u00e3o Totalmente Recomendado Medica\u00e7\u00e3o:\nAgonolexina\n\n=============================================================\nMedica\u00e7\u00e3o para narcolapsia est\u00e1vel:\nDifenilmetilamina\n\nMedica\u00e7\u00e3o para narcolapsia inst\u00e1vel:\nEtiloxiefedrina",
+      "involved": "Equipe de Psicologia M\u00e9dica do Comando Central.",
+      "title": "Medica\u00e7\u00e3o sob prescri\u00e7\u00e3o m\u00e9dica"
+    },
+    {
+      "description": "Possui Habilidades Altas em Hackeamento Manual de Portas e Maquinario e para Desmontar Paredes.\n\nGeralmente Tem Carrega Varias Ferramentas de Hackeamento e para Desmontar Paredes ou Fazer Reparos.\n\nQuando Passageira Possui uma Shiv em sua Bolsa.\n\nEla Consegue sentir a Ess\u00eancia ao Farejar Objetos para saber quem usou ou segurou ou portou ele.\n\nOdeia Implantes e Principalmente o Mindshield por Medo Canino \u00e9 Capaz de Correr de Implantes, ela fica Agressiva.\n\nMeio Improvavel do que vai fazer quando Inritada por algu\u00eam.\nN\u00e3o consegue Ferir alguem sem uma Boa Causa.",
+      "involved": "Seguran\u00e7a do Comando Central.",
+      "title": "Registro de Seguran\u00e7a"
+    },
+    {
+      "description": "Possui o Medo Vulp de Implantes e Vacinas.",
+      "involved": "Seguran\u00e7a do Comando Central",
+      "title": "Medo de Implantes"
+    },
+    {
+      "description": "Possui Momentos Raivozos no qual fica Agressiva quase retornando a sua Forma Selvagem de Vulpkanin, at\u00e9 o Momento Causa desconhecida mas talvez seja algo Relacionado por ser Femea e ter os Momentos de \"In Heat\" Animal.\n\nTalvez seja necess\u00e1rio Remedios ou Drogas Calmantes ou Meios mais Extremos de Prevenir ela de se Ferir ou Ferir os Outros.",
+      "involved": "Inteligencia da Seguran\u00e7a.",
+      "title": "Surtos de Raiva"
+    }
+  ],
+  "employmentEntries": [
+    {
+      "description": "Ela \u00e9 cega, mas possui alto n\u00edvel de habilidade em medicina e assist\u00eancia geral.\n\nMesmo tendo recebido ofertas de tratamento e cirurgia para restaurar sua vis\u00e3o, ela recusa, alegando que:\n\nOs flashes e luzes fortes da esta\u00e7\u00e3o a fazem se sentir muito mal devido \u00e0 tontura.\n\nEla possui alta habilidade na \u00e1rea de Medicina.\n\nComo M\u00e9dica S\u00eanior, M\u00e9dica, Qu\u00edmica e como Diretora M\u00e9dica.",
+      "involved": "NanoTrasen Pirata/Quadrante de Andr\u00f4meda",
+      "title": "Registros de Emprego"
+    },
+    {
+      "description": "Veterana no Departamento M\u00e9dico.\r\n\r\nPossui mais de 1k de horas no Departamento M\u00e9dico, atua como M\u00e9dica/Senior, J\u00e1 foi CMO e Chem.\r\n\r\nPossui Cegueira mas Possui Alta Habilidade na area Medica e Ajuda em Geral.\r\nPossui Narcolapsia, acaba Dormindo do Nada em Certos Momentos.\r\n \r\nPor mais que Oferecido o Tratamento e Opera\u00e7\u00e3o para Restaurar sua Vis\u00e3o ela se Recusa Alegando que:\r\nOs Flashs e Luzes Fortes da Esta\u00e7\u00e3o a Fazem ficar Bem Mal devido ao Tonteio.\r\n\r\nOdeia Implantes e Principalmente o Mindshield por Medo Canino.",
+      "involved": "Gerencia de Emprego do Comando Central.",
+      "title": "Informa\u00e7\u00e3o Sobre Carreira"
+    }
+  ],
+  "weight": 0,
+  "height": 0,
+  "identifyingFeatures": "",
+  "allergies": [],
+  "drugAllergies": "",
+  "emergencyContactName": ""
+}
