@@ -8,6 +8,7 @@ from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, load_yaml_documents, validate_yaml_text, collect_sprite_refs,
     get_db, load_instances, get_instance_by_name, load_instances,
+    resolve_preview_batch,
 )
 
 character_bp = Blueprint("character", __name__, url_prefix="/characters")
@@ -122,6 +123,9 @@ def character_view(char_id: str):
 
     templates = _load_templates(cache_root)
 
+    all_proto_ids = _collect_all_proto_ids_from_character(char_data)
+    preview_map = resolve_preview_batch(selected["name"], selected["root_path"], all_proto_ids)
+
     return render_template(
         "character_view.html",
         char_id=char_id,
@@ -129,6 +133,7 @@ def character_view(char_id: str):
         char_data=char_data,
         templates=templates,
         selected=selected,
+        preview_map=preview_map,
     )
 
 
@@ -377,6 +382,33 @@ def _load_templates(cache_root: Path) -> list[dict]:
                 templates.append(tmpl)
 
     return templates
+
+
+def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
+    ids = set()
+
+    equipment = char_data.get("equipment", {})
+    for item in equipment.values():
+        if item:
+            ids.add(item)
+
+    loadouts = char_data.get("loadouts", {})
+    for job, loadout_data in loadouts.items():
+        selected = loadout_data.get("selectedLoadouts", {})
+        if isinstance(selected, dict):
+            for items in selected.values():
+                if isinstance(items, list):
+                    for item in items:
+                        if isinstance(item, dict) and item.get("prototype"):
+                            ids.add(item["prototype"])
+                        elif isinstance(item, str) and item:
+                            ids.add(item)
+
+    for mark_id in char_data.get("markingIds", []):
+        if mark_id:
+            ids.add(mark_id)
+
+    return list(ids)
 
 
 def _parse_character_file(data: dict) -> dict:
