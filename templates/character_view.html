@@ -99,14 +99,23 @@
       {% if char_data.markingIds %}
       <div class="rounded-lg border bg-white p-6 shadow-sm">
         <h2 class="mb-4 text-lg font-semibold">Markings</h2>
-        <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {% for mark_id in char_data.markingIds %}
-          <div class="flex items-center justify-between rounded bg-slate-50 px-3 py-2">
-            <span class="font-mono text-sm">{{ mark_id }}</span>
+          {% set preview = preview_map.get(mark_id) %}
+          <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
+            {% if preview %}
+            <img
+              loading="lazy"
+              src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
+              class="h-12 w-12 rounded object-contain pixelated"
+              onerror="this.style.display='none'"
+            />
+            {% endif %}
+            <span class="font-mono text-xs">{{ mark_id }}</span>
             {% if char_data.markingColors[mark_id] %}
-            <div class="flex gap-1">
+            <div class="flex gap-0.5">
               {% for color in char_data.markingColors[mark_id] %}
-              <span class="h-4 w-4 rounded border" style="background-color: {{ color }}"></span>
+              <span class="h-3 w-3 rounded border" style="background-color: {{ color }}"></span>
               {% endfor %}
             </div>
             {% endif %}
@@ -168,12 +177,26 @@
         {% if char_data.equipment %}
         <div class="mt-6">
           <h3 class="mb-3 font-medium">Currently Equipped</h3>
-          <div class="flex flex-wrap gap-2">
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {% for slot, item in char_data.equipment.items() %}
+            {% if item and preview_map.get(item) %}
+            {% set preview = preview_map[item] %}
+            <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
+              <img
+                loading="lazy"
+                src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
+                class="h-12 w-12 rounded object-contain pixelated"
+                onerror="this.style.display='none'"
+              />
+              <span class="mt-1 text-xs font-medium capitalize">{{ slot }}</span>
+              <span class="font-mono text-xs text-slate-600">{{ item }}</span>
+            </div>
+            {% else %}
             <span class="flex items-center gap-1 rounded bg-slate-100 px-3 py-1">
               <span class="text-sm font-medium capitalize">{{ slot }}:</span>
               <span class="font-mono text-sm">{{ item }}</span>
             </span>
+            {% endif %}
             {% endfor %}
           </div>
         </div>
@@ -216,15 +239,24 @@
       {% if char_data.allItemIds %}
       <div class="rounded-lg border bg-white p-6 shadow-sm">
         <h2 class="mb-4 text-lg font-semibold">All Available Item IDs</h2>
-        <div class="flex flex-wrap gap-1 max-h-64 overflow-y-auto">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 max-h-96 overflow-y-auto">
           {% for item_id in char_data.allItemIds %}
+          {% set preview = preview_map.get(item_id) %}
           <button
             type="button"
             onclick="copyItem('{{ item_id }}')"
-            class="font-mono text-xs rounded bg-slate-100 px-2 py-1 hover:bg-slate-200"
+            class="flex flex-col items-center rounded-lg border bg-slate-50 p-2 hover:bg-slate-100"
             title="Click to copy"
           >
-            {{ item_id }}
+            {% if preview %}
+            <img
+              loading="lazy"
+              src="{{ url_for('api.sprite_preview', sprite=preview[0], state=preview[1], scale=2) }}"
+              class="h-10 w-10 rounded object-contain pixelated"
+              onerror="this.style.display='none'"
+            />
+            {% endif %}
+            <span class="font-mono text-xs">{{ item_id }}</span>
           </button>
           {% endfor %}
         </div>
