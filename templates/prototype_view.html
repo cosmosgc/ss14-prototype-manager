@@ -158,7 +158,7 @@
                 <p class="text-slate-500">Type: {{ proto.type }}</p>
                 {% if proto.sprite %}
                   <img class="mt-1 h-10 w-10 rounded border bg-slate-100 object-contain pixelated"
-                       src="{{ url_for('rsi.rsi_preview') }}?sprite={{ proto.sprite }}&state={{ proto.state }}&scale=2"
+                       src="{{ url_for('rsi.rsi_preview') }}?sprite={{ proto.sprite }}&state={{ proto.state }}&scale=6"
                        onerror="this.style.display='none'">
                 {% endif %}
               </div>

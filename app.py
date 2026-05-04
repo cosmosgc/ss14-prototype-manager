@@ -429,6 +429,30 @@ def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
     return "", "icon"
 
 
+def find_first_sprite_state_in_doc(doc: dict[str, Any]) -> tuple[str, str]:
+    stack = [doc]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            sprite = current.get("sprite")
+            state = current.get("state")
+            if isinstance(sprite, str) and sprite.endswith(".rsi"):
+                return sprite, state if isinstance(state, str) and state else "icon"
+            sprites = current.get("sprites")
+            if isinstance(sprites, list):
+                for item in sprites:
+                    if isinstance(item, dict):
+                        s = item.get("sprite")
+                        st = item.get("state")
+                        if isinstance(s, str) and s.endswith(".rsi"):
+                            return s, st if isinstance(st, str) and st else "icon"
+            for v in current.values():
+                stack.append(v)
+        elif isinstance(current, list):
+            stack.extend(current)
+    return "", "icon"
+
+
 def resolve_preview_for_prototype_id(instance: dict[str, str], proto_id: str) -> tuple[str, str]:
     return resolve_preview_batch(instance["name"], instance["root_path"], [proto_id])[proto_id]
 
@@ -481,13 +505,28 @@ def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids:
                 stack.extend(current.values() if isinstance(current, dict) else current)
             elif isinstance(current, list):
                 stack.extend(current)
+        proto_doc_map: dict[str, dict] = {}
+        stack = list(docs)
+        while stack:
+            current = stack.pop()
+            if isinstance(current, dict):
+                pid = current.get("id")
+                if pid:
+                    proto_doc_map[pid] = current
+                stack.extend(current.values() if isinstance(current, dict) else current)
+            elif isinstance(current, list):
+                stack.extend(current)
         for pid in pids:
             t_pid = time.perf_counter()
             entity = entity_map.get(pid)
             if entity:
                 result[pid] = resolve_entity_sprite_state(instance, entity, set(), 0)
             else:
-                result[pid] = find_first_sprite_state_from_docs(docs)
+                proto_doc = proto_doc_map.get(pid)
+                if proto_doc:
+                    result[pid] = find_first_sprite_state_in_doc(proto_doc)
+                else:
+                    result[pid] = ("", "icon")
             t_res = time.perf_counter(); print(f"[DEBUG batch] resolve {pid}: {t_res-t_pid:.3f}s")
     print(f"[DEBUG batch] total: {time.perf_counter()-t0:.3f}s")
     return result
