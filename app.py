@@ -412,8 +412,10 @@ def resolve_preview_batch(instance_name: str, root_path: str, proto_ids: list[st
 
 @lru_cache(maxsize=256)
 def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids: tuple[str, ...]) -> dict[str, tuple[str, str]]:
+    import time
     if not proto_ids:
         return {}
+    t0 = time.perf_counter()
     proto_root = Path(root_path) / "Resources" / "Prototypes"
     instance = {"name": instance_name, "root_path": root_path}
     result: dict[str, tuple[str, str]] = {pid: ("", "icon") for pid in proto_ids}
@@ -424,19 +426,23 @@ def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids:
             + ") ORDER BY rel_path",
             (instance_name, *proto_ids),
         ).fetchall()
+    t1 = time.perf_counter(); print(f"[DEBUG batch] DB query: {t1-t0:.3f}s ({len(rows)} rows)")
     path_to_ids: dict[str, list[str]] = {}
     for r in rows:
         rel = r["rel_path"]
         if rel not in path_to_ids:
             path_to_ids[rel] = []
         path_to_ids[rel].append(r["proto_id"])
+    print(f"[DEBUG batch] unique files: {len(path_to_ids)}")
     for rel, pids in path_to_ids.items():
+        t_file = time.perf_counter()
         try:
             docs = load_yaml_documents(safe_join(proto_root, rel))
         except Exception:
             for pid in pids:
                 result[pid] = ("", "icon")
             continue
+        t_load = time.perf_counter(); print(f"[DEBUG batch] load {rel}: {t_load-t_file:.3f}s")
         entity_map = {}
         stack = list(docs)
         while stack:
@@ -449,11 +455,14 @@ def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids:
             elif isinstance(current, list):
                 stack.extend(current)
         for pid in pids:
+            t_pid = time.perf_counter()
             entity = entity_map.get(pid)
             if entity:
                 result[pid] = resolve_entity_sprite_state(instance, entity, set(), 0)
             else:
                 result[pid] = find_first_sprite_state_from_docs(docs)
+            t_res = time.perf_counter(); print(f"[DEBUG batch] resolve {pid}: {t_res-t_pid:.3f}s")
+    print(f"[DEBUG batch] total: {time.perf_counter()-t0:.3f}s")
     return result
 
 
@@ -485,12 +494,18 @@ def find_entity_node_by_id(node: Any, proto_id: str) -> dict[str, Any] | None:
 def resolve_entity_sprite_state(
     instance: dict[str, str], entity: dict[str, Any], visited: set[str], depth: int
 ) -> tuple[str, str]:
+    return _resolve_entity_sprite_state_impl(instance["name"], instance["root_path"], entity, visited, depth)
+
+
+def _resolve_entity_sprite_state_impl(
+    instance_name: str, root_path: str, entity: dict[str, Any], visited: set[str], depth: int
+) -> tuple[str, str]:
     if depth > 30:
         return "", "icon"
     local_sprite, local_state = extract_sprite_from_entity(entity)
     forced_state = local_state if local_state and local_state != "icon" else ""
     if local_sprite:
-        return adjust_state_to_existing(instance, local_sprite, local_state or "icon")
+        return adjust_state_to_existing_by_name(instance_name, root_path, local_sprite, local_state or "icon")
 
     parent_val = entity.get("parent")
     parent_ids: list[str] = []
@@ -503,14 +518,13 @@ def resolve_entity_sprite_state(
         if parent_id in visited:
             continue
         visited.add(parent_id)
-        parent_entity = load_entity_by_id(instance, parent_id)
+        parent_entity = load_entity_by_id(instance_name, root_path, parent_id)
         if not parent_entity:
             continue
-        parent_sprite, parent_state = resolve_entity_sprite_state(instance, parent_entity, visited, depth + 1)
+        parent_sprite, parent_state = _resolve_entity_sprite_state_impl(instance_name, root_path, parent_entity, visited, depth + 1)
         if parent_sprite:
-            # If current entity overrides only state, apply it to inherited parent sprite.
             if forced_state:
-                return adjust_state_to_existing(instance, parent_sprite, forced_state)
+                return adjust_state_to_existing_by_name(instance_name, root_path, parent_sprite, forced_state)
             return parent_sprite, parent_state
 
     return "", local_state or "icon"
@@ -554,7 +568,12 @@ def extract_sprite_from_entity(entity: dict[str, Any]) -> tuple[str, str]:
 
 
 def adjust_state_to_existing(instance: dict[str, str], sprite: str, preferred_state: str) -> tuple[str, str]:
-    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    return adjust_state_to_existing_by_name(instance["name"], instance["root_path"], sprite, preferred_state)
+
+
+@lru_cache(maxsize=512)
+def adjust_state_to_existing_by_name(instance_name: str, root_path: str, sprite: str, preferred_state: str) -> tuple[str, str]:
+    textures_root = Path(root_path) / "Resources" / "Textures"
     rsi_dir = safe_join_or_none(textures_root, sprite)
     if not rsi_dir or not rsi_dir.exists():
         return sprite, preferred_state
@@ -582,11 +601,12 @@ def list_rsi_states(rsi_dir: Path) -> list[str]:
     return sorted(set(states))
 
 
-def load_entity_by_id(instance: dict[str, str], proto_id: str) -> dict[str, Any] | None:
-    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
+@lru_cache(maxsize=1024)
+def load_entity_by_id(instance_name: str, root_path: str, proto_id: str) -> dict[str, Any] | None:
+    rel = find_first_prototype_path_by_id(instance_name, proto_id)
     if not rel:
         return None
-    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
     try:
         docs = load_yaml_documents(safe_join(proto_root, rel))
     except Exception:
@@ -600,7 +620,7 @@ def validate_crate_parent_compatibility(instance: dict[str, str], parent_id: str
     allowed = {"CrateBaseSecure", "CrateGeneric", "CrateBaseWeldable"}
     if parent_id in allowed:
         return True, "ok"
-    entity = load_entity_by_id(instance, parent_id)
+    entity = load_entity_by_id(instance["name"], instance["root_path"], parent_id)
     if not entity:
         return False, f'"{parent_id}" was not found in scanned prototype IDs.'
     if is_entity_descended_from(instance, entity, allowed, set(), 0):
@@ -625,7 +645,7 @@ def is_entity_descended_from(
         if parent_id in visited:
             continue
         visited.add(parent_id)
-        parent_entity = load_entity_by_id(instance, parent_id)
+        parent_entity = load_entity_by_id(instance["name"], instance["root_path"], parent_id)
         if parent_entity and is_entity_descended_from(instance, parent_entity, allowed, visited, depth + 1):
             return True
     return False
