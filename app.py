@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -141,6 +142,7 @@ def create_app() -> Flask:
 
     return app
 
+@lru_cache(maxsize=1)
 def load_instances() -> list[dict[str, str]]:
     with get_db() as conn:
         rows = conn.execute("SELECT name, root_path FROM instances ORDER BY name").fetchall()
@@ -285,6 +287,16 @@ def validate_yaml_text(text: str) -> tuple[bool, str | None]:
         return False, str(exc)
 
 
+def load_yaml_documents_with_error(file_path: Path) -> tuple[list[Any], str | None]:
+    try:
+        text = file_path.read_text(encoding="utf-8")
+        text = text.replace("\t", "    ")
+        docs = list(yaml.load_all(text, Loader=IgnoreUnknownTagLoader))
+        return docs, None
+    except yaml.YAMLError as exc:
+        return [], str(exc)
+
+
 def collect_sprite_refs(node: Any) -> list[str]:
     refs: list[str] = []
     stack = [node]
@@ -333,6 +345,39 @@ def collect_sprite_state_pairs(node: Any) -> list[dict[str, str]]:
     return [{"sprite": s, "state": st} for s, st in sorted(unique)]
 
 
+def collect_all_refs(node: Any) -> tuple[list[str], list[dict[str, str]], list[dict[str, str]]]:
+    sprite_refs: list[str] = []
+    audio_refs: list[str] = []
+    proto_refs: list[dict[str, str]] = []
+    pairs: list[dict[str, str]] = []
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if key == "sprite" and isinstance(value, str) and value.endswith(".rsi"):
+                    sprite_refs.append(value)
+                elif key == "path" and isinstance(value, str) and value.startswith("/Audio/"):
+                    audio_refs.append(value)
+                elif is_prototype_key(key):
+                    for candidate in extract_candidate_values(value):
+                        if looks_like_proto_id(candidate):
+                            proto_refs.append({"key": key, "id": candidate})
+                sprite = current.get("sprite")
+                state = current.get("state")
+                if isinstance(sprite, str) and sprite.endswith(".rsi") and isinstance(state, str):
+                    pairs.append({"sprite": sprite, "state": state})
+                stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(current)
+    sprite_refs = sorted(set(sprite_refs))
+    audio_refs = sorted(set(audio_refs))
+    proto_refs = [{"key": k, "id": pid} for k, pid in sorted({(r["key"], r["id"]) for r in proto_refs})]
+    unique = {(p["sprite"], p["state"]) for p in pairs}
+    sprite_state_pairs = [{"sprite": s, "state": st} for s, st in sorted(unique)]
+    return sprite_refs, audio_refs, proto_refs, sprite_state_pairs
+
+
 def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
     stack = [docs]
     while stack:
@@ -358,18 +403,58 @@ def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
 
 
 def resolve_preview_for_prototype_id(instance: dict[str, str], proto_id: str) -> tuple[str, str]:
-    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
-    if not rel:
-        return "", "icon"
-    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
-    try:
-        docs = load_yaml_documents(safe_join(proto_root, rel))
-    except Exception:
-        return "", "icon"
-    entity = find_entity_node_by_id(docs, proto_id)
-    if not entity:
-        return find_first_sprite_state_from_docs(docs)
-    return resolve_entity_sprite_state(instance, entity, set(), 0)
+    return resolve_preview_batch(instance["name"], instance["root_path"], [proto_id])[proto_id]
+
+
+def resolve_preview_batch(instance_name: str, root_path: str, proto_ids: list[str]) -> dict[str, tuple[str, str]]:
+    return _resolve_preview_batch_cached(instance_name, root_path, tuple(proto_ids) if proto_ids else ())
+
+
+@lru_cache(maxsize=256)
+def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids: tuple[str, ...]) -> dict[str, tuple[str, str]]:
+    if not proto_ids:
+        return {}
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
+    instance = {"name": instance_name, "root_path": root_path}
+    result: dict[str, tuple[str, str]] = {pid: ("", "icon") for pid in proto_ids}
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT proto_id, rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id IN ("
+            + ",".join("?" * len(proto_ids))
+            + ") ORDER BY rel_path",
+            (instance_name, *proto_ids),
+        ).fetchall()
+    path_to_ids: dict[str, list[str]] = {}
+    for r in rows:
+        rel = r["rel_path"]
+        if rel not in path_to_ids:
+            path_to_ids[rel] = []
+        path_to_ids[rel].append(r["proto_id"])
+    for rel, pids in path_to_ids.items():
+        try:
+            docs = load_yaml_documents(safe_join(proto_root, rel))
+        except Exception:
+            for pid in pids:
+                result[pid] = ("", "icon")
+            continue
+        entity_map = {}
+        stack = list(docs)
+        while stack:
+            current = stack.pop()
+            if isinstance(current, dict):
+                eid = current.get("id")
+                if current.get("type") == "entity" and eid:
+                    entity_map[eid] = current
+                stack.extend(current.values() if isinstance(current, dict) else current)
+            elif isinstance(current, list):
+                stack.extend(current)
+        for pid in pids:
+            entity = entity_map.get(pid)
+            if entity:
+                result[pid] = resolve_entity_sprite_state(instance, entity, set(), 0)
+            else:
+                result[pid] = find_first_sprite_state_from_docs(docs)
+    return result
 
 
 def resolve_preview_for_row(instance: dict[str, str], rel_path: str, proto_id: str) -> tuple[str, str]:
