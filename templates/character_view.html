@@ -185,16 +185,34 @@
 {% if character_viewer %}
     <!-- Character Preview Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
-      <div class="flex items-center gap-2 mb-4">
-        <div class="p-2 rounded-lg bg-cyan-50">
-          <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-lg bg-cyan-50">
+            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Character Preview</h2>
         </div>
-        <h2 class="text-lg font-semibold text-slate-900">Character Preview</h2>
+        <div class="flex items-center gap-2">
+          <select id="exportDirection" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+            <option value="0">South</option>
+            <option value="1">North</option>
+            <option value="2">East</option>
+            <option value="3">West</option>
+          </select>
+          <select id="exportFormat" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+            <option value="png">PNG</option>
+            <option value="gif">GIF (all dirs)</option>
+          </select>
+          <button type="button" onclick="exportCharacter()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3v0a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export
+          </button>
+        </div>
       </div>
 
       <div class="flex flex-col items-center">
         <!-- Preview Window -->
-        <div class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-4 shadow-inner">
+        <div id="previewContainer" class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-4 shadow-inner">
           <div class="relative bg-slate-950 rounded-xl overflow-hidden" style="width: 96px; height: 128px;">
             {% if character_viewer.base_layer.skinColor %}
             <div class="absolute inset-0 flex items-center justify-center">
@@ -516,6 +534,9 @@
   </div>
 </div>
 
+<!-- Hidden canvas for export -->
+<canvas id="exportCanvas" class="hidden"></canvas>
+
 <script>
   const charId = '{{ char_id }}';
   let currentSearchSlot = 'body';
@@ -704,6 +725,128 @@
       }
     });
     updatePreview();
+  }
+
+  async function exportCharacter() {
+    const format = document.getElementById('exportFormat').value;
+    const direction = document.getElementById('exportDirection').value;
+    const canvas = document.getElementById('exportCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = 128, height = 128;
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+
+    if (format === 'gif') {
+      await exportGifAnimation(direction, width, height);
+    } else {
+      await exportPngSingle(direction, ctx, width, height);
+    }
+  }
+
+  async function exportPngSingle(direction, ctx, width, height) {
+    const previewContainer = document.getElementById('previewContainer');
+    const imgSelectors = ['.rsi-preview:not([style*="display: none"])'];
+    const allImages = previewContainer.querySelectorAll('img');
+    const imgDataList = [];
+
+    for (const img of allImages) {
+      if (img.style.display === 'none') continue;
+      const sprite = img.getAttribute('data-sprite');
+      const state = img.getAttribute('data-state');
+      if (!sprite || !state) continue;
+
+      const dirs = parseInt(img.getAttribute('data-directions') || '1');
+      const actualDir = direction < dirs ? direction : '0';
+
+      imgDataList.push({
+        src: `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDir}`,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+    }
+
+    for (const data of imgDataList) {
+      const img = new Image();
+      img.src = data.src;
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      ctx.globalAlpha = data.opacity;
+      ctx.filter = data.filter;
+      ctx.drawImage(img, 0, 0, width, height);
+    }
+
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+
+    const canvas = document.getElementById('exportCanvas');
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = charId + '_preview.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
+  async function exportGifAnimation(direction, width, height) {
+    const frames = [];
+
+    for (let dir = 0; dir < 4; dir++) {
+      const c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      const cx = c.getContext('2d');
+
+      const previewContainer = document.getElementById('previewContainer');
+      const allImages = previewContainer.querySelectorAll('img');
+
+      for (const img of allImages) {
+        if (img.style.display === 'none') continue;
+        const sprite = img.getAttribute('data-sprite');
+        const state = img.getAttribute('data-state');
+        if (!sprite || !state) continue;
+
+        const dirs = parseInt(img.getAttribute('data-directions') || '1');
+        const actualDir = dir < dirs ? dir : 0;
+
+        const imgEl = new Image();
+        imgEl.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDir}`;
+        await new Promise(resolve => { imgEl.onload = resolve; imgEl.onerror = resolve; });
+
+        cx.globalAlpha = parseFloat(img.style.opacity) || 1;
+        cx.filter = img.style.filter || 'none';
+        cx.drawImage(imgEl, 0, 0, width, height);
+      }
+
+      frames.push(c.toDataURL('image/png'));
+    }
+
+    const formData = new FormData();
+    formData.append('frames', JSON.stringify(frames));
+    formData.append('char_id', charId);
+
+    try {
+      const resp = await fetch('/characters/api/export_gif', {
+        method: 'POST',
+        body: formData
+      });
+      if (resp.ok) {
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = charId + '_preview.gif';
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        const text = await resp.text();
+        alert('Export failed: ' + text);
+      }
+    } catch(e) {
+      console.error(e);
+      alert('Export failed. Try PNG format.');
+    }
   }
 
 document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {

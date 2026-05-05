@@ -1,9 +1,11 @@
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, jsonify, send_file, session
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, jsonify, send_file, session, Response
 from pathlib import Path
 import json
 import os
 import yaml
 import fnmatch
+import io
+import base64
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
@@ -1096,3 +1098,52 @@ def _find_equipped_state(instance: dict, sprite: str, slot_component: str) -> st
             return state_info
 
     return None
+
+
+@character_bp.route("/api/export_gif", methods=["POST"])
+def api_export_gif():
+    """Create a GIF from character preview frames"""
+    try:
+        from PIL import Image
+    except ImportError:
+        return jsonify({"error": "PIL required"}), 500
+
+    frames_json = request.form.get("frames", "[]")
+    try:
+        frames = json.loads(frames_json)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid frames JSON"}), 400
+
+    if not frames:
+        return jsonify({"error": "No frames provided"}), 400
+
+    images = []
+    for frame_data in frames:
+        if frame_data.startswith("data:image"):
+            header, data = frame_data.split(",", 1)
+            image_data = base64.b64decode(data)
+            img = Image.open(io.BytesIO(image_data))
+            images.append(img.convert("RGBA"))
+        else:
+            return jsonify({"error": "Invalid frame data"}), 400
+
+    if not images:
+        return jsonify({"error": "No valid images"}), 400
+
+    output = io.BytesIO()
+    images[0].save(
+        output,
+        format="GIF",
+        save_all=True,
+        append_images=images[1:],
+        duration=100,
+        loop=0,
+    )
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype="image/gif",
+        as_attachment=True,
+        download_name="character_preview.gif"
+    )
