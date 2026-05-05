@@ -162,6 +162,7 @@ def character_view(char_id: str):
     species = char_data.get("species", "").lower()
     gender = char_data.get("gender", "").lower()
     sex = char_data.get("sex", "").lower()
+    skin_color = char_data.get("appearance", {}).get("skinColor", "#C5BAAEFF")
 
     if species and species != "human":
         suffix = "_m"
@@ -181,6 +182,9 @@ def character_view(char_id: str):
             "r_hand": "r_hand",
             "l_foot": "l_foot",
             "r_foot": "r_foot",
+            "skin_color": skin_color,
+            "color": skin_color,
+            "filter": _get_color_filter(skin_color),
         }
 
     return render_template(
@@ -478,6 +482,12 @@ def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
         if mark_id:
             ids.add(mark_id)
 
+    appearance = char_data.get("appearance", {})
+    for hair_slot in ("hair", "facialHair"):
+        hair_id = appearance.get(hair_slot)
+        if hair_id:
+            ids.add(hair_id)
+
     return list(ids), loadout_entity_map
 
 
@@ -640,20 +650,66 @@ def _build_character_viewer(char_data: dict, preview_map: dict, direction_info: 
         preview = preview_map.get(mark_id, ("", ""))
         if preview and preview[0]:
             state_info = direction_info.get(mark_id, {})
+            colors = char_data.get("markingColors", {}).get(mark_id, [])
             markings_list.append({
                 "item": mark_id,
                 "sprite": preview[0],
                 "state": preview[1],
                 "directions": state_info.get("directions", 1),
                 "proto_paths": state_info.get("proto_paths", []),
-                "colors": char_data.get("markingColors", {}).get(mark_id, []),
+                "colors": colors,
+                "color": colors[0] if colors else None,
+                "filter": _get_color_filter(colors[0]) if colors else None,
             })
 
     return {
         "regions": regions,
         "base_layer": char_data.get("appearance", {}),
         "markings": markings_list,
+        "hair": _build_hair_entry(char_data, preview_map, direction_info, "hair"),
+        "facial_hair": _build_hair_entry(char_data, preview_map, direction_info, "facialHair"),
     }
+
+
+def _build_hair_entry(char_data: dict, preview_map: dict, direction_info: dict, slot: str) -> dict | None:
+    hair_id = char_data.get("appearance", {}).get(slot)
+    if not hair_id:
+        return None
+    preview = preview_map.get(hair_id)
+    if not preview:
+        return None
+    sprite_path = preview[0] if preview else ""
+    if not sprite_path:
+        return None
+    state_info = direction_info.get(hair_id, {})
+    color = char_data.get("appearance", {}).get(f"{slot}Color", "#000000")
+    return {
+        "item": hair_id,
+        "sprite": sprite_path,
+        "state": preview[1] if preview[1] else "icon",
+        "directions": state_info.get("directions", 1),
+        "color": color,
+        "filter": _get_color_filter(color),
+    }
+
+
+def _get_color_filter(hex_color: str) -> str:
+    if not hex_color or hex_color in ("#000000", "#000"):
+        return "none"
+    try:
+        r = int(hex_color[1:3], 16) / 255
+        g = int(hex_color[3:5], 16) / 255
+        b = int(hex_color[5:7], 16) / 255
+        max_val = max(r, g, b)
+        min_val = min(r, g, b)
+        if max_val < 0.1:
+            return "none"
+        sat = (max_val - min_val) / max_val if max_val > 0 else 0
+        gray = 0.213 * r + 0.715 * g + 0.072 * b
+        sepia = 0.393 * r + 0.769 * g + 0.189 * b
+        return f"sepia({sepia}) saturate({1 + sat}) hue-rotate({(gray - r) * 30}deg)"
+    except Exception:
+        return "none"
 
 
 def _parse_character_file(data: dict) -> dict:
