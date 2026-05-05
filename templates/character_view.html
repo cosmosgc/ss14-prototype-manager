@@ -30,8 +30,8 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-    <div class="space-y-6">
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="space-y-6 xl:col-span-4">
       <!-- Basic Info Card -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
         <div class="flex items-center gap-2 mb-4">
@@ -184,23 +184,23 @@
 
 {% if character_viewer %}
     <!-- Character Preview Card -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+    <div class="bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-sm border border-amber-700/40 p-6 hover:shadow-md transition-shadow duration-300 xl:col-span-4">
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <div class="p-2 rounded-lg bg-cyan-50">
             <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
           </div>
-          <h2 class="text-lg font-semibold text-slate-900">Character Preview</h2>
+          <h2 class="text-lg font-semibold text-amber-100">Character Preview</h2>
         </div>
         <div class="flex items-center gap-2">
-          <select id="exportDirection" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+          <select id="exportDirection" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
             <option value="0">South</option>
             <option value="1">North</option>
             <option value="2">East</option>
             <option value="3">West</option>
           </select>
-          <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white" title="Scale" />
-          <select id="exportFormat" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+          <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100" title="Scale" />
+          <select id="exportFormat" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
             <option value="png">PNG</option>
             <option value="gif">GIF</option>
           </select>
@@ -212,58 +212,58 @@
       </div>
       <div class="flex flex-col items-center">
         <!-- Preview Window -->
-        <div id="previewContainer" class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-4 shadow-inner">
-          <div class="relative bg-slate-950 rounded-xl overflow-hidden" style="width: 96px; height: 128px;">
+        <div id="previewContainer" class="relative rounded-2xl border border-amber-700/50 bg-gradient-to-b from-[#24190d] via-[#1f1a14] to-[#131416] p-6 shadow-inner">
+          <div class="relative mx-auto rounded-xl border border-amber-500/40 bg-slate-950 overflow-hidden shadow-[0_0_40px_rgba(251,191,36,0.12)] flex items-center justify-center" style="width: 224px; height: 288px;">
             {% if character_viewer.base_layer.skinColor %}
             <div class="absolute inset-0 flex items-center justify-center">
               <div class="w-16 h-24 rounded-lg" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.4;"></div>
             </div>
             {% endif %}
             {% if character_viewer.hair %}
-            <img loading="lazy" data-sprite="{{ character_viewer.hair.sprite }}" data-state="{{ character_viewer.hair.state }}" data-directions="{{ character_viewer.hair.directions }}" data-color="{{ character_viewer.hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.hair.sprite, state=character_viewer.hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.hair.filter }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.hair.sprite }}" data-state="{{ character_viewer.hair.state }}" data-directions="{{ character_viewer.hair.directions }}" data-color="{{ character_viewer.hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.hair.sprite, state=character_viewer.hair.state, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="filter: {{ character_viewer.hair.filter }}" onerror="this.style.display='none'" />
             {% endif %}
             {% if character_viewer.facial_hair %}
-            <img loading="lazy" data-sprite="{{ character_viewer.facial_hair.sprite }}" data-state="{{ character_viewer.facial_hair.state }}" data-directions="{{ character_viewer.facial_hair.directions }}" data-color="{{ character_viewer.facial_hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.facial_hair.sprite, state=character_viewer.facial_hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.facial_hair.filter }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.facial_hair.sprite }}" data-state="{{ character_viewer.facial_hair.state }}" data-directions="{{ character_viewer.facial_hair.directions }}" data-color="{{ character_viewer.facial_hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.facial_hair.sprite, state=character_viewer.facial_hair.state, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="filter: {{ character_viewer.facial_hair.filter }}" onerror="this.style.display='none'" />
             {% endif %}
             {% if character_viewer.species_parts %}
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.torso }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.torso, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.head }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.head, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.torso }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.torso, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.head }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.head, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_arm, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
             {% endif %}
             {% for region, items in character_viewer.regions.items() %}
               {% for item in items %}
-              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute m-auto pixelated" onerror="this.style.display='none'" />
               {% endfor %}
             {% endfor %}
             {% for mark in character_viewer.markings %}
-            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
             {% endfor %}
-            <img id="outfit-head" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-eyes" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-neck" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-body" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-outer" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-hands" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-feet" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-belt" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-back" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-head" class="outfit-preview absolute  m-auto pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-eyes" class="outfit-preview absolute  m-auto pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-neck" class="outfit-preview absolute  m-auto pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-body" class="outfit-preview absolute  m-auto pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-outer" class="outfit-preview absolute  m-auto pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-hands" class="outfit-preview absolute  m-auto pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-feet" class="outfit-preview absolute  m-auto pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-belt" class="outfit-preview absolute  m-auto pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-back" class="outfit-preview absolute  m-auto pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
           </div>
         </div>
 
         <!-- Equipment Slots -->
-        <div class="mt-6 grid grid-cols-3 gap-3">
+        <div class="mt-6 grid grid-cols-3 gap-3 rounded-2xl border border-amber-700/40 bg-slate-900/70 p-4">
           <div class="flex flex-col items-center">
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="head" onclick="openSlotSearch('head')">
                 <img id="slot-img-head" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Head</span>
+                <span class="text-xs text-amber-200/80 font-medium">Head</span>
               </button>
               <button type="button" onclick="unequipSlot('head')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="head">✕</button>
             </div>
@@ -272,7 +272,7 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="eyes" onclick="openSlotSearch('eyes')">
                 <img id="slot-img-eyes" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Eyes</span>
+                <span class="text-xs text-amber-200/80 font-medium">Eyes</span>
               </button>
               <button type="button" onclick="unequipSlot('eyes')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="eyes">✕</button>
             </div>
@@ -281,20 +281,20 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="neck" onclick="openSlotSearch('neck')">
                 <img id="slot-img-neck" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Neck</span>
+                <span class="text-xs text-amber-200/80 font-medium">Neck</span>
               </button>
               <button type="button" onclick="unequipSlot('neck')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="neck">✕</button>
             </div>
           </div>
-          <div class="flex flex-col items-center">
-            <div class="relative group">
-              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hands" onclick="openSlotSearch('hands')">
-                <img id="slot-img-hands" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Hands</span>
-              </button>
-              <button type="button" onclick="unequipSlot('hands')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hands">✕</button>
+            <div class="flex flex-col items-center">
+              <div class="relative group">
+                <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hand" onclick="openSlotSearch('hand')">
+                  <img id="slot-img-hand" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                  <span class="text-xs text-amber-200/80 font-medium">Hand</span>
+                </button>
+                <button type="button" onclick="unequipSlot('hand')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hand">✕</button>
+              </div>
             </div>
-          </div>
           <div class="flex flex-col items-center">
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-amber-500 bg-slate-800 flex items-center justify-center" data-slot="body" onclick="openSlotSearch('body')">
@@ -308,7 +308,7 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="belt" onclick="openSlotSearch('belt')">
                 <img id="slot-img-belt" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Belt</span>
+                <span class="text-xs text-amber-200/80 font-medium">Belt</span>
               </button>
               <button type="button" onclick="unequipSlot('belt')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="belt">✕</button>
             </div>
@@ -317,7 +317,7 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="outer" onclick="openSlotSearch('outer')">
                 <img id="slot-img-outer" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Outer</span>
+                <span class="text-xs text-amber-200/80 font-medium">Outer</span>
               </button>
               <button type="button" onclick="unequipSlot('outer')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="outer">✕</button>
             </div>
@@ -326,7 +326,7 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="feet" onclick="openSlotSearch('feet')">
                 <img id="slot-img-feet" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Feet</span>
+                <span class="text-xs text-amber-200/80 font-medium">Feet</span>
               </button>
               <button type="button" onclick="unequipSlot('feet')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="feet">✕</button>
             </div>
@@ -335,7 +335,7 @@
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="back" onclick="openSlotSearch('back')">
                 <img id="slot-img-back" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                <span class="text-xs text-slate-500 font-medium">Back</span>
+                <span class="text-xs text-amber-200/80 font-medium">Back</span>
               </button>
               <button type="button" onclick="unequipSlot('back')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="back">✕</button>
             </div>
@@ -344,18 +344,18 @@
 
         <!-- Currently Equipped -->
         <div class="mt-6 w-full">
-          <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+          <h3 class="text-sm font-semibold text-amber-100 mb-3 flex items-center gap-2">
             <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
             Currently Equipped
           </h3>
-          <div class="grid grid-cols-3 gap-2" id="equippedGrid">
+          <div class="grid grid-cols-3 gap-2 rounded-xl border border-amber-700/30 bg-slate-900/60 p-3" id="equippedGrid">
           </div>
         </div>
       </div>
     </div>
     {% endif %}
 
-    <div class="space-y-6">
+    <div class="space-y-6 xl:col-span-4">
       <!-- Loadouts Card -->
       {% if char_data.loadouts %}
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
