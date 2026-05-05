@@ -199,6 +199,7 @@
             <option value="2">East</option>
             <option value="3">West</option>
           </select>
+          <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white" title="Scale" />
           <select id="exportFormat" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
             <option value="png">PNG</option>
             <option value="gif">GIF (all dirs)</option>
@@ -730,23 +731,23 @@
   async function exportCharacter() {
     const format = document.getElementById('exportFormat').value;
     const direction = document.getElementById('exportDirection').value;
+    const scale = parseInt(document.getElementById('exportScale').value) || 8;
     const canvas = document.getElementById('exportCanvas');
     const ctx = canvas.getContext('2d');
-    const width = 128, height = 128;
+    const width = 32 * scale, height = 32 * scale;
     canvas.width = width;
     canvas.height = height;
     ctx.clearRect(0, 0, width, height);
 
     if (format === 'gif') {
-      await exportGifAnimation(direction, width, height);
+      await exportGifAnimation(direction, width, height, scale);
     } else {
-      await exportPngSingle(direction, ctx, width, height);
+      await exportPngSingle(direction, ctx, width, height, scale);
     }
   }
 
-  async function exportPngSingle(direction, ctx, width, height) {
+  async function exportPngSingle(direction, ctx, width, height, scale) {
     const previewContainer = document.getElementById('previewContainer');
-    const imgSelectors = ['.rsi-preview:not([style*="display: none"])'];
     const allImages = previewContainer.querySelectorAll('img');
     const imgDataList = [];
 
@@ -760,7 +761,7 @@
       const actualDir = direction < dirs ? direction : '0';
 
       imgDataList.push({
-        src: `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDir}`,
+        src: `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`,
         filter: img.style.filter || 'none',
         opacity: parseFloat(img.style.opacity) || 1
       });
@@ -789,7 +790,7 @@
     }, 'image/png');
   }
 
-  async function exportGifAnimation(direction, width, height) {
+  async function exportGifAnimation(direction, width, height, scale) {
     const frames = [];
 
     for (let dir = 0; dir < 4; dir++) {
@@ -811,7 +812,7 @@
         const actualDir = dir < dirs ? dir : 0;
 
         const imgEl = new Image();
-        imgEl.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDir}`;
+        imgEl.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`;
         await new Promise(resolve => { imgEl.onload = resolve; imgEl.onerror = resolve; });
 
         cx.globalAlpha = parseFloat(img.style.opacity) || 1;
