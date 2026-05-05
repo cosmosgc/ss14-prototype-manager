@@ -6,6 +6,7 @@ import json
 import hashlib
 import sqlite3
 import io
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 import yaml
 import math
@@ -13,14 +14,14 @@ import math
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
     build_tree, validate_yaml_text, get_db, load_yaml_documents,
-    find_first_sprite_in_text, find_first_state_in_text, list_rsi_states, IgnoreUnknownTagLoader,
+    list_rsi_states, IgnoreUnknownTagLoader, resolve_preview_batch,
+    find_first_sprite_in_text, find_first_state_in_text,
 )
 
 
-# some bugs to fix:
-# its not fetching direction from the map yml entities
-# extract_rsi_texture is not cutting the sprite sheet
-# i want to copy all the files inside the rsi to the cache to preserve animations and directions, instead of just cutting the first frame
+# TODO: Fetch direction from map YML entities.
+# TODO: Ensure extract_rsi_texture properly slices sprite sheets.
+# TODO: Copy full RSI contents to cache (preserve animations/directions) instead of caching only first-frame cuts.
 
 CHUNK_SIZE = 16
 TILE_SIZE_PX = 32
@@ -83,6 +84,154 @@ def ignore_unknown(loader, tag_suffix, node):
 IgnoreTagsLoader.add_multi_constructor('!', ignore_unknown)
 
 
+def normalize_sprite_path(sprite: str) -> str:
+    cleaned = (sprite or "").strip().replace("\\", "/")
+    if cleaned.startswith("/"):
+        cleaned = cleaned[1:]
+    if cleaned.lower().startswith("textures/"):
+        cleaned = cleaned[9:]
+    return cleaned
+
+
+def resolve_rsi_dir(textures_root: Path, sprite: str) -> Path | None:
+    """Resolve RSI directory from sprite path with/without .rsi suffix."""
+    s = (sprite or "").strip()
+    if not s:
+        return None
+    candidates = []
+    if s.lower().endswith(".rsi"):
+        candidates.append(s)
+    else:
+        candidates.append(f"{s}.rsi")
+        candidates.append(s)
+    for c in candidates:
+        p = safe_join(textures_root, c)
+        if p and p.exists() and p.is_dir():
+            return p
+    return None
+
+
+def choose_rsi_state(requested_state: str | None, available_states: list[str]) -> str | None:
+    if requested_state and requested_state in available_states:
+        return requested_state
+    if "full" in available_states:
+        return "full"
+    if "icon" in available_states:
+        return "icon"
+    return available_states[0] if available_states else None
+
+
+def parse_pos(value) -> tuple[float, float]:
+    if isinstance(value, str):
+        try:
+            x, y = value.split(",")
+            return float(x), float(y)
+        except Exception:
+            return 0.0, 0.0
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        try:
+            return float(value[0]), float(value[1])
+        except Exception:
+            return 0.0, 0.0
+    return 0.0, 0.0
+
+
+def angle_to_ss14_direction(angle_value) -> int | None:
+    try:
+        raw = float(angle_value)
+    except Exception:
+        return None
+
+    # Heuristic: map data usually stores radians. If magnitude is large, treat as degrees.
+    if abs(raw) <= (2 * math.pi + 0.001):
+        deg = math.degrees(raw)
+    else:
+        deg = raw
+    deg = deg % 360
+
+    # Direction enum used elsewhere in this app: 0 South, 1 North, 2 East, 3 West.
+    if 45 <= deg < 135:
+        return 2  # East
+    if 135 <= deg < 225:
+        return 1  # North
+    if 225 <= deg < 315:
+        return 3  # West
+    return 0  # South
+
+
+def parse_entity_direction(components: list[dict]) -> int:
+    text_map = {
+        "south": 0, "s": 0,
+        "north": 1, "n": 1,
+        "east": 2, "e": 2,
+        "west": 3, "w": 3,
+    }
+
+    for comp in components:
+        if not isinstance(comp, dict):
+            continue
+        for key in ("direction", "dir", "facing"):
+            val = comp.get(key)
+            if val is None:
+                continue
+            if isinstance(val, str):
+                lowered = val.strip().lower()
+                if lowered in text_map:
+                    return text_map[lowered]
+                try:
+                    numeric = int(lowered)
+                    return numeric if 0 <= numeric <= 3 else numeric % 4
+                except Exception:
+                    pass
+            elif isinstance(val, (int, float)):
+                numeric = int(val)
+                return numeric if 0 <= numeric <= 3 else numeric % 4
+
+        for key in ("rotation", "rot", "localRotation", "worldRotation"):
+            if key in comp:
+                parsed = angle_to_ss14_direction(comp.get(key))
+                if parsed is not None:
+                    return parsed
+    return 0
+
+
+def parse_entity_state(components: list[dict]) -> str | None:
+    for comp in components:
+        if not isinstance(comp, dict):
+            continue
+        if comp.get("type") == "Sprite":
+            state = comp.get("state")
+            if isinstance(state, str) and state.strip():
+                return state.strip()
+            layers = comp.get("layers")
+            if isinstance(layers, list):
+                for layer in layers:
+                    if isinstance(layer, dict):
+                        layer_state = layer.get("state")
+                        if isinstance(layer_state, str) and layer_state.strip():
+                            return layer_state.strip()
+    return None
+
+
+def copy_rsi_to_cache(textures_root: Path, sprite: str, cache_root: Path) -> Path | None:
+    rsi_dir = resolve_rsi_dir(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists() or not rsi_dir.is_dir():
+        return None
+    target_dir = cache_root / sprite
+    for src in rsi_dir.rglob("*"):
+        rel = src.relative_to(rsi_dir)
+        dst = target_dir / rel
+        if src.is_dir():
+            dst.mkdir(parents=True, exist_ok=True)
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(src, dst)
+        except Exception:
+            pass
+    return target_dir
+
+
 def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] | None:
     """Look up sprite info for a tile by ID - scans tile definition files"""
     if not tile_name or tile_name == "Space":
@@ -122,16 +271,7 @@ def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] 
                 if isinstance(tile, dict) and tile.get("id") == tile_name:
                     sprite = tile.get("sprite")
                     if sprite and isinstance(sprite, str):
-                        sprite = sprite.strip()
-                        if sprite.startswith("/"):
-                            sprite = sprite[1:]
-                        # Strip leading "Textures/" or "textures/"
-                        if sprite.lower().startswith("textures/"):
-                            sprite = sprite[9:]
-                        if sprite.endswith(".png"):
-                            sprite = sprite[:-4]
-                        elif sprite.endswith(".rsi"):
-                            sprite = sprite[:-4]
+                        sprite = normalize_sprite_path(sprite)
                         if sprite:
                             return sprite, "icon"
         except Exception:
@@ -144,16 +284,22 @@ def extract_rsi_texture(textures_root: Path, sprite: str, state: str, direction:
     """Extract texture from RSI - handles directions and animations
     Returns: (image, mime_type) - image can be PNG or GIF for animations
     """
-    print(f"Extracting RSI texture: sprite={sprite}, state={state}, direction={direction}, scale={scale}, textures_root={textures_root}")
-    direct_png = textures_root / f"{sprite}.png"
-    if direct_png.exists():
-        with Image.open(direct_png) as im:
-            tex = im.convert("RGBA")
-            if scale > 1:
-                tex = tex.resize((tex.width * scale, tex.height * scale), Image.Resampling.NEAREST)
-            return tex, "image/png"
-    
-    rsi_dir = safe_join(textures_root, sprite)
+    sprite = normalize_sprite_path(sprite)
+    direct_png_candidates = []
+    if sprite.lower().endswith(".png"):
+        direct_png_candidates.append(textures_root / sprite)
+    else:
+        sprite_no_ext = sprite[:-4] if sprite.lower().endswith(".rsi") else sprite
+        direct_png_candidates.append(textures_root / f"{sprite_no_ext}.png")
+    for direct_png in direct_png_candidates:
+        if direct_png.exists():
+            with Image.open(direct_png) as im:
+                tex = im.convert("RGBA")
+                if scale > 1:
+                    tex = tex.resize((tex.width * scale, tex.height * scale), Image.Resampling.NEAREST)
+                return tex, "image/png"
+
+    rsi_dir = resolve_rsi_dir(textures_root, sprite)
     if not rsi_dir or not rsi_dir.exists():
         return None, "image/png"
     
@@ -165,41 +311,61 @@ def extract_rsi_texture(textures_root: Path, sprite: str, state: str, direction:
         except Exception:
             pass
     
+    available_states = list_rsi_states(rsi_dir)
+    actual_state = choose_rsi_state(state, available_states)
+    if not actual_state:
+        return None, "image/png"
+
     state_meta = None
     if meta and "states" in meta:
         for s in meta["states"]:
-            if isinstance(s, dict) and s.get("name") == state:
+            if isinstance(s, dict) and s.get("name") == actual_state:
                 state_meta = s
                 break
-    
-    available_states = list_rsi_states(rsi_dir)
-    actual_state = state if state in available_states else "icon" if "icon" in available_states else (available_states[0] if available_states else None)
-    if not actual_state:
-        return None, "image/png"
-    
+
+    size_x = 32
+    size_y = 32
+    if isinstance(meta, dict):
+        size = meta.get("size", {})
+        if isinstance(size, dict):
+            try:
+                size_x = int(size.get("x", 32))
+                size_y = int(size.get("y", 32))
+            except Exception:
+                size_x, size_y = 32, 32
+
+    directions = int(state_meta.get("directions", 1)) if isinstance(state_meta, dict) else 1
+    if direction < 0 or direction >= directions:
+        direction = 0
+
     image_path = rsi_dir / f"{actual_state}.png"
     if not image_path.exists():
         return None, "image/png"
-    
+
     with Image.open(image_path) as im:
         im = im.convert("RGBA")
-        
-        if not state_meta or "delays" not in state_meta:
-            if scale > 1:
-                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
-            return im, "image/png"
-        
-        delays = state_meta.get("delays", [])
-        directions = state_meta.get("directions", 1)
-        
+
+        delays = state_meta.get("delays", []) if isinstance(state_meta, dict) else []
+        columns = max(1, im.width // max(1, size_x))
+
+        # Static states can still contain directional sprite sheets.
         if not delays:
+            if directions > 1 and size_x > 0 and size_y > 0 and im.width >= size_x and im.height >= size_y:
+                frame_index = direction
+                x1 = (frame_index % columns) * size_x
+                y1 = (frame_index // columns) * size_y
+                x2 = min(x1 + size_x, im.width)
+                y2 = min(y1 + size_y, im.height)
+                if x2 > x1 and y2 > y1:
+                    frame = im.crop((x1, y1, x2, y2))
+                    if scale > 1:
+                        frame = frame.resize((frame.width * scale, frame.height * scale), Image.Resampling.NEAREST)
+                    return frame, "image/png"
+
             if scale > 1:
                 im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
             return im, "image/png"
-        
-        if direction < 0 or direction >= directions:
-            direction = 0
-        
+
         if isinstance(delays, list) and len(delays) > 0:
             if isinstance(delays[0], list):
                 if direction < len(delays):
@@ -211,37 +377,17 @@ def extract_rsi_texture(textures_root: Path, sprite: str, state: str, direction:
         else:
             frame_delays = [0.1]
         
-        frame_count = len(frame_delays)
-        if frame_count <= 1:
-            if scale > 1:
-                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
-            return im, "image/png"
-        
-        if directions > 1:
-            frame_width = im.width // frame_count
-            frame_height = im.height // directions
-        else:
-            frame_width = im.width // frame_count
-            frame_height = im.height
-        
-        if frame_width <= 0 or frame_height <= 0:
-            if scale > 1:
-                im = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
-            return im, "image/png"
-        
+        frame_count = max(1, len(frame_delays))
         frames = []
         for i in range(frame_count):
-            x1 = i * frame_width
-            y1 = direction * frame_height
-            x2 = (i + 1) * frame_width
-            y2 = (direction + 1) * frame_height
-            
-            x2 = min(x2, im.width)
-            y2 = min(y2, im.height)
-            
+            frame_index = direction * frame_count + i
+            x1 = (frame_index % columns) * size_x
+            y1 = (frame_index // columns) * size_y
+            x2 = min(x1 + size_x, im.width)
+            y2 = min(y1 + size_y, im.height)
+
             if x2 <= x1 or y2 <= y1:
                 continue
-            
             try:
                 frame = im.crop((x1, y1, x2, y2))
                 if scale > 1:
@@ -278,7 +424,6 @@ def extract_rsi_texture(textures_root: Path, sprite: str, state: str, direction:
                 duration=durations[:len(frames)],
                 loop=0
             )
-            buffer.seek(0)
             buffer.seek(0)
             gif_im = Image.open(buffer)
             return gif_im, "image/gif"
@@ -333,20 +478,27 @@ ENTITY_COLORS = {
 
 def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.Image | None:
     """Load a tile texture image from RSI or direct PNG"""
-    direct_png = textures_root / f"{sprite}.png"
-    if direct_png.exists():
-        try:
-            with Image.open(direct_png) as im:
-                return im.convert("RGBA")
-        except Exception:
-            pass
-    
-    rsi_dir = safe_join(textures_root, sprite)
+    sprite = normalize_sprite_path(sprite)
+    direct_png_candidates = []
+    if sprite.lower().endswith(".png"):
+        direct_png_candidates.append(textures_root / sprite)
+    else:
+        sprite_no_ext = sprite[:-4] if sprite.lower().endswith(".rsi") else sprite
+        direct_png_candidates.append(textures_root / f"{sprite_no_ext}.png")
+    for direct_png in direct_png_candidates:
+        if direct_png.exists():
+            try:
+                with Image.open(direct_png) as im:
+                    return im.convert("RGBA")
+            except Exception:
+                pass
+
+    rsi_dir = resolve_rsi_dir(textures_root, sprite)
     if not rsi_dir or not rsi_dir.exists():
         return None
     
     available_states = list_rsi_states(rsi_dir)
-    actual_state = state if state in available_states else "icon" if "icon" in available_states else (available_states[0] if available_states else None)
+    actual_state = choose_rsi_state(state, available_states)
     if not actual_state:
         return None
     
@@ -361,8 +513,15 @@ def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.
         return None
 
 
-def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Image.Image | None:
+def get_entity_icon(
+    instance_name: str,
+    proto: str,
+    icon_size: int = 32,
+    direction: int = 0,
+    state_override: str | None = None
+) -> Image.Image | None:
     """Get or create cached entity icon - copies RSI folder structure"""
+    print(f"[ICON] start proto={proto} dir={direction} state_override={state_override} size={icon_size}")
     instance_root = None
     with get_db() as conn:
         inst_row = conn.execute(
@@ -374,81 +533,161 @@ def get_entity_icon(instance_name: str, proto: str, icon_size: int = 32) -> Imag
     if not instance_root:
         return None
     
+    # Gather candidates from both the new resolver and old text scan fallback.
+    candidates: list[tuple[str, str | None]] = []
+    preview = resolve_preview_batch(instance_name, str(instance_root), [proto]).get(proto)
+    print(f"[ICON] preview resolver proto={proto} -> {preview}")
+    if preview and preview[0]:
+        candidates.append((normalize_sprite_path(preview[0]), state_override or preview[1]))
+
     with get_db() as conn:
         row = conn.execute(
             "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
-            (proto, instance_name)
+            (proto, instance_name),
         ).fetchone()
-    
-    if not row:
-        return None
-    
-    proto_root = instance_root / "Resources" / "Prototypes"
-    proto_path = safe_join(proto_root, row["rel_path"])
-    
-    if not proto_path or not proto_path.exists():
-        return None
-    
-    text = proto_path.read_text(encoding="utf-8")
-    sprite = find_first_sprite_in_text(text)
-    if not sprite:
-        return None
-    
-    state = find_first_state_in_text(text)
-    
-    sprite = sprite.strip()
-    if sprite.startswith("/"):
-        sprite = sprite[1:]
-    if sprite.endswith(".png"):
-        sprite = sprite[:-4]
-    
-    textures_root = instance_root / "Resources" / "Textures"
-    rsi_dir = safe_join(textures_root, sprite)
-    available_states = list_rsi_states(rsi_dir) if rsi_dir else []
-
-    chosen_state = None
-    if state in available_states:
-        chosen_state = state
-    elif "icon" in available_states:
-        chosen_state = "icon"
-    elif available_states:
-        chosen_state = available_states[0]
-    elif rsi_dir and rsi_dir.exists():
-        direct_png = textures_root / f"{sprite}.png"
-        if direct_png.exists():
+    print(f"[ICON] db rel_path proto={proto} -> {row['rel_path'] if row else None}")
+    if row:
+        proto_root = instance_root / "Resources" / "Prototypes"
+        proto_path = safe_join(proto_root, row["rel_path"])
+        if proto_path and proto_path.exists():
             try:
-                with Image.open(direct_png) as im:
-                    return im.convert("RGBA")
+                text = proto_path.read_text(encoding="utf-8")
+                fallback_sprite = find_first_sprite_in_text(text)
+                fallback_state = find_first_state_in_text(text)
+                if fallback_sprite:
+                    candidates.append((
+                        normalize_sprite_path(fallback_sprite),
+                        state_override or fallback_state
+                    ))
+                    print(f"[ICON] text fallback proto={proto} sprite={fallback_sprite} state={fallback_state}")
             except Exception:
                 pass
-    
-    if not chosen_state and not available_states:
+
+    # Deduplicate while preserving order.
+    seen = set()
+    unique_candidates: list[tuple[str, str | None]] = []
+    for sprite, state in candidates:
+        key = (sprite, state or "")
+        if sprite and key not in seen:
+            seen.add(key)
+            unique_candidates.append((sprite, state))
+    print(f"[ICON] candidates proto={proto} -> {unique_candidates}")
+
+    if not unique_candidates:
         return None
-    
-    cache_dir = Path("static") / "entity_cache" / instance_name / sprite
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    icon_path = cache_dir / f"{chosen_state}.png"
-    
-    if icon_path.exists():
-        try:
-            with Image.open(icon_path) as im:
-                return im.convert("RGBA")
-        except Exception:
-            pass
-    
-    tex, _ = extract_rsi_texture(textures_root, sprite, chosen_state, direction=0, scale=1)
-    if not tex:
-        return None
-    
-    if tex.size != (icon_size, icon_size):
-        tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
-    
-    try:
-        tex.save(icon_path)
-    except Exception:
-        pass
-    
-    return tex
+
+    textures_root = instance_root / "Resources" / "Textures"
+    cache_root = Path("static") / "entity_cache" / instance_name
+
+    for sprite, state in unique_candidates:
+        print(f"[ICON] try candidate proto={proto} sprite={sprite} requested_state={state}")
+        # Direct PNG sprites
+        direct_png_candidates = []
+        if sprite.lower().endswith(".png"):
+            direct_png_candidates.append(textures_root / sprite)
+        else:
+            sprite_no_ext = sprite[:-4] if sprite.lower().endswith(".rsi") else sprite
+            direct_png_candidates.append(textures_root / f"{sprite_no_ext}.png")
+        for direct_png in direct_png_candidates:
+            if direct_png.exists():
+                try:
+                    with Image.open(direct_png) as im:
+                        tex = im.convert("RGBA")
+                    if tex.size != (icon_size, icon_size):
+                        tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
+
+                    cache_dir = cache_root / sprite
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    icon_path = cache_dir / f"__preview_direct_dir{direction}_s{icon_size}.png"
+                    try:
+                        tex.save(icon_path)
+                    except Exception:
+                        pass
+                    print(f"[ICON] success direct png proto={proto} path={direct_png} cache={icon_path}")
+                    return tex
+                except Exception:
+                    pass
+
+        # RSI sprites
+        rsi_dir = resolve_rsi_dir(textures_root, sprite)
+        available_states = list_rsi_states(rsi_dir) if rsi_dir else []
+        chosen_state = choose_rsi_state(state, available_states)
+        print(
+            f"[ICON] rsi candidate proto={proto} rsi={rsi_dir} exists={bool(rsi_dir and rsi_dir.exists())} "
+            f"available_states={available_states} chosen_state={chosen_state}"
+        )
+        if not chosen_state:
+            continue
+
+        copy_rsi_to_cache(textures_root, sprite, cache_root)
+        cache_dir = cache_root / sprite
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        # Try preferred state first, then fall back through available states.
+        state_candidates = [chosen_state] + [s for s in available_states if s != chosen_state]
+        for candidate_state in state_candidates:
+            icon_path = cache_dir / f"__preview_{candidate_state}_dir{direction}_s{icon_size}.png"
+            print(f"[ICON] try state proto={proto} sprite={sprite} state={candidate_state} cache={icon_path}")
+
+            if icon_path.exists():
+                try:
+                    with Image.open(icon_path) as im:
+                        print(f"[ICON] cache hit proto={proto} state={candidate_state} path={icon_path}")
+                        return im.convert("RGBA")
+                except Exception:
+                    pass
+
+            tex, _ = extract_rsi_texture(textures_root, sprite, candidate_state, direction=direction, scale=1)
+            if not tex:
+                print(f"[ICON] extract failed proto={proto} sprite={sprite} state={candidate_state}")
+                continue
+
+            if tex.size != (icon_size, icon_size):
+                tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
+
+            try:
+                tex.save(icon_path)
+            except Exception:
+                pass
+            print(f"[ICON] success rsi proto={proto} sprite={sprite} state={candidate_state} cache={icon_path}")
+            return tex
+
+    print(f"[ICON] failed proto={proto} dir={direction} state_override={state_override}")
+    return None
+
+
+def pre_cache_entity_icons(entities: list[dict], instance_name: str, icon_size: int = 32) -> tuple[int, int]:
+    """Warm icon cache for unique (proto, direction, state) combos."""
+    keys: set[tuple[str, int, str | None]] = set()
+    for ent in entities:
+        proto = ent.get("proto", "")
+        if not proto:
+            continue
+        direction = int(ent.get("direction", 0) or 0)
+        state = ent.get("state")
+        if isinstance(state, str):
+            state = state.strip() or None
+        else:
+            state = None
+        keys.add((proto, direction, state))
+
+    cached = 0
+    missed = 0
+    print(f"[ICON] pre-cache start entities={len(entities)} unique_keys={len(keys)} instance={instance_name}")
+    for proto, direction, state in keys:
+        icon = get_entity_icon(
+            instance_name,
+            proto,
+            icon_size=icon_size,
+            direction=direction,
+            state_override=state,
+        )
+        if icon is not None:
+            cached += 1
+        else:
+            missed += 1
+            print(f"WARN: Failed to pre-cache icon for proto={proto} dir={direction} state={state}")
+    print(f"[ICON] pre-cache done cached={cached} missed={missed}")
+    return cached, missed
 
 
 def render_entity_layer(entities: list, instance_name: str, 
@@ -471,6 +710,8 @@ def render_entity_layer(entities: list, instance_name: str,
         x = ent.get("x", 0)
         y = ent.get("y", 0)
         proto = ent.get("proto", "")
+        direction = int(ent.get("direction", 0) or 0)
+        state = ent.get("state")
         
         chunk_x = math.floor(x / CHUNK_SIZE)
         chunk_y = math.floor(y / CHUNK_SIZE)
@@ -487,12 +728,13 @@ def render_entity_layer(entities: list, instance_name: str,
 
         px = (offset_x + local_x) * scale
         py = (offset_y + (CHUNK_SIZE - local_y)) * scale
-        if proto not in icon_cache:
-            icon = get_entity_icon(instance_name, proto, scale)
+        cache_key = (proto, direction, state)
+        if cache_key not in icon_cache:
+            icon = get_entity_icon(instance_name, proto, scale, direction=direction, state_override=state)
             if icon:
-                icon_cache[proto] = icon
+                icon_cache[cache_key] = icon
         
-        icon = icon_cache.get(proto)
+        icon = icon_cache.get(cache_key)
         if icon:
             if icon.mode != 'RGBA':
                 icon = icon.convert('RGBA')
@@ -699,25 +941,31 @@ def parse_map_data(doc):
         elif proto_name:
             # Regular entities
             for ent in group.get("entities", []):
+                if not isinstance(ent, dict):
+                    continue
                 pos_x, pos_y = 0.0, 0.0
                 name = ""
+                direction = int(ent.get("direction", 0) or 0)
+                state = None
                 
-                for comp in ent.get("components", []):
+                components = ent.get("components", [])
+                for comp in components:
+                    if not isinstance(comp, dict):
+                        continue
                     if comp.get("type") == "Transform":
-                        try:
-                            x, y = comp.get("pos", "0,0").split(",")
-                            pos_x = float(x)
-                            pos_y = float(y)
-                        except:
-                            pass
+                        pos_x, pos_y = parse_pos(comp.get("pos", "0,0"))
                     if comp.get("type") == "MetaData":
                         name = comp.get("name", "")
-                
+                direction = parse_entity_direction(components)
+                state = parse_entity_state(components)
+
                 entities.append({
                     "proto": proto_name,
                     "x": pos_x,
                     "y": pos_y,
-                    "name": name
+                    "name": name,
+                    "direction": direction,
+                    "state": state,
                 })
     
     return tilemap, grid_chunks, entities
@@ -860,14 +1108,8 @@ def map_view():
         
         # Pre-cache entity icons
         print("DEBUG: Pre-caching entity icons...")
-        unique_protos = set()
-        for ent in entities:
-            proto = ent.get("proto", "")
-            if proto:
-                unique_protos.add(proto)
-        for proto in unique_protos:
-            print(f"Pre-caching icon for {proto}...")
-            get_entity_icon(instance_name, proto, 32)
+        cached_count, missed_count = pre_cache_entity_icons(entities, instance_name, icon_size=32)
+        print(f"DEBUG: Pre-cache complete: cached={cached_count}, missed={missed_count}")
         
         # Save metadata
         with open(meta_path, "w") as f:
@@ -891,14 +1133,8 @@ def map_view():
             render_entity_layer(entities, selected["name"], min_cx, min_cy, x_range, y_range, entity_layer_path, scale=64)
         
         # Pre-cache entity icons if needed
-        unique_protos = set()
-        for ent in entities:
-            proto = ent.get("proto", "")
-            if proto:
-                unique_protos.add(proto)
-        for proto in unique_protos:
-            # Just call get_entity_icon - it handles new structure
-            get_entity_icon(selected["name"], proto, 32)
+        cached_count, missed_count = pre_cache_entity_icons(entities, selected["name"], icon_size=32)
+        print(f"DEBUG: Pre-cache complete: cached={cached_count}, missed={missed_count}")
     
     return render_template(
         "map_view.html",
@@ -973,71 +1209,22 @@ def get_entity_layer(cache_key):
 
 @map_bp.route("/api/entity-icon/<instance_name>/<proto>")
 def get_entity_icon_api(instance_name, proto):
-    """Serve cached entity icon - find it in RSI folder structure"""
-    # First try the new structure (sprite-based)
-    # Need to look up sprite path from proto
-    instance_root = None
-    with get_db() as conn:
-        inst_row = conn.execute(
-            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
-        ).fetchone()
-        if inst_row:
-            instance_root = Path(inst_row["root_path"])
-    
-    if not instance_root:
+    """Serve cached entity icon preview for a proto."""
+    direction = int(request.args.get("direction", "0"))
+    state = request.args.get("state", "").strip() or None
+    scale = int(request.args.get("scale", "32"))
+
+    icon = get_entity_icon(
+        instance_name,
+        proto,
+        icon_size=max(1, min(256, scale)),
+        direction=direction,
+        state_override=state,
+    )
+    if not icon:
         abort(404)
-    
-    # Find proto file
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
-            (proto, instance_name)
-        ).fetchone()
-    
-    if not row:
-        abort(404)
-    
-    proto_path = safe_join(instance_root / "Resources" / "Prototypes", row["rel_path"])
-    if not proto_path or not proto_path.exists():
-        abort(404)
-    
-    # Find sprite path
-    text = proto_path.read_text(encoding="utf-8")
-    sprite = find_first_sprite_in_text(text)
-    if not sprite:
-        abort(404)
-    
-    state = find_first_state_in_text(text)
-    
-    # Cleanup
-    sprite = sprite.strip()
-    if sprite.startswith("/"):
-        sprite = sprite[1:]
-    if sprite.endswith(".png"):
-        sprite = sprite[:-4]
-    
-    # Get states and find chosen
-    textures_root = instance_root / "Resources" / "Textures"
-    rsi_dir = safe_join(textures_root, sprite)
-    available_states = list_rsi_states(rsi_dir) if rsi_dir else []
-    
-    chosen_state = None
-    if state in available_states:
-        chosen_state = state
-    elif "icon" in available_states:
-        chosen_state = "icon"
-    elif available_states:
-        chosen_state = available_states[0]
-    
-    if not chosen_state:
-        # Try direct PNG
-        direct_png = textures_root / f"{sprite}.png"
-        if direct_png.exists():
-            return send_file(direct_png, mimetype='image/png')
-        abort(404)
-    
-    # New cache path
-    icon_path = Path("static") / "entity_cache" / instance_name / sprite / f"{chosen_state}.png"
-    if not icon_path.exists():
-        abort(404)
-    return send_file(icon_path, mimetype='image/png')
+
+    buffer = io.BytesIO()
+    icon.save(buffer, format="PNG")
+    buffer.seek(0)
+    return send_file(buffer, mimetype="image/png")

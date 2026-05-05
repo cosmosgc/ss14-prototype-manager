@@ -80,7 +80,7 @@
     "entities": {{ entities | tojson }},
     "entityTypes": {{ entity_types | tojson }},
     "cacheKey": "{{ cache_key }}",
-    "instanceName": "{{ selected_instance_name }}",
+    "instanceName": {{ selected_instance_name | tojson }},
     "relFile": {{ rel_file | tojson }}
   }
 </script>

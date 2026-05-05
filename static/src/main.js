@@ -48,6 +48,17 @@ console.log('Map data loaded:', {
   instanceName: instanceName
 });
 
+function buildEntityIconUrl(instance, proto, direction, state) {
+  const safeInstance = encodeURIComponent(instance || '');
+  const safeProto = encodeURIComponent(proto || '');
+  const params = new URLSearchParams();
+  params.set('direction', String(Number.isFinite(direction) ? direction : 0));
+  if (state && typeof state === 'string') {
+    params.set('state', state);
+  }
+  return `/maps/api/entity-icon/${safeInstance}/${safeProto}?${params.toString()}`;
+}
+
 // ---- Compute chunk bounds (world space) ----
 let minCx = Infinity, maxCx = -Infinity;
 let minCy = Infinity, maxCy = -Infinity;
@@ -280,18 +291,22 @@ Object.keys(entitiesByType).forEach(entType => {
 
     const feature = new Feature({ geometry: point });
     const proto = ent.proto || 'unknown';
+    const entDirection = Number.isFinite(ent.direction) ? ent.direction : 0;
+    const entState = typeof ent.state === 'string' ? ent.state : '';
     feature.set('proto', proto);
     feature.set('name', ent.name || proto);
     feature.set('type', entType);
+    feature.set('direction', entDirection);
+    feature.set('state', entState);
 
     const entName = ent.name || proto;
     
     // Try to load entity icon, fallback to circle
-    const iconUrl = `/maps/api/entity-icon/${instanceName}/${encodeURIComponent(proto)}`;
+    const iconUrl = buildEntityIconUrl(instanceName, proto, entDirection, entState);
     
 // Dynamic scale based on resolution - icon always matches 1 tile
     feature.setStyle((feature, resolution) => {
-      const iconSizePx = 64;
+      const iconSizePx = 32;
       const desiredMapSize = 1;
       const scale = desiredMapSize / (iconSizePx * resolution);
       
