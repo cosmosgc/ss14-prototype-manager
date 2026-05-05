@@ -1,4 +1,4 @@
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, jsonify, send_file
+from flask import Blueprint, abort, flash, redirect, render_template, request, url_for, jsonify, send_file, session
 from pathlib import Path
 import json
 import os
@@ -156,6 +156,31 @@ def character_view(char_id: str):
     equipment_layers = _build_equipment_layers(char_data.get("equipment", {}), extended_preview_map, direction_info)
 
     character_viewer = _build_character_viewer(char_data, preview_map, direction_info)
+    character_viewer["species_parts"] = {}
+
+    species = char_data.get("species", "").lower()
+    gender = char_data.get("gender", "").lower()
+    sex = char_data.get("sex", "").lower()
+
+    if species and species != "human":
+        suffix = "_m"
+        if gender == "female" or sex == "female":
+            suffix = "_f"
+
+        parts_path = f"_DV/Mobs/Species/{species}/parts.rsi"
+        character_viewer["species_parts"] = {
+            "sprite": parts_path,
+            "torso": f"torso{suffix}",
+            "head": f"head{suffix}",
+            "l_arm": "l_arm",
+            "r_arm": "r_arm",
+            "l_leg": "l_leg",
+            "r_leg": "r_leg",
+            "l_hand": "l_hand",
+            "r_hand": "r_hand",
+            "l_foot": "l_foot",
+            "r_foot": "r_foot",
+        }
 
     return render_template(
         "character_view.html",
@@ -763,3 +788,76 @@ def _collect_all_slots(loadouts: dict) -> list[str]:
         slot_names.add(s)
 
     return sorted(slot_names)
+
+
+@character_bp.route("/api/outfit", methods=["GET"])
+def api_outfit_get():
+    char_id = request.args.get("char_id", "").strip()
+    if not char_id:
+        return jsonify({})
+    key = f"outfit_{char_id}"
+    outfit = session.get(key, {})
+    return jsonify(outfit)
+
+
+@character_bp.route("/api/outfit", methods=["POST"])
+def api_outfit_update():
+    char_id = request.args.get("char_id", "").strip()
+    if not char_id:
+        return jsonify({"success": False, "error": "No char_id"})
+
+    action = request.args.get("action", "equip")
+    item_id = request.args.get("item_id", "").strip()
+    slot = request.args.get("slot", "").strip()
+    color = request.args.get("color", "").strip()
+
+    key = f"outfit_{char_id}"
+    outfit = session.get(key, {})
+
+    if action == "equip":
+        if not item_id or not slot:
+            return jsonify({"success": False, "error": "item_id and slot required"})
+        if slot not in outfit:
+            outfit[slot] = {}
+        outfit[slot]["item"] = item_id
+        if color:
+            outfit[slot]["color"] = color
+    elif action == "unequip":
+        if slot in outfit:
+            del outfit[slot]
+    elif action == "set_color":
+        if slot in outfit and color:
+            outfit[slot]["color"] = color
+    elif action == "clear":
+        outfit = {}
+
+    session[key] = outfit
+    return jsonify({"success": True, "outfit": outfit})
+
+
+@character_bp.route("/api/item-list", methods=["GET"])
+def api_item_list():
+    selected = selected_instance_or_400()
+    q = request.args.get("q", "").strip().lower()
+
+    sprites_root = Path(selected["root_path"]) / "Resources" / "Textures"
+    if not sprites_root.exists():
+        return jsonify([])
+
+    items = []
+    for rsi_dir in sprites_root.rglob("*.rsi"):
+        rel = rsi_dir.relative_to(sprites_root).parent.as_posix()
+        if q and q not in rel.lower():
+            continue
+        states = []
+        for png in rsi_dir.glob("*.png"):
+            states.append(png.stem)
+        if states:
+            items.append({
+                "id": rel,
+                "states": states,
+            })
+        if len(items) >= 100:
+            break
+
+    return jsonify(items)
