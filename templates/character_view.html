@@ -210,6 +210,19 @@
           </button>
         </div>
       </div>
+      <div id="gifDebug" style="
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  max-height: 300px;
+  overflow: auto;
+  background: rgba(0,0,0,0.8);
+  padding: 8px;
+  z-index: 9999;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+"></div>
 
       <div class="flex flex-col items-center">
         <!-- Preview Window -->
@@ -536,8 +549,14 @@
 </div>
 
 <!-- Hidden canvas for export -->
-<canvas id="exportCanvas" class="hidden"></canvas>
+<canvas id="exportCanvas" class=""></canvas>
 
+<script type="module">
+  import { parseGIF, decompressFrames } from 'https://cdn.jsdelivr.net/npm/gifuct-js/+esm';
+
+  window.parseGIF = parseGIF;
+  window.decompressFrames = decompressFrames;
+</script>
 <script>
   const charId = '{{ char_id }}';
   let currentSearchSlot = 'body';
@@ -789,73 +808,7 @@
       URL.revokeObjectURL(url);
     }, 'image/png');
   }
-
-  async function exportGifAnimation(direction, width, height, scale) {
-    const previewContainer = document.getElementById('previewContainer');
-    const allImages = Array.from(previewContainer.querySelectorAll('img'));
-
-    const hasAnimation = allImages.some(img => {
-      if (img.style.display === 'none') return false;
-      const dirs = parseInt(img.getAttribute('data-directions') || '1');
-      return dirs > 1;
-    });
-
-    const directions = hasAnimation ? [0, 1, 2, 3] : [parseInt(direction)];
-    const frames = [];
-
-    for (const dir of directions) {
-      const c = document.createElement('canvas');
-      c.width = width;
-      c.height = height;
-      const cx = c.getContext('2d');
-
-      for (const img of allImages) {
-        if (img.style.display === 'none') continue;
-        const sprite = img.getAttribute('data-sprite');
-        const state = img.getAttribute('data-state');
-        if (!sprite || !state) continue;
-
-        const dirs = parseInt(img.getAttribute('data-directions') || '1');
-        const actualDir = dir < dirs ? dir : 0;
-
-        const imgEl = new Image();
-        imgEl.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`;
-        await new Promise(resolve => { imgEl.onload = resolve; imgEl.onerror = resolve; });
-
-        cx.globalAlpha = parseFloat(img.style.opacity) || 1;
-        cx.filter = img.style.filter || 'none';
-        cx.drawImage(imgEl, 0, 0, width, height);
-      }
-
-      frames.push(c.toDataURL('image/png'));
-    }
-
-    const formData = new FormData();
-    formData.append('frames', JSON.stringify(frames));
-    formData.append('char_id', charId);
-
-    try {
-      const resp = await fetch('/characters/api/export_gif', {
-        method: 'POST',
-        body: formData
-      });
-      if (resp.ok) {
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = charId + '_preview.gif';
-        a.click();
-        URL.revokeObjectURL(url);
-      } else {
-        const text = await resp.text();
-        alert('Export failed: ' + text);
-      }
-    } catch(e) {
-      console.error(e);
-      alert('Export failed. Try PNG format.');
-    }
-  }
+  
 
 document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {
     clearTimeout(searchDebounce);
@@ -867,5 +820,182 @@ document.getElementById('slotSearchInput')?.addEventListener('input', function(e
   document.addEventListener('DOMContentLoaded', function() {
     loadEquipment();
   });
+
+
+async function exportGifAnimation(direction, width, height, scale) {
+  const previewContainer = document.getElementById('previewContainer');
+  const allImages = Array.from(previewContainer.querySelectorAll('img'));
+
+  const debug = document.getElementById('gifDebug');
+  if (debug) debug.innerHTML = '';
+  
+
+  const dir = parseInt(direction);
+  const layers = [];
+
+  // 🔥 LOAD LAYERS
+  for (const img of allImages) {
+    if (img.style.display === 'none') continue;
+
+    const sprite = img.getAttribute('data-sprite');
+    const state = img.getAttribute('data-state');
+    if (!sprite || !state) continue;
+
+    const dirs = parseInt(img.getAttribute('data-directions') || '1');
+    const actualDir = dir < dirs ? dir : 0;
+
+    const url = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`;
+
+    const resp = await fetch(url);
+    const buffer = await resp.arrayBuffer();
+
+    const header = new Uint8Array(buffer.slice(0, 6));
+    const isGif = String.fromCharCode(...header).startsWith("GIF");
+
+    if (isGif) {
+      const gif = parseGIF(buffer);
+      const frames = decompressFrames(gif, true);
+
+      layers.push({
+        type: 'gif',
+        frames,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+
+    } else {
+      const image = new Image();
+      image.src = URL.createObjectURL(new Blob([buffer]));
+      await new Promise(r => { image.onload = r; image.onerror = r; });
+
+      layers.push({
+        type: 'static',
+        image,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+    }
+  }
+
+  if (!layers.length) return;
+
+  const maxFrames = Math.max(
+    ...layers.map(l => l.type === 'gif' ? l.frames.length : 1)
+  );
+
+  const outputFrames = [];
+
+  // 🔥 FRAME LOOP
+  for (let i = 0; i < maxFrames; i++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+
+    // ✅ CLEAR ENTIRE FRAME
+    ctx.clearRect(0, 0, width, height);
+    // DEBUG: show temp canvas
+    
+
+    for (const layer of layers) {
+      ctx.globalAlpha = layer.opacity;
+      ctx.filter = layer.filter;
+
+      if (layer.type === 'gif') {
+        const frameIndex = i % layer.frames.length;
+        const frame = layer.frames[frameIndex];
+
+        // ✅ persistent clean buffer per layer
+        if (!layer._buffer) {
+          layer._buffer = new Uint8ClampedArray(width * height * 4);
+        }
+
+        // ✅ clear buffer ONLY at animation loop start
+        if (frameIndex === 0) {
+          layer._buffer.fill(0);
+        }
+
+        // 🧠 apply patch into buffer manually
+        const fw = frame.dims.width;
+        const fh = frame.dims.height;
+        const fx = frame.dims.left;
+        const fy = frame.dims.top;
+
+        for (let y = 0; y < fh; y++) {
+          for (let x = 0; x < fw; x++) {
+            const srcIdx = (y * fw + x) * 4;
+            const dstIdx = ((y + fy) * width + (x + fx)) * 4;
+
+            // copy RGBA
+            layer._buffer[dstIdx + 0] = frame.patch[srcIdx + 0];
+            layer._buffer[dstIdx + 1] = frame.patch[srcIdx + 1];
+            layer._buffer[dstIdx + 2] = frame.patch[srcIdx + 2];
+            layer._buffer[dstIdx + 3] = frame.patch[srcIdx + 3];
+          }
+        }
+
+        // 🎯 render buffer → canvas
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+
+        const tempCtx = tempCanvas.getContext('2d');
+        const imageData = tempCtx.createImageData(width, height);
+        imageData.data.set(layer._buffer);
+        tempCtx.putImageData(imageData, 0, 0);
+        // DEBUG: show temp canvas
+        if (debug) {
+          const preview = document.createElement('canvas');
+          preview.width = width;
+          preview.height = height;
+
+          const pctx = preview.getContext('2d');
+          pctx.drawImage(tempCanvas, 0, 0, width, height);
+
+          preview.style.width = '48px';
+          preview.style.height = '48px';
+          preview.style.imageRendering = 'pixelated';
+          preview.style.border = '1px solid red';
+
+          debug.appendChild(preview);
+        }
+
+        ctx.drawImage(tempCanvas, 0, 0, width, height);
+      } else {
+        ctx.drawImage(layer.image, 0, 0, width, height);
+      }
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+
+    outputFrames.push(canvas.toDataURL('image/png'));
+  }
+
+  // 🚀 SEND TO BACKEND
+  const formData = new FormData();
+  formData.append('frames', JSON.stringify(outputFrames));
+  formData.append('char_id', charId);
+
+  const resp = await fetch('/characters/api/export_gif', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (resp.ok) {
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = charId + '_preview.gif';
+    a.click();
+
+    URL.revokeObjectURL(url);
+  } else {
+    alert("Export failed");
+  }
+}
 </script>
 {% endblock %}
