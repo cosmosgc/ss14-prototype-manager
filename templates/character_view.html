@@ -210,20 +210,6 @@
           </button>
         </div>
       </div>
-      <div id="gifDebug" style="
-  position: fixed;
-  bottom: 10px;
-  left: 10px;
-  max-height: 300px;
-  overflow: auto;
-  background: rgba(0,0,0,0.8);
-  padding: 8px;
-  z-index: 9999;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-"></div>
-
       <div class="flex flex-col items-center">
         <!-- Preview Window -->
         <div id="previewContainer" class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-4 shadow-inner">
@@ -825,9 +811,6 @@ document.getElementById('slotSearchInput')?.addEventListener('input', function(e
 async function exportGifAnimation(direction, width, height, scale) {
   const previewContainer = document.getElementById('previewContainer');
   const allImages = Array.from(previewContainer.querySelectorAll('img'));
-
-  const debug = document.getElementById('gifDebug');
-  if (debug) debug.innerHTML = '';
   
 
   const dir = parseInt(direction);
@@ -906,61 +889,27 @@ async function exportGifAnimation(direction, width, height, scale) {
         const frameIndex = i % layer.frames.length;
         const frame = layer.frames[frameIndex];
 
-        // ✅ persistent clean buffer per layer
-        if (!layer._buffer) {
-          layer._buffer = new Uint8ClampedArray(width * height * 4);
-        }
-
-        // ✅ clear buffer ONLY at animation loop start
-        if (frameIndex === 0) {
-          layer._buffer.fill(0);
-        }
-
-        // 🧠 apply patch into buffer manually
+        // Render each GIF frame on a fresh transparent buffer so
+        // old pixels cannot persist between frames.
         const fw = frame.dims.width;
         const fh = frame.dims.height;
         const fx = frame.dims.left;
         const fy = frame.dims.top;
 
-        for (let y = 0; y < fh; y++) {
-          for (let x = 0; x < fw; x++) {
-            const srcIdx = (y * fw + x) * 4;
-            const dstIdx = ((y + fy) * width + (x + fx)) * 4;
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = fw;
+        frameCanvas.height = fh;
+        const frameCtx = frameCanvas.getContext('2d');
+        const frameImageData = frameCtx.createImageData(fw, fh);
+        frameImageData.data.set(frame.patch);
+        frameCtx.putImageData(frameImageData, 0, 0);
 
-            // copy RGBA
-            layer._buffer[dstIdx + 0] = frame.patch[srcIdx + 0];
-            layer._buffer[dstIdx + 1] = frame.patch[srcIdx + 1];
-            layer._buffer[dstIdx + 2] = frame.patch[srcIdx + 2];
-            layer._buffer[dstIdx + 3] = frame.patch[srcIdx + 3];
-          }
-        }
-
-        // 🎯 render buffer → canvas
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
-
         const tempCtx = tempCanvas.getContext('2d');
-        const imageData = tempCtx.createImageData(width, height);
-        imageData.data.set(layer._buffer);
-        tempCtx.putImageData(imageData, 0, 0);
-        
-        // DEBUG: show temp canvas
-        if (debug) {
-          const preview = document.createElement('canvas');
-          preview.width = width;
-          preview.height = height;
-
-          const pctx = preview.getContext('2d');
-          pctx.drawImage(tempCanvas, 0, 0, width, height);
-
-          preview.style.width = '48px';
-          preview.style.height = '48px';
-          preview.style.imageRendering = 'pixelated';
-          preview.style.border = '1px solid red';
-
-          debug.appendChild(preview);
-        }
+        tempCtx.clearRect(0, 0, width, height);
+        tempCtx.drawImage(frameCanvas, fx, fy);
 
         ctx.drawImage(tempCanvas, 0, 0, width, height);
       } else {
