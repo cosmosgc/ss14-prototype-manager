@@ -420,13 +420,13 @@ function spriteModal() {
       if (!this.currentSprite || !this.currentState) return "";
       const sprite = encodeURIComponent(this.currentSprite);
       const state = encodeURIComponent(this.currentState);
-      return `/sprite/preview?sprite=${sprite}&state=${state}&scale=8`;
+      return `/api/sprite/preview?sprite=${sprite}&state=${state}&scale=8`;
     },
     thumbnailUrl(state) {
       if (!this.currentSprite || !state) return "";
       const sprite = encodeURIComponent(this.currentSprite);
       const st = encodeURIComponent(state);
-      return `/sprite/preview?sprite=${sprite}&state=${st}&scale=2`;
+      return `/api/sprite/preview?sprite=${sprite}&state=${st}&scale=2`;
     },
     onKeydown(evt) {
       if (!this.isOpen) return;
