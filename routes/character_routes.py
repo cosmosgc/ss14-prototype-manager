@@ -871,14 +871,37 @@ def api_outfit_update():
     key = f"outfit_{char_id}"
     outfit = session.get(key, {})
 
+    selected = selected_instance_or_400()
+
     if action == "equip":
         if not item_id or not slot:
             return jsonify({"success": False, "error": "item_id and slot required"})
-        if slot not in outfit:
-            outfit[slot] = {}
-        outfit[slot]["item"] = item_id
-        if color:
-            outfit[slot]["color"] = color
+        
+        preview = resolve_preview_batch(selected["name"], selected["root_path"], [item_id]).get(item_id)
+        
+        slot_component = {
+            "head": "HEAD",
+            "eyes": "EYES",
+            "neck": "NECK",
+            "body": "UNIFORM",
+            "uniform": "UNIFORM",
+            "outer": "OUTERCLOTHING",
+            "hands": "HANDS",
+            "feet": "FEET",
+            "belt": "WAIST",
+            "back": "BACK",
+        }.get(slot, slot.upper() if slot else None)
+        
+        equipped_state = None
+        if preview and preview[0] and slot_component:
+            equipped_state = _find_equipped_state(selected, preview[0], slot_component)
+        
+        outfit[slot] = {
+            "item": item_id,
+            "sprite": preview[0] if preview else None,
+            "state": equipped_state or (preview[1] if preview else None),
+            "color": color,
+        }
     elif action == "unequip":
         if slot in outfit:
             del outfit[slot]
@@ -890,6 +913,67 @@ def api_outfit_update():
 
     session[key] = outfit
     return jsonify({"success": True, "outfit": outfit})
+
+
+@character_bp.route("/api/search", methods=["GET"])
+def api_character_search():
+    """ElasticSearch-like prototype search using SQLite for clothing items"""
+    try:
+        selected = selected_instance_or_400()
+    except Exception as e:
+        return jsonify({
+            "error": str(e), 
+            "hint": "No instance selected", 
+            "session": session.get("selected_instance"),
+            "instances": [i["name"] for i in load_instances()]
+        }), 400
+    
+    query = request.args.get("q", "").strip()
+    slot_filter = request.args.get("slot", "").strip()
+    limit = min(int(request.args.get("limit", 50)), 200)
+    
+    params = [selected["name"]]
+    
+    sql = """
+        SELECT DISTINCT pc.proto_id
+        FROM prototype_components pc
+        WHERE pc.instance_name = ? AND pc.component_type = 'Clothing'
+    """
+    
+    if query:
+        sql += " AND pc.proto_id LIKE ?"
+        params.append(f"%{query}%")
+    
+    sql += " ORDER BY pc.proto_id LIMIT ?"
+    params.append(limit)
+
+    try:
+        with get_db() as conn:
+            rows = conn.execute(sql, params).fetchall()
+    except Exception as e:
+        return jsonify({"error": str(e), "sql": sql, "params": params}), 500
+
+    proto_ids = [r["proto_id"] for r in rows]
+    
+    if not proto_ids:
+        return jsonify([])
+
+    preview_map = resolve_preview_batch(selected["name"], selected["root_path"], proto_ids)
+
+    results = []
+    for row in rows:
+        proto_id = row["proto_id"]
+        preview = preview_map.get(proto_id)
+        item = {
+            "id": proto_id,
+            "type": "Clothing",
+        }
+        if preview and preview[0]:
+            item["sprite"] = preview[0]
+            item["state"] = preview[1]
+        results.append(item)
+
+    return jsonify(results)
 
 
 @character_bp.route("/api/item-list", methods=["GET"])

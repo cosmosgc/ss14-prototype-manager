@@ -23,7 +23,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
     <div class="space-y-6">
       <div class="rounded-lg border bg-white p-6 shadow-sm">
         <h2 class="mb-4 text-lg font-semibold">Basic Info</h2>
@@ -154,86 +154,115 @@
 {% if character_viewer %}
     <div class="rounded-lg border bg-white p-6 shadow-sm">
       <h2 class="mb-4 text-lg font-semibold">Character Preview</h2>
-      <div class="flex gap-6">
-        <div class="flex-shrink-0">
-          <div class="relative bg-slate-900 rounded-lg overflow-hidden" style="width: 96px; height: 128px;">
-            {% if character_viewer.base_layer.skinColor %}
-            <div class="absolute inset-0 flex items-center justify-center">
-              <div class="w-16 h-24 rounded" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.3;"></div>
-            </div>
-            {% endif %}
-            {% if character_viewer.hair %}
-            <img loading="lazy" data-sprite="{{ character_viewer.hair.sprite }}" data-state="{{ character_viewer.hair.state }}" data-directions="{{ character_viewer.hair.directions }}" data-color="{{ character_viewer.hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.hair.sprite, state=character_viewer.hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.hair.filter }}" onerror="this.style.display='none'" />
-            {% endif %}
-            {% if character_viewer.facial_hair %}
-            <img loading="lazy" data-sprite="{{ character_viewer.facial_hair.sprite }}" data-state="{{ character_viewer.facial_hair.state }}" data-directions="{{ character_viewer.facial_hair.directions }}" data-color="{{ character_viewer.facial_hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.facial_hair.sprite, state=character_viewer.facial_hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.facial_hair.filter }}" onerror="this.style.display='none'" />
-            {% endif %}
-            {% if character_viewer.species_parts %}
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.torso }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.torso, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.head }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.head, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
-            {% endif %}
-            {% for region, items in character_viewer.regions.items() %}
-              {% for item in items %}
-              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
-              {% endfor %}
-            {% endfor %}
-            {% for mark in character_viewer.markings %}
-            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
-            {% endfor %}
-            <img id="outfit-head" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-eyes" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-neck" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-body" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-outer" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-hands" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-feet" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-belt" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-back" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-          </div>
-        </div>
-        <div class="flex-1">
-          <h3 class="mb-3 font-medium">Equipped Items</h3>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            {% for region, items in character_viewer.regions.items() %}
-              {% if items %}
-            <div class="rounded bg-slate-50 p-2">
-              <span class="text-xs font-medium text-slate-500 uppercase">{{ region }}</span>
-              {% for item in items %}
-              <div class="flex items-center gap-1 mt-1">
-                <span class="font-mono text-xs">{{ item.slot }}</span>
-                <span class="font-mono text-xs text-slate-600">{{ item.item }}</span>
-              </div>
-              {% endfor %}
-            </div>
-              {% endif %}
-            {% endfor %}
-          </div>
-          {% if character_viewer.markings %}
-          <h3 class="mt-4 mb-3 font-medium">Markings</h3>
-          <div class="grid grid-cols-3 gap-2 text-sm">
-            {% for mark in character_viewer.markings %}
-            <div class="flex flex-col items-center rounded bg-slate-50 p-2">
-              <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview h-8 w-8 rounded pixelated" onerror="this.style.display='none'" />
-              <span class="font-mono text-xs mt-1">{{ mark.item }}</span>
-              {% if mark.colors %}
-              <div class="flex gap-0.5 mt-0.5">
-                {% for color in mark.colors %}
-                <span class="h-2 w-2 rounded" style="background-color: {{ color }}"></span>
-                {% endfor %}
-              </div>
-              {% endif %}
-            </div>
-            {% endfor %}
+
+      <div class="flex flex-col items-center">
+        <div class="relative bg-slate-900 rounded-lg overflow-hidden" style="width: 96px; height: 128px;">
+          {% if character_viewer.base_layer.skinColor %}
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-16 h-24 rounded" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.3;"></div>
           </div>
           {% endif %}
+          {% if character_viewer.hair %}
+          <img loading="lazy" data-sprite="{{ character_viewer.hair.sprite }}" data-state="{{ character_viewer.hair.state }}" data-directions="{{ character_viewer.hair.directions }}" data-color="{{ character_viewer.hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.hair.sprite, state=character_viewer.hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.hair.filter }}" onerror="this.style.display='none'" />
+          {% endif %}
+          {% if character_viewer.facial_hair %}
+          <img loading="lazy" data-sprite="{{ character_viewer.facial_hair.sprite }}" data-state="{{ character_viewer.facial_hair.state }}" data-directions="{{ character_viewer.facial_hair.directions }}" data-color="{{ character_viewer.facial_hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.facial_hair.sprite, state=character_viewer.facial_hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.facial_hair.filter }}" onerror="this.style.display='none'" />
+          {% endif %}
+          {% if character_viewer.species_parts %}
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.torso }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.torso, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.head }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.head, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+          {% endif %}
+          {% for region, items in character_viewer.regions.items() %}
+            {% for item in items %}
+            <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+            {% endfor %}
+          {% endfor %}
+          {% for mark in character_viewer.markings %}
+          <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
+          {% endfor %}
+          <img id="outfit-head" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-eyes" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-neck" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-body" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-outer" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-hands" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-feet" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-belt" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          <img id="outfit-back" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+        </div>
+
+        <div class="mt-4 grid grid-cols-3 gap-2">
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="head" onclick="openSlotSearch('head')">
+              <img id="slot-img-head" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Head</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('head')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="head">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="eyes" onclick="openSlotSearch('eyes')">
+              <img id="slot-img-eyes" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Eyes</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('eyes')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="eyes">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="neck" onclick="openSlotSearch('neck')">
+              <img id="slot-img-neck" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Neck</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('neck')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="neck">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="hands" onclick="openSlotSearch('hands')">
+              <img id="slot-img-hands" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Hands</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('hands')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="hands">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-amber-500 bg-slate-800 flex items-center justify-center relative" data-slot="body" onclick="openSlotSearch('body')">
+              <img id="slot-img-body" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-amber-400">Body</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('body')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="body">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="belt" onclick="openSlotSearch('belt')">
+              <img id="slot-img-belt" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Belt</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('belt')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="belt">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="outer" onclick="openSlotSearch('outer')">
+              <img id="slot-img-outer" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Outer</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('outer')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="outer">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="feet" onclick="openSlotSearch('feet')">
+              <img id="slot-img-feet" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Feet</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('feet')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="feet">✕</button>
+            </button>
+          </div>
+          <div class="flex flex-col items-center">
+            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="back" onclick="openSlotSearch('back')">
+              <img id="slot-img-back" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              <span class="slot-label text-xs text-slate-400">Back</span>
+              <button type="button" onclick="event.stopPropagation(); unequipSlot('back')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="back">✕</button>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -241,102 +270,36 @@
 
     <div class="lg:col-span-2 space-y-6">
       <div class="rounded-lg border bg-white p-6 shadow-sm">
-        <h2 class="mb-4 text-lg font-semibold">Outfit (RPG Style)</h2>
-        
-        <div class="flex gap-4">
-          <div class="flex-1">
-            <div class="flex gap-2 mb-3">
-              <select id="slotSelect" class="rounded border border-slate-300 px-2 py-2 text-sm">
-                <option value="head">Head</option>
-                <option value="eyes">Eyes</option>
-                <option value="neck">Neck</option>
-                <option value="body" selected>Body</option>
-                <option value="outer">Outer</option>
-                <option value="hands">Hands</option>
-                <option value="feet">Feet</option>
-                <option value="belt">Belt</option>
-                <option value="back">Back</option>
-              </select>
-              <input type="text" id="itemSearch" placeholder="Search items..." class="flex-1 rounded border border-slate-300 px-3 py-2 text-sm" />
-            </div>
-            <div class="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto" id="itemGrid">
-              <p class="col-span-3 text-sm text-slate-500">Loading items...</p>
-            </div>
-          </div>
-          <div class="w-48">
-            <h3 class="mb-2 text-sm font-medium">Equipped</h3>
-            <div id="outfitList" class="space-y-1 text-sm">
-              <p class="text-slate-500">No items equipped</p>
-            </div>
-          </div>
-        </div>
-      </div>
+        <h2 class="mb-4 text-lg font-semibold">Currently Equipped</h2>
 
-        <form method="post" action="{{ url_for('character.character_dressup', char_id=char_id) }}" class="space-y-4">
-          <div class="flex gap-2">
-            <select
-              name="slot"
-              class="rounded border border-slate-300 px-3 py-2"
-              required
-            >
-              <option value="">Select Slot</option>
-              {% for slot in meta.slots %}
-              <option value="{{ slot }}">{{ slot }}</option>
-              {% endfor %}
-            </select>
-            <input
-              type="text"
-              name="item_id"
-              placeholder="Item ID"
-              list="item-ids"
-              class="flex-1 rounded border border-slate-300 px-3 py-2"
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" id="equippedGrid">
+          {% for slot, item in char_data.equipment.items() %}
+          {% if item %}
+          {% set preview = preview_map.get(item) %}
+          {% set state_info = direction_info.get(item, {}) %}
+          {% set dirs = state_info.get('directions', 1) %}
+          <div class="equipped-slot relative flex flex-col items-center rounded-lg border bg-slate-50 p-2" data-slot="{{ slot }}" data-item="{{ item }}">
+            <button type="button" onclick="unequipSlot('{{ slot }}')" class="absolute top-1 right-1 text-red-500 hover:text-red-700 text-xs opacity-0 hover:opacity-100 transition-opacity" title="Unequip">✕</button>
+            {% if preview and preview[0] %}
+            <img
+              loading="lazy"
+              data-sprite="{{ preview[0] }}"
+              data-state="{{ preview[1] }}"
+              data-directions="{{ dirs }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
+              class="rsi-preview h-12 w-12 rounded object-contain pixelated"
+              onerror="this.style.display='none'"
             />
-            <datalist id="item-ids">
-              {% for item_id in char_data.allItemIds %}
-              <option value="{{ item_id }}">
-              {% endfor %}
-            </datalist>
-            <button
-              type="submit"
-              class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-            >
-              Equip
-            </button>
-          </div>
-        </form>
-
-        {% if char_data.equipment %}
-        <div class="mt-6">
-          <h3 class="mb-3 font-medium">Currently Equipped</h3>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {% for slot, item in char_data.equipment.items() %}
-            {% if item and preview_map.get(item) and preview_map[item][0] %}
-            {% set preview = preview_map[item] %}
-            {% set state_info = direction_info.get(item, {}) %}
-            {% set dirs = state_info.get('directions', 1) %}
-            <div class="flex flex-col items-center rounded-lg border bg-slate-50 p-2">
-              <img
-                loading="lazy"
-                data-sprite="{{ preview[0] }}"
-                data-state="{{ preview[1] }}"
-                data-directions="{{ dirs }}"
-                src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
-                class="rsi-preview h-12 w-12 rounded object-contain pixelated"
-                onerror="this.style.display='none'"
-              />
-              <span class="mt-1 text-xs font-medium capitalize">{{ slot }}</span>
-              <span class="font-mono text-xs text-slate-600">{{ item }}</span>
-            </div>
-            {% else %}
-            <span class="flex items-center gap-1 rounded bg-slate-100 px-3 py-1">
-              <span class="text-sm font-medium capitalize">{{ slot }}:</span>
-              <span class="font-mono text-sm">{{ item }}</span>
-            </span>
             {% endif %}
-            {% endfor %}
+            <span class="mt-1 text-xs font-medium capitalize">{{ slot }}</span>
+            <span class="font-mono text-xs text-slate-600 truncate max-w-full">{{ item }}</span>
           </div>
+          {% endif %}
+          {% endfor %}
+          {% if not char_data.equipment %}
+          <p class="col-span-3 text-sm text-slate-500">No items equipped</p>
+          {% endif %}
         </div>
-        {% endif %}
       </div>
 
       {% if char_data.loadouts %}
@@ -469,27 +432,89 @@
   </div>
 </div>
 
+<div id="slotSearchModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-black/50" onclick="closeSlotSearch()"></div>
+  <div class="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold capitalize" id="modalSlotTitle">Search Item</h3>
+      <button type="button" onclick="closeSlotSearch()" class="text-slate-500 hover:text-slate-700">✕</button>
+    </div>
+    <input type="text" id="slotSearchInput" placeholder="Search items..." class="w-full rounded border border-slate-300 px-3 py-2 mb-3" />
+    <div class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto" id="slotItemGrid">
+      <p class="col-span-4 text-sm text-slate-500">Loading...</p>
+    </div>
+  </div>
+</div>
+
 <script>
   const charId = '{{ char_id }}';
-  let outfit = {};
-  let allItems = [];
-  let currentSlot = 'body';
+  let currentSearchSlot = 'body';
 
-  async function loadItems() {
+  async function loadEquipment() {
     try {
-      currentSlot = document.getElementById('slotSelect')?.value || 'body';
-      const q = document.getElementById('itemSearch')?.value || '';
-      const resp = await fetch(`/characters/api/item-list?q=${encodeURIComponent(q)}&slot=${encodeURIComponent(currentSlot)}&preview=1`);
-      allItems = await resp.json();
-      renderItemGrid(allItems.slice(0, 30));
+      const resp = await fetch(`/characters/api/outfit?char_id=${charId}`);
+      const data = await resp.json();
+      renderEquippedSlots(data);
+      updatePreview();
     } catch(e) { console.error(e); }
   }
 
-  function renderItemGrid(items) {
-    const grid = document.getElementById('itemGrid');
+  function renderEquippedSlots(outfit) {
+    const grid = document.getElementById('equippedGrid');
     if (!grid) return;
+
+    const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+    let html = '';
+    for (const slot of slots) {
+      const item = outfit[slot];
+      if (item && item.item) {
+        const sprite = item.sprite || '';
+        const state = item.state || 'icon';
+        const direction = 0;
+        let imgHtml = '';
+        if (sprite && state) {
+          imgHtml = `<img src="/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${direction}" class="rsi-preview h-12 w-12 rounded object-contain pixelated" onerror="this.style.display='none'" />`;
+        }
+        html += `<div class="equipped-slot relative flex flex-col items-center rounded-lg border bg-slate-50 p-2" data-slot="${slot}" data-item="${item.item}">
+          <button type="button" onclick="unequipSlot('${slot}')" class="absolute top-1 right-1 text-red-500 hover:text-red-700 text-xs" title="Unequip">✕</button>
+          ${imgHtml}
+          <span class="mt-1 text-xs font-medium capitalize">${slot}</span>
+          <span class="font-mono text-xs text-slate-600 truncate max-w-full">${item.item}</span>
+        </div>`;
+      }
+    }
+    if (!html) {
+      html = '<p class="col-span-3 text-sm text-slate-500">No items equipped</p>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function openSlotSearch(slot) {
+    currentSearchSlot = slot;
+    document.getElementById('modalSlotTitle').textContent = slot.charAt(0).toUpperCase() + slot.slice(1);
+    document.getElementById('slotSearchModal').classList.remove('hidden');
+    document.getElementById('slotSearchInput').value = '';
+    loadSlotItems('');
+  }
+
+  function closeSlotSearch() {
+    document.getElementById('slotSearchModal').classList.add('hidden');
+    currentSearchSlot = 'body';
+  }
+
+  async function loadSlotItems(q) {
+    try {
+      const params = new URLSearchParams({ q, slot: currentSearchSlot, preview: '1' });
+      const resp = await fetch(`/characters/api/search?${params}`);
+      const items = await resp.json();
+      renderSlotItems(items);
+    } catch(e) { console.error(e); }
+  }
+
+  function renderSlotItems(items) {
+    const grid = document.getElementById('slotItemGrid');
     if (!items.length) {
-      grid.innerHTML = '<p class="col-span-3 text-sm text-slate-500">No items found</p>';
+      grid.innerHTML = '<p class="col-span-4 text-sm text-slate-500">No items found</p>';
       return;
     }
     let html = '';
@@ -497,9 +522,9 @@
       let imgHtml = '';
       if (item.sprite && item.state) {
         const src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
-        imgHtml = `<img src="${src}" class="h-8 w-8 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
+        imgHtml = `<img src="${src}" class="h-10 w-10 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
       }
-      html += `<button type="button" onclick="selectItem('${item.id}')" class="flex flex-col items-center rounded border bg-slate-50 p-2 hover:bg-slate-100">
+      html += `<button type="button" onclick="equipSlotItem('${item.id}')" class="flex flex-col items-center rounded border bg-slate-50 p-2 hover:bg-slate-100">
         ${imgHtml}
         <span class="font-mono text-xs truncate w-full mt-1">${item.id}</span>
       </button>`;
@@ -507,125 +532,87 @@
     grid.innerHTML = html;
   }
 
-  function selectItem(itemId) {
-    const slotSelect = document.getElementById('slotSelect');
-    const slot = slotSelect?.value || 'body';
-    equipItem(slot, itemId);
-  }
-
-  document.getElementById('itemSearch')?.addEventListener('input', function(e) {
-    loadItems();
-  });
-
-  document.getElementById('slotSelect')?.addEventListener('change', function(e) {
-    currentSlot = e.target.value;
-    loadItems();
-  });
-
-  async function loadOutfit() {
+  async function equipSlotItem(itemId) {
     try {
-      const resp = await fetch(`/characters/api/outfit?char_id=${charId}`);
-      outfit = await resp.json();
-      renderOutfitPanel();
-      updatePreview();
-    } catch(e) { console.error(e); }
-  }
-
-  async function equipItem(slot, itemId, color = '') {
-    try {
-      const params = new URLSearchParams({ char_id: charId, action: 'equip', slot, item_id: itemId });
-      if (color) params.append('color', color);
+      const params = new URLSearchParams({ char_id: charId, action: 'equip', slot: currentSearchSlot, item_id: itemId });
       const resp = await fetch(`/characters/api/outfit?${params}`, { method: 'POST' });
       const data = await resp.json();
       if (data.success) {
-        outfit = data.outfit;
-        const itemData = allItems.find(i => i.id === itemId);
-        if (itemData) {
-          outfit[slot] = {
-            ...outfit[slot],
-            sprite: itemData.sprite,
-            state: itemData.equipped_state || itemData.state,
-          };
-        }
-        renderOutfitPanel();
+        renderEquippedSlots(data.outfit);
         updatePreview();
+        closeSlotSearch();
       }
     } catch(e) { console.error(e); }
   }
 
-  async function unequipItem(slot) {
+  async function unequipSlot(slot) {
     try {
       const params = new URLSearchParams({ char_id: charId, action: 'unequip', slot });
       const resp = await fetch(`/characters/api/outfit?${params}`, { method: 'POST' });
       const data = await resp.json();
       if (data.success) {
-        outfit = data.outfit;
-        renderOutfitPanel();
+        renderEquippedSlots(data.outfit);
         updatePreview();
       }
     } catch(e) { console.error(e); }
   }
 
-  async function setItemColor(slot, color) {
-    if (!outfit[slot]) return;
+  async function loadOutfit() {
     try {
-      const params = new URLSearchParams({ char_id: charId, action: 'set_color', slot, color });
-      const resp = await fetch(`/characters/api/outfit?${params}`, { method: 'POST' });
-      const data = await resp.json();
-      if (data.success) {
-        outfit[slot] = { ...outfit[slot], color };
-        updatePreviewColor(slot, color);
-      }
-    } catch(e) { console.error(e); }
-  }
-
-  function renderOutfitPanel() {
-    const panel = document.getElementById('outfitList');
-    if (!panel) return;
-    const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
-    let html = '';
-    for (const slot of slots) {
-      const item = outfit[slot];
-      if (item) {
-        html += `<div class="flex items-center gap-2 rounded bg-slate-100 p-2">
-          <span class="text-xs font-medium capitalize w-16">${slot}</span>
-          <span class="font-mono text-xs flex-1 truncate">${item.item || ''}</span>
-          <input type="color" value="${item.color || '#ffffff'}" class="h-6 w-6 cursor-pointer" onchange="setItemColor('${slot}', this.value)" />
-          <button type="button" onclick="unequipItem('${slot}')" class="text-red-500 hover:text-red-700 text-sm">✕</button>
-        </div>`;
-      }
-    }
-    panel.innerHTML = html || '<p class="text-sm text-slate-500">No items equipped</p>';
+      const resp = await fetch(`/characters/api/outfit?char_id=${charId}`);
+      return await resp.json();
+    } catch(e) { console.error(e); return {}; }
   }
 
   function updatePreview() {
-    document.querySelectorAll('.outfit-preview').forEach(img => {
-      const slot = img.getAttribute('data-slot');
-      const item = outfit[slot];
-      if (item && item.item) {
-        const sprite = item.sprite;
-        const state = item.state;
-        const direction = document.getElementById('directionSelect')?.value || '0';
-        if (sprite && state) {
-          img.setAttribute('data-sprite', sprite);
-          img.setAttribute('data-state', state);
-          img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=6&direction=' + direction;
+    loadOutfit().then(outfit => {
+      const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+      for (const slot of slots) {
+        const item = outfit[slot];
+        const img = document.getElementById(`outfit-${slot}`);
+        const slotImg = document.getElementById(`slot-img-${slot}`);
+        const slotLabel = document.querySelector(`.slot-btn[data-slot="${slot}"] .slot-label`);
+        const unequipBtn = document.querySelector(`.slot-btn[data-slot="${slot}"] .unequip-btn`);
+        
+        if (item && item.sprite && item.state) {
+          img.setAttribute('data-sprite', item.sprite);
+          img.setAttribute('data-state', item.state);
+          const direction = document.getElementById('directionSelect')?.value || '0';
+          img.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=6&direction=${direction}`;
+          if (item.color) {
+            img.style.filter = getColorFilter(item.color);
+          } else {
+            img.style.filter = 'none';
+          }
           img.style.display = '';
+          
+          if (slotImg) {
+            slotImg.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
+            slotImg.style.display = '';
+          }
+          if (slotLabel) {
+            slotLabel.textContent = item.item ? item.item.substring(0, 6) : slot;
+            slotLabel.classList.add('text-amber-400', 'font-mono', 'text-xs');
+            if (slotLabel.classList.contains('text-slate-400')) {
+              slotLabel.classList.remove('text-slate-400');
+            }
+          }
+          if (unequipBtn) {
+            unequipBtn.classList.remove('hidden');
+          }
         } else {
-          img.style.display = 'none';
+          if (img) img.style.display = 'none';
+          if (slotImg) slotImg.style.display = 'none';
+          if (slotLabel) {
+            slotLabel.textContent = slot.charAt(0).toUpperCase() + slot.slice(1);
+            slotLabel.classList.remove('text-amber-400', 'font-mono', 'text-xs');
+            slotLabel.classList.add('text-slate-400');
+          }
+          if (unequipBtn) {
+            unequipBtn.classList.add('hidden');
+          }
         }
-        if (item.color) {
-          updatePreviewColor(slot, item.color);
-        }
-      } else {
-        img.style.display = 'none';
       }
-    });
-  }
-
-  function updatePreviewColor(slot, color) {
-    document.querySelectorAll(`.outfit-preview[data-slot="${slot}"]`).forEach(img => {
-      img.style.filter = getColorFilter(color);
     });
   }
 
@@ -657,16 +644,18 @@
       const dirs = parseInt(img.getAttribute('data-directions') || '1');
       if (sprite && state) {
         const actualDirection = direction < dirs ? direction : '0';
-        img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=6&direction=' + actualDirection;
+        img.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDirection}`;
       }
     });
     updatePreview();
   }
 
-  // Initialize outfit on load
+  document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {
+    loadSlotItems(e.target.value);
+  });
+
   document.addEventListener('DOMContentLoaded', function() {
-    loadItems();
-    loadOutfit();
+    loadEquipment();
   });
 </script>
 {% endblock %}
