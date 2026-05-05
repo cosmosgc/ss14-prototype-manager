@@ -1138,6 +1138,8 @@ def api_export_gif():
         append_images=images[1:],
         duration=100,
         loop=0,
+        disposal=2,
+        optimize=False,
     )
     output.seek(0)
 
