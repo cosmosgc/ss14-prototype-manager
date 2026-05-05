@@ -538,7 +538,7 @@
           outfit[slot] = {
             ...outfit[slot],
             sprite: itemData.sprite,
-            state: itemData.state,
+            state: itemData.equipped_state || itemData.state,
           };
         }
         renderOutfitPanel();

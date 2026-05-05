@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import os
 import yaml
+import fnmatch
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
@@ -842,6 +843,21 @@ def api_item_list():
     slot_filter = request.args.get("slot", "").strip()
     with_preview = request.args.get("preview", "").strip() == "1"
 
+    slot_to_component = {
+        "head": "HEAD",
+        "eyes": "EYES",
+        "neck": "NECK",
+        "body": "UNIFORM",
+        "outer": "OUTERCLOTHING",
+        "hands": "HANDS",
+        "feet": "FEET",
+        "belt": "WAIST",
+        "back": "BACK",
+        "id": "ID",
+    }
+
+    slot_component = slot_to_component.get(slot_filter, slot_filter.upper())
+
     where_clauses = ["pc.component_type = 'Clothing'"]
     params = [selected["name"]]
 
@@ -882,9 +898,61 @@ def api_item_list():
         if with_preview:
             preview = resolve_preview_batch(selected["name"], selected["root_path"], [row["proto_id"]]).get(row["proto_id"])
             if preview and preview[0]:
-                item_data["sprite"] = preview[0]
-                item_data["state"] = preview[1]
+                sprite_path = preview[0]
+                icon_state = preview[1]
+                item_data["sprite"] = sprite_path
+                item_data["state"] = icon_state
+                equipped_state = _find_equipped_state(selected, sprite_path, slot_component)
+                if equipped_state:
+                    item_data["equipped_state"] = equipped_state
 
         items.append(item_data)
 
     return jsonify(items)
+
+
+def _find_equipped_state(instance: dict, sprite: str, slot_component: str) -> str | None:
+    if not sprite:
+        return None
+    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return None
+    meta_path = rsi_dir / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    states = meta.get("states", [])
+    slot_upper = slot_component.upper()
+
+    patterns = [
+        f"*-equipped-{slot_upper}",
+        f"*-equipped-{slot_component}",
+        f"equipment-{slot_upper}",
+        f"equipment-{slot_component}",
+        "equipped",
+    ]
+
+    for pattern in patterns:
+        for state_info in states:
+            if isinstance(state_info, dict):
+                state_name = state_info.get("name", "")
+                if fnmatch.fnmatch(state_name, pattern):
+                    return state_name
+            elif isinstance(state_info, str):
+                if fnmatch.fnmatch(state_info, pattern):
+                    return state_info
+
+    for state_info in states:
+        if isinstance(state_info, dict):
+            name = state_info.get("name", "")
+            if "equipped" in name.lower():
+                return name
+        elif isinstance(state_info, str) and "equipped" in state_info.lower():
+            return state_info
+
+    return None
