@@ -944,6 +944,7 @@ async function exportGifAnimation(direction, width, height, scale) {
         const imageData = tempCtx.createImageData(width, height);
         imageData.data.set(layer._buffer);
         tempCtx.putImageData(imageData, 0, 0);
+        
         // DEBUG: show temp canvas
         if (debug) {
           const preview = document.createElement('canvas');
