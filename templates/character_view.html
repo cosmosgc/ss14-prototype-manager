@@ -192,23 +192,24 @@
           </div>
           <h2 class="text-lg font-semibold text-amber-100">Character Preview</h2>
         </div>
-        <div class="flex items-center gap-2">
-          <select id="exportDirection" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
-            <option value="0">South</option>
-            <option value="1">North</option>
-            <option value="2">East</option>
-            <option value="3">West</option>
-          </select>
-          <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100" title="Scale" />
-          <select id="exportFormat" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
-            <option value="png">PNG</option>
-            <option value="gif">GIF</option>
-          </select>
-          <button type="button" onclick="exportCharacter()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3v0a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-            Export
-          </button>
-        </div>
+        
+      </div>
+      <div class="flex items-center gap-2 py-1.5">
+        <select id="exportDirection" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
+          <option value="0">South</option>
+          <option value="1">North</option>
+          <option value="2">East</option>
+          <option value="3">West</option>
+        </select>
+        <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100" title="Scale" />
+        <select id="exportFormat" class="text-xs border border-amber-700/50 rounded-lg px-2 py-1.5 bg-slate-900 text-amber-100">
+          <option value="png">PNG</option>
+          <option value="gif">GIF</option>
+        </select>
+        <button type="button" onclick="exportCharacter()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3v0a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Export
+        </button>
       </div>
       <div class="flex flex-col items-center">
         <!-- Preview Window -->
@@ -216,7 +217,6 @@
           <div class="relative mx-auto rounded-xl border border-amber-500/40 bg-slate-950 overflow-hidden shadow-[0_0_40px_rgba(251,191,36,0.12)] flex items-center justify-center" style="width: 224px; height: 288px;">
             {% if character_viewer.base_layer.skinColor %}
             <div class="absolute inset-0 flex items-center justify-center">
-              <div class="w-16 h-24 rounded-lg" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.4;"></div>
             </div>
             {% endif %}
             {% if character_viewer.hair %}
@@ -242,16 +242,19 @@
               <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute m-auto pixelated" onerror="this.style.display='none'" />
               {% endfor %}
             {% endfor %}
+            
+            <img id="outfit-feet" class="outfit-preview absolute  m-auto pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-body" class="outfit-preview absolute  m-auto pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+
             {% for mark in character_viewer.markings %}
-            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute  m-auto pixelated" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
             {% endfor %}
             <img id="outfit-head" class="outfit-preview absolute  m-auto pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
             <img id="outfit-eyes" class="outfit-preview absolute  m-auto pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
             <img id="outfit-neck" class="outfit-preview absolute  m-auto pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-body" class="outfit-preview absolute  m-auto pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
             <img id="outfit-outer" class="outfit-preview absolute  m-auto pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-hands" class="outfit-preview absolute  m-auto pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
-            <img id="outfit-feet" class="outfit-preview absolute  m-auto pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-hand1" class="outfit-preview absolute  m-auto pixelated" data-slot="hand1" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-hand2" class="outfit-preview absolute  m-auto pixelated" data-slot="hand2" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
             <img id="outfit-belt" class="outfit-preview absolute  m-auto pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
             <img id="outfit-back" class="outfit-preview absolute  m-auto pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
           </div>
@@ -288,13 +291,22 @@
           </div>
             <div class="flex flex-col items-center">
               <div class="relative group">
-                <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hand" onclick="openSlotSearch('hand')">
-                  <img id="slot-img-hand" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-                  <span class="text-xs text-amber-200/80 font-medium">Hand</span>
+                <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hand1" onclick="openSlotSearch('hand1')">
+                  <img id="slot-img-hand1" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                  <span class="text-xs text-amber-200/80 font-medium">L Hand</span>
                 </button>
-                <button type="button" onclick="unequipSlot('hand')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hand">✕</button>
+                <button type="button" onclick="unequipSlot('hand1')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hand1">✕</button>
               </div>
             </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hand2" onclick="openSlotSearch('hand2')">
+                <img id="slot-img-hand2" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-amber-200/80 font-medium">R Hand</span>
+              </button>
+              <button type="button" onclick="unequipSlot('hand2')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hand2">✕</button>
+            </div>
+          </div>
           <div class="flex flex-col items-center">
             <div class="relative group">
               <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-amber-500 bg-slate-800 flex items-center justify-center" data-slot="body" onclick="openSlotSearch('body')">
@@ -448,20 +460,20 @@
   </div>
   {% endif %}
 
-  <!-- Templates Card -->
+  <!-- Loadouts Card -->
   <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
     <div class="flex items-center gap-2 mb-4">
       <div class="p-2 rounded-lg bg-teal-50">
         <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
       </div>
-      <h2 class="text-lg font-semibold text-slate-900">Templates</h2>
+      <h2 class="text-lg font-semibold text-slate-900">Loadouts</h2>
     </div>
 
     <form method="post" action="{{ url_for('character.save_template', char_id=char_id) }}" class="mb-4 flex gap-2">
       <input
         type="text"
         name="template_name"
-        placeholder="Template name..."
+        placeholder="Loadout name..."
         required
         class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow"
       />
@@ -501,7 +513,7 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-slate-500 text-center py-4">No templates saved yet.</p>
+    <p class="text-slate-500 text-center py-4">No loadouts saved yet.</p>
     {% endif %}
   </div>
 
@@ -561,7 +573,7 @@
     const grid = document.getElementById('equippedGrid');
     if (!grid) return;
 
-    const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+    const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hand1', 'hand2', 'feet', 'belt', 'back'];
     let html = '';
     for (const slot of slots) {
       const item = outfit[slot];
@@ -600,7 +612,8 @@
 
   async function loadSlotItems(q) {
     try {
-      const params = new URLSearchParams({ q, slot: currentSearchSlot, preview: '1' });
+      const slotFilter = (currentSearchSlot === 'hand1' || currentSearchSlot === 'hand2') ? 'hands' : currentSearchSlot;
+      const params = new URLSearchParams({ q, slot: slotFilter, preview: '1' });
       const resp = await fetch(`/characters/api/search?${params}`);
       const items = await resp.json();
       renderSlotItems(items);
@@ -662,7 +675,7 @@
 
   function updatePreview() {
     loadOutfit().then(outfit => {
-      const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+      const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hand1', 'hand2', 'feet', 'belt', 'back'];
       for (const slot of slots) {
         const item = outfit[slot];
         const img = document.getElementById(`outfit-${slot}`);
@@ -672,6 +685,7 @@
         if (item && item.sprite && item.state) {
           img.setAttribute('data-sprite', item.sprite);
           img.setAttribute('data-state', item.state);
+          img.setAttribute('data-directions', String(item.directions || 1));
           const direction = document.getElementById('directionSelect')?.value || '0';
           img.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=6&direction=${direction}`;
           if (item.color) {
@@ -719,14 +733,35 @@
     alert('Copied: ' + itemId);
   }
 
+  function getSelectedDirection() {
+    const dirSelect = document.getElementById('directionSelect');
+    const fallback = document.getElementById('exportDirection');
+    const raw = (dirSelect && dirSelect.value) || (fallback && fallback.value) || '0';
+    return parseInt(raw, 10) || 0;
+  }
+
+  function syncDirectionSelects(sourceId) {
+    const a = document.getElementById('directionSelect');
+    const b = document.getElementById('exportDirection');
+    if (!a || !b) return;
+    if (sourceId === 'directionSelect') {
+      b.value = a.value;
+    } else if (sourceId === 'exportDirection') {
+      a.value = b.value;
+    }
+  }
+
   function updateDirection() {
-    const direction = document.getElementById('directionSelect').value;
-    document.querySelectorAll('.rsi-preview').forEach(img => {
+    const direction = getSelectedDirection();
+    const previewContainer = document.getElementById('previewContainer');
+    if (!previewContainer) return;
+
+    previewContainer.querySelectorAll('.rsi-preview').forEach(img => {
       const sprite = img.getAttribute('data-sprite');
       const state = img.getAttribute('data-state');
       const dirs = parseInt(img.getAttribute('data-directions') || '1');
       if (sprite && state) {
-        const actualDirection = direction < dirs ? direction : '0';
+        const actualDirection = direction < dirs ? String(direction) : '0';
         img.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDirection}`;
       }
     });
@@ -804,6 +839,21 @@ document.getElementById('slotSearchInput')?.addEventListener('input', function(e
   });
 
   document.addEventListener('DOMContentLoaded', function() {
+    const directionSelect = document.getElementById('directionSelect');
+    const exportDirection = document.getElementById('exportDirection');
+    if (directionSelect) {
+      directionSelect.addEventListener('change', () => {
+        syncDirectionSelects('directionSelect');
+        updateDirection();
+      });
+    }
+    if (exportDirection) {
+      exportDirection.addEventListener('change', () => {
+        syncDirectionSelects('exportDirection');
+        updateDirection();
+      });
+    }
+    syncDirectionSelects('directionSelect');
     loadEquipment();
   });
 

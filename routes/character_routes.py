@@ -129,7 +129,7 @@ def character_view(char_id: str):
 
     enriched_data = _enrich_character_data_with_paths(char_data, selected["name"], selected["root_path"])
 
-    templates = _load_templates(cache_root)
+    templates = _load_loadouts(cache_root)
 
     all_proto_ids, loadout_entity_map = _collect_all_proto_ids_from_character(enriched_data)
     entity_ids_for_preview = set(all_proto_ids)
@@ -238,8 +238,7 @@ def save_template(char_id: str):
     selected = selected_instance_or_400()
     cache_root = Path("static") / "character_cache" / selected["name"] / char_id
 
-    data_path = cache_root / "data.json"
-    if not data_path.exists():
+    if not (cache_root / "data.json").exists():
         abort(404, "Character not found.")
 
     template_name = request.form.get("template_name", "").strip()
@@ -247,20 +246,14 @@ def save_template(char_id: str):
         flash("Template name is required.", "error")
         return redirect(url_for("character.character_view", char_id=char_id))
 
-    with open(data_path, "r", encoding="utf-8") as f:
-        char_data = json.load(f)
-
+    key = f"outfit_{char_id}"
+    current_outfit = session.get(key, {})
     template = {
         "name": template_name,
-        "equipment": char_data.get("equipment", {}),
+        "equipment": current_outfit,
         "created_at": str(Path(__file__).stat().st_mtime),
     }
-
-    template_path = cache_root / "templates" / f"{template_name}.json"
-    template_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(template_path, "w", encoding="utf-8") as f:
-        json.dump(template, f, indent=2)
+    _upsert_loadout(cache_root, template)
 
     flash(f"Template '{template_name}' saved.", "success")
     return redirect(url_for("character.character_view", char_id=char_id))
@@ -271,29 +264,18 @@ def load_template(char_id: str):
     selected = selected_instance_or_400()
     cache_root = Path("static") / "character_cache" / selected["name"] / char_id
 
-    data_path = cache_root / "data.json"
     template_name = request.form.get("template_name", "").strip()
 
-    if not data_path.exists() or not template_name:
+    if not (cache_root / "data.json").exists() or not template_name:
         abort(404, "Character or template not found.")
-
-    template_path = cache_root / "templates" / f"{template_name}.json"
-    if not template_path.exists():
+    loadouts = _load_loadouts(cache_root)
+    template = next((l for l in loadouts if l.get("name") == template_name), None)
+    if not template:
         flash(f"Template '{template_name}' not found.", "error")
         return redirect(url_for("character.character_view", char_id=char_id))
 
-    with open(template_path, "r", encoding="utf-8") as f:
-        template = json.load(f)
-
-    with open(data_path, "r", encoding="utf-8") as f:
-        char_data = json.load(f)
-
-    char_data["equipment"] = template.get("equipment", {})
-
-    enriched = _enrich_character_data_with_paths(char_data, selected["name"], selected["root_path"])
-
-    with open(data_path, "w", encoding="utf-8") as f:
-        json.dump(enriched, f, indent=2)
+    key = f"outfit_{char_id}"
+    session[key] = template.get("equipment", {}) or {}
 
     flash(f"Template '{template_name}' loaded.", "success")
     return redirect(url_for("character.character_view", char_id=char_id))
@@ -309,9 +291,8 @@ def delete_template(char_id: str):
         flash("Template name is required.", "error")
         return redirect(url_for("character.character_view", char_id=char_id))
 
-    template_path = cache_root / "templates" / f"{template_name}.json"
-    if template_path.exists():
-        template_path.unlink()
+    removed = _delete_loadout(cache_root, template_name)
+    if removed:
         flash(f"Template '{template_name}' deleted.", "success")
 
     return redirect(url_for("character.character_view", char_id=char_id))
@@ -441,18 +422,46 @@ def _build_character_data(proto: dict, root_path: str) -> dict:
     return char_data
 
 
-def _load_templates(cache_root: Path) -> list[dict]:
-    templates = []
-    templates_dir = cache_root / "templates"
+def _loadouts_file(cache_root: Path) -> Path:
+    return cache_root / "loadouts.json"
 
-    if templates_dir.exists():
-        for tmpl_file in templates_dir.glob("*.json"):
-            with open(tmpl_file, "r", encoding="utf-8") as f:
-                tmpl = json.load(f)
-                tmpl["filename"] = tmpl_file.name
-                templates.append(tmpl)
 
-    return templates
+def _load_loadouts(cache_root: Path) -> list[dict]:
+    path = _loadouts_file(cache_root)
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if isinstance(data, dict):
+        return data.get("loadouts", [])
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def _save_loadouts(cache_root: Path, loadouts: list[dict]) -> None:
+    path = _loadouts_file(cache_root)
+    payload = {"version": 1, "loadouts": loadouts}
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _upsert_loadout(cache_root: Path, loadout: dict) -> None:
+    loadouts = _load_loadouts(cache_root)
+    name = loadout.get("name", "")
+    loadouts = [l for l in loadouts if l.get("name") != name]
+    loadouts.append(loadout)
+    _save_loadouts(cache_root, loadouts)
+
+
+def _delete_loadout(cache_root: Path, name: str) -> bool:
+    loadouts = _load_loadouts(cache_root)
+    filtered = [l for l in loadouts if l.get("name") != name]
+    if len(filtered) == len(loadouts):
+        return False
+    _save_loadouts(cache_root, filtered)
+    return True
 
 
 def _collect_all_proto_ids_from_character(char_data: dict) -> list[str]:
@@ -696,20 +705,42 @@ def _build_hair_entry(char_data: dict, preview_map: dict, direction_info: dict, 
 
 
 def _get_color_filter(hex_color: str) -> str:
-    if not hex_color or hex_color in ("#000000", "#000"):
+    if not hex_color:
         return "none"
     try:
-        r = int(hex_color[1:3], 16) / 255
-        g = int(hex_color[3:5], 16) / 255
-        b = int(hex_color[5:7], 16) / 255
+        cleaned = hex_color.strip()
+        if cleaned.startswith("#"):
+            cleaned = cleaned[1:]
+        if len(cleaned) not in (6, 8):
+            return "none"
+
+        r = int(cleaned[0:2], 16) / 255.0
+        g = int(cleaned[2:4], 16) / 255.0
+        b = int(cleaned[4:6], 16) / 255.0
+
         max_val = max(r, g, b)
         min_val = min(r, g, b)
-        if max_val < 0.1:
+        if max_val < 0.08:
             return "none"
-        sat = (max_val - min_val) / max_val if max_val > 0 else 0
-        gray = 0.213 * r + 0.715 * g + 0.072 * b
-        sepia = 0.393 * r + 0.769 * g + 0.189 * b
-        return f"sepia({sepia}) saturate({1 + sat}) hue-rotate({(gray - r) * 30}deg)"
+
+        delta = max_val - min_val
+        sat = (delta / max_val) if max_val > 0 else 0
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+        # Keep skin/hair tints subtle and avoid the strong yellow cast from heavy sepia.
+        sepia = 0.12 + (sat * 0.22)
+        saturate = 1.0 + (sat * 0.45)
+        brightness = 0.92 + (lum * 0.20)
+        contrast = 0.98 + (sat * 0.12)
+        hue = int((b - r) * 12)
+
+        return (
+            f"sepia({sepia:.3f}) "
+            f"saturate({saturate:.3f}) "
+            f"hue-rotate({hue}deg) "
+            f"brightness({brightness:.3f}) "
+            f"contrast({contrast:.3f})"
+        )
     except Exception:
         return "none"
 
@@ -856,6 +887,24 @@ def api_outfit_get():
         return jsonify({})
     key = f"outfit_{char_id}"
     outfit = session.get(key, {})
+    try:
+        selected = selected_instance_or_400()
+    except Exception:
+        selected = None
+
+    # Backfill directions for older session entries so export direction works.
+    if selected and isinstance(outfit, dict):
+        changed = False
+        for slot, item in outfit.items():
+            if not isinstance(item, dict):
+                continue
+            sprite = item.get("sprite")
+            state = item.get("state")
+            if sprite and state and not item.get("directions"):
+                item["directions"] = get_rsi_state_info(selected, sprite, state).get("directions", 1)
+                changed = True
+        if changed:
+            session[key] = outfit
     return jsonify(outfit)
 
 
@@ -889,6 +938,8 @@ def api_outfit_update():
             "uniform": "UNIFORM",
             "outer": "OUTERCLOTHING",
             "hands": "HANDS",
+            "hand1": "HANDS",
+            "hand2": "HANDS",
             "feet": "FEET",
             "belt": "WAIST",
             "back": "BACK",
@@ -897,12 +948,21 @@ def api_outfit_update():
         equipped_state = None
         if preview and preview[0] and slot_component:
             equipped_state = _find_equipped_state(selected, preview[0], slot_component)
+        if preview and preview[0] and slot in ("hand1", "hand2"):
+            inhand_state = _find_inhand_state(selected, preview[0], slot)
+            if inhand_state:
+                equipped_state = inhand_state
         
         outfit[slot] = {
             "item": item_id,
             "sprite": preview[0] if preview else None,
             "state": equipped_state or (preview[1] if preview else None),
             "color": color,
+            "directions": get_rsi_state_info(
+                selected,
+                preview[0] if preview else "",
+                equipped_state or (preview[1] if preview else "")
+            ).get("directions", 1) if preview and preview[0] else 1,
         }
     elif action == "unequip":
         if slot in outfit:
@@ -915,6 +975,29 @@ def api_outfit_update():
 
     session[key] = outfit
     return jsonify({"success": True, "outfit": outfit})
+
+
+def _find_inhand_state(instance: dict, sprite: str, slot: str) -> str | None:
+    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return None
+    meta_path = rsi_dir / "meta.json"
+    if not meta_path.exists():
+        return None
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    target = "inhand-left" if slot == "hand1" else "inhand-right"
+    states = meta.get("states", [])
+    for state_info in states:
+        if isinstance(state_info, dict) and state_info.get("name") == target:
+            return target
+        if isinstance(state_info, str) and state_info == target:
+            return target
+    return None
 
 
 @character_bp.route("/api/search", methods=["GET"])

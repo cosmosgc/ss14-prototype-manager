@@ -916,7 +916,9 @@ def find_vscode_cli() -> str | None:
     return None
 
 
-def is_prototype_key(key: str) -> bool:
+def is_prototype_key(key: Any) -> bool:
+    if not isinstance(key, str):
+        return False
     key_l = key.lower()
     if key_l in {"id", "type", "name", "description", "sprite", "state", "path"}:
         return False
