@@ -202,7 +202,7 @@
           <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white" title="Scale" />
           <select id="exportFormat" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
             <option value="png">PNG</option>
-            <option value="gif">GIF (all dirs)</option>
+            <option value="gif">GIF</option>
           </select>
           <button type="button" onclick="exportCharacter()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3v0a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
@@ -791,16 +791,23 @@
   }
 
   async function exportGifAnimation(direction, width, height, scale) {
+    const previewContainer = document.getElementById('previewContainer');
+    const allImages = Array.from(previewContainer.querySelectorAll('img'));
+
+    const hasAnimation = allImages.some(img => {
+      if (img.style.display === 'none') return false;
+      const dirs = parseInt(img.getAttribute('data-directions') || '1');
+      return dirs > 1;
+    });
+
+    const directions = hasAnimation ? [0, 1, 2, 3] : [parseInt(direction)];
     const frames = [];
 
-    for (let dir = 0; dir < 4; dir++) {
+    for (const dir of directions) {
       const c = document.createElement('canvas');
       c.width = width;
       c.height = height;
       const cx = c.getContext('2d');
-
-      const previewContainer = document.getElementById('previewContainer');
-      const allImages = previewContainer.querySelectorAll('img');
 
       for (const img of allImages) {
         if (img.style.display === 'none') continue;
