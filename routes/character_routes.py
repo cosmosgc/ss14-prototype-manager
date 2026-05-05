@@ -839,25 +839,52 @@ def api_outfit_update():
 def api_item_list():
     selected = selected_instance_or_400()
     q = request.args.get("q", "").strip().lower()
+    slot_filter = request.args.get("slot", "").strip()
+    with_preview = request.args.get("preview", "").strip() == "1"
 
-    sprites_root = Path(selected["root_path"]) / "Resources" / "Textures"
-    if not sprites_root.exists():
-        return jsonify([])
+    where_clauses = ["pc.component_type = 'Clothing'"]
+    params = [selected["name"]]
+
+    if slot_filter:
+        where_clauses.append("""
+            EXISTS (
+                SELECT 1 FROM prototype_component_fields pcf
+                WHERE pcf.instance_name = pc.instance_name
+                AND pcf.proto_id = pc.proto_id
+                AND pcf.component_type = 'Clothing'
+                AND pcf.field_name = 'slots'
+                AND pcf.field_value LIKE ?
+            )
+        """)
+        params.append(f"%{slot_filter}%")
+
+    if q:
+        where_clauses.append("(pc.proto_id LIKE ?)")
+        params.append(f"%{q}%")
+
+    where_sql = " AND ".join(where_clauses)
+
+    query = f"""
+        SELECT DISTINCT pc.proto_id
+        FROM prototype_components pc
+        WHERE pc.instance_name = ? AND {where_sql}
+        ORDER BY pc.proto_id
+        LIMIT 100
+    """
+
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
 
     items = []
-    for rsi_dir in sprites_root.rglob("*.rsi"):
-        rel = rsi_dir.relative_to(sprites_root).parent.as_posix()
-        if q and q not in rel.lower():
-            continue
-        states = []
-        for png in rsi_dir.glob("*.png"):
-            states.append(png.stem)
-        if states:
-            items.append({
-                "id": rel,
-                "states": states,
-            })
-        if len(items) >= 100:
-            break
+    for row in rows:
+        item_data = {"id": row["proto_id"]}
+
+        if with_preview:
+            preview = resolve_preview_batch(selected["name"], selected["root_path"], [row["proto_id"]]).get(row["proto_id"])
+            if preview and preview[0]:
+                item_data["sprite"] = preview[0]
+                item_data["state"] = preview[1]
+
+        items.append(item_data)
 
     return jsonify(items)

@@ -169,6 +169,10 @@
             <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
             <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
             <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
             {% endif %}
             {% for region, items in character_viewer.regions.items() %}
               {% for item in items %}
@@ -463,10 +467,13 @@
   const charId = '{{ char_id }}';
   let outfit = {};
   let allItems = [];
+  let currentSlot = 'body';
 
   async function loadItems() {
     try {
-      const resp = await fetch('/characters/api/item-list?q=');
+      currentSlot = document.getElementById('slotSelect')?.value || 'body';
+      const q = document.getElementById('itemSearch')?.value || '';
+      const resp = await fetch(`/characters/api/item-list?q=${encodeURIComponent(q)}&slot=${encodeURIComponent(currentSlot)}&preview=1`);
       allItems = await resp.json();
       renderItemGrid(allItems.slice(0, 30));
     } catch(e) { console.error(e); }
@@ -481,8 +488,14 @@
     }
     let html = '';
     for (const item of items) {
+      let imgHtml = '';
+      if (item.sprite && item.state) {
+        const src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
+        imgHtml = `<img src="${src}" class="h-8 w-8 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
+      }
       html += `<button type="button" onclick="selectItem('${item.id}')" class="flex flex-col items-center rounded border bg-slate-50 p-2 hover:bg-slate-100">
-        <span class="font-mono text-xs truncate w-full">${item.id}</span>
+        ${imgHtml}
+        <span class="font-mono text-xs truncate w-full mt-1">${item.id}</span>
       </button>`;
     }
     grid.innerHTML = html;
@@ -495,9 +508,12 @@
   }
 
   document.getElementById('itemSearch')?.addEventListener('input', function(e) {
-    const q = e.target.value.toLowerCase();
-    const filtered = allItems.filter(item => item.id.toLowerCase().includes(q)).slice(0, 30);
-    renderItemGrid(filtered);
+    loadItems();
+  });
+
+  document.getElementById('slotSelect')?.addEventListener('change', function(e) {
+    currentSlot = e.target.value;
+    loadItems();
   });
 
   async function loadOutfit() {
@@ -517,6 +533,14 @@
       const data = await resp.json();
       if (data.success) {
         outfit = data.outfit;
+        const itemData = allItems.find(i => i.id === itemId);
+        if (itemData) {
+          outfit[slot] = {
+            ...outfit[slot],
+            sprite: itemData.sprite,
+            state: itemData.state,
+          };
+        }
         renderOutfitPanel();
         updatePreview();
       }
@@ -573,11 +597,17 @@
       const slot = img.getAttribute('data-slot');
       const item = outfit[slot];
       if (item && item.item) {
-        const sprite = img.getAttribute('data-sprite');
-        const state = img.getAttribute('data-state');
+        const sprite = item.sprite;
+        const state = item.state;
         const direction = document.getElementById('directionSelect')?.value || '0';
-        img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=6&direction=' + direction;
-        img.style.display = '';
+        if (sprite && state) {
+          img.setAttribute('data-sprite', sprite);
+          img.setAttribute('data-state', state);
+          img.src = '/rsi/preview?sprite=' + encodeURIComponent(sprite) + '&state=' + encodeURIComponent(state) + '&scale=6&direction=' + direction;
+          img.style.display = '';
+        } else {
+          img.style.display = 'none';
+        }
         if (item.color) {
           updatePreviewColor(slot, item.color);
         }
