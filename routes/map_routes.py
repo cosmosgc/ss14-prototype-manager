@@ -6,10 +6,10 @@ import json
 import hashlib
 import sqlite3
 import io
-import shutil
 from PIL import Image, ImageDraw, ImageFont
 import yaml
 import math
+from functools import lru_cache
 
 from app import (
     selected_instance_or_400, safe_join, list_prototype_files, build_file_entries,
@@ -26,6 +26,15 @@ from app import (
 CHUNK_SIZE = 16
 TILE_SIZE_PX = 32
 TILE_DATA_SIZE = 7  # SS14 format 6/7: 7 bytes per tile
+MAP_ICON_DEBUG = False
+
+
+def _icon_debug(msg: str) -> None:
+    if MAP_ICON_DEBUG:
+        print(msg)
+
+
+ICON_RENDER_CACHE_SIZE = 2048
 
 # Tile colors for rendering (hardcoded for now, later fetch from RSI)
 TILE_COLORS = {
@@ -109,6 +118,50 @@ def resolve_rsi_dir(textures_root: Path, sprite: str) -> Path | None:
         if p and p.exists() and p.is_dir():
             return p
     return None
+
+
+@lru_cache(maxsize=64)
+def get_instance_root_cached(instance_name: str) -> str | None:
+    with get_db() as conn:
+        inst_row = conn.execute(
+            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
+        ).fetchone()
+    if not inst_row:
+        return None
+    return str(Path(inst_row["root_path"]))
+
+
+@lru_cache(maxsize=8192)
+def get_proto_rel_path_cached(instance_name: str, proto: str) -> str | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
+            (proto, instance_name),
+        ).fetchone()
+    if not row:
+        return None
+    return row["rel_path"]
+
+
+@lru_cache(maxsize=8192)
+def get_proto_text_fallback_cached(instance_name: str, proto: str) -> tuple[str, str | None]:
+    root_path = get_instance_root_cached(instance_name)
+    if not root_path:
+        return "", None
+    rel_path = get_proto_rel_path_cached(instance_name, proto)
+    if not rel_path:
+        return "", None
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
+    proto_path = safe_join(proto_root, rel_path)
+    if not proto_path or not proto_path.exists():
+        return "", None
+    try:
+        text = proto_path.read_text(encoding="utf-8")
+    except Exception:
+        return "", None
+    sprite = find_first_sprite_in_text(text) or ""
+    state = find_first_state_in_text(text)
+    return sprite, state
 
 
 def choose_rsi_state(requested_state: str | None, available_states: list[str]) -> str | None:
@@ -214,22 +267,9 @@ def parse_entity_state(components: list[dict]) -> str | None:
 
 
 def copy_rsi_to_cache(textures_root: Path, sprite: str, cache_root: Path) -> Path | None:
-    rsi_dir = resolve_rsi_dir(textures_root, sprite)
-    if not rsi_dir or not rsi_dir.exists() or not rsi_dir.is_dir():
-        return None
-    target_dir = cache_root / sprite
-    for src in rsi_dir.rglob("*"):
-        rel = src.relative_to(rsi_dir)
-        dst = target_dir / rel
-        if src.is_dir():
-            dst.mkdir(parents=True, exist_ok=True)
-            continue
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            shutil.copy2(src, dst)
-        except Exception:
-            pass
-    return target_dir
+    # Deprecated behavior kept as no-op compatibility.
+    _ = (textures_root, sprite, cache_root)
+    return None
 
 
 def get_tile_sprite_info(instance_name: str, tile_name: str) -> tuple[str, str] | None:
@@ -513,55 +553,35 @@ def extract_tile_texture(textures_root: Path, sprite: str, state: str) -> Image.
         return None
 
 
-def get_entity_icon(
+def _render_entity_icon_uncached(
     instance_name: str,
     proto: str,
     icon_size: int = 32,
     direction: int = 0,
     state_override: str | None = None
 ) -> Image.Image | None:
-    """Get or create cached entity icon - copies RSI folder structure"""
-    print(f"[ICON] start proto={proto} dir={direction} state_override={state_override} size={icon_size}")
-    instance_root = None
-    with get_db() as conn:
-        inst_row = conn.execute(
-            "SELECT root_path FROM instances WHERE name = ?", (instance_name,)
-        ).fetchone()
-        if inst_row:
-            instance_root = Path(inst_row["root_path"])
-    
-    if not instance_root:
+    """Render entity icon directly from instance resources (uncached)."""
+    _icon_debug(f"[ICON] start proto={proto} dir={direction} state_override={state_override} size={icon_size}")
+    root_path = get_instance_root_cached(instance_name)
+    if not root_path:
         return None
+    instance_root = Path(root_path)
     
     # Gather candidates from both the new resolver and old text scan fallback.
     candidates: list[tuple[str, str | None]] = []
     preview = resolve_preview_batch(instance_name, str(instance_root), [proto]).get(proto)
-    print(f"[ICON] preview resolver proto={proto} -> {preview}")
+    _icon_debug(f"[ICON] preview resolver proto={proto} -> {preview}")
     if preview and preview[0]:
         candidates.append((normalize_sprite_path(preview[0]), state_override or preview[1]))
-
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT rel_path FROM prototype_ids WHERE proto_id = ? AND instance_name = ? LIMIT 1",
-            (proto, instance_name),
-        ).fetchone()
-    print(f"[ICON] db rel_path proto={proto} -> {row['rel_path'] if row else None}")
-    if row:
-        proto_root = instance_root / "Resources" / "Prototypes"
-        proto_path = safe_join(proto_root, row["rel_path"])
-        if proto_path and proto_path.exists():
-            try:
-                text = proto_path.read_text(encoding="utf-8")
-                fallback_sprite = find_first_sprite_in_text(text)
-                fallback_state = find_first_state_in_text(text)
-                if fallback_sprite:
-                    candidates.append((
-                        normalize_sprite_path(fallback_sprite),
-                        state_override or fallback_state
-                    ))
-                    print(f"[ICON] text fallback proto={proto} sprite={fallback_sprite} state={fallback_state}")
-            except Exception:
-                pass
+    rel_path = get_proto_rel_path_cached(instance_name, proto)
+    _icon_debug(f"[ICON] db rel_path proto={proto} -> {rel_path}")
+    fallback_sprite, fallback_state = get_proto_text_fallback_cached(instance_name, proto)
+    if fallback_sprite:
+        candidates.append((
+            normalize_sprite_path(fallback_sprite),
+            state_override or fallback_state
+        ))
+        _icon_debug(f"[ICON] text fallback proto={proto} sprite={fallback_sprite} state={fallback_state}")
 
     # Deduplicate while preserving order.
     seen = set()
@@ -571,16 +591,14 @@ def get_entity_icon(
         if sprite and key not in seen:
             seen.add(key)
             unique_candidates.append((sprite, state))
-    print(f"[ICON] candidates proto={proto} -> {unique_candidates}")
+    _icon_debug(f"[ICON] candidates proto={proto} -> {unique_candidates}")
 
     if not unique_candidates:
         return None
 
     textures_root = instance_root / "Resources" / "Textures"
-    cache_root = Path("static") / "entity_cache" / instance_name
-
     for sprite, state in unique_candidates:
-        print(f"[ICON] try candidate proto={proto} sprite={sprite} requested_state={state}")
+        _icon_debug(f"[ICON] try candidate proto={proto} sprite={sprite} requested_state={state}")
         # Direct PNG sprites
         direct_png_candidates = []
         if sprite.lower().endswith(".png"):
@@ -596,14 +614,7 @@ def get_entity_icon(
                     if tex.size != (icon_size, icon_size):
                         tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
 
-                    cache_dir = cache_root / sprite
-                    cache_dir.mkdir(parents=True, exist_ok=True)
-                    icon_path = cache_dir / f"__preview_direct_dir{direction}_s{icon_size}.png"
-                    try:
-                        tex.save(icon_path)
-                    except Exception:
-                        pass
-                    print(f"[ICON] success direct png proto={proto} path={direct_png} cache={icon_path}")
+                    _icon_debug(f"[ICON] success direct png proto={proto} path={direct_png}")
                     return tex
                 except Exception:
                     pass
@@ -612,51 +623,88 @@ def get_entity_icon(
         rsi_dir = resolve_rsi_dir(textures_root, sprite)
         available_states = list_rsi_states(rsi_dir) if rsi_dir else []
         chosen_state = choose_rsi_state(state, available_states)
-        print(
+        _icon_debug(
             f"[ICON] rsi candidate proto={proto} rsi={rsi_dir} exists={bool(rsi_dir and rsi_dir.exists())} "
             f"available_states={available_states} chosen_state={chosen_state}"
         )
         if not chosen_state:
             continue
 
-        copy_rsi_to_cache(textures_root, sprite, cache_root)
-        cache_dir = cache_root / sprite
-        cache_dir.mkdir(parents=True, exist_ok=True)
         # Try preferred state first, then fall back through available states.
         state_candidates = [chosen_state] + [s for s in available_states if s != chosen_state]
         for candidate_state in state_candidates:
-            icon_path = cache_dir / f"__preview_{candidate_state}_dir{direction}_s{icon_size}.png"
-            print(f"[ICON] try state proto={proto} sprite={sprite} state={candidate_state} cache={icon_path}")
-
-            if icon_path.exists():
-                try:
-                    with Image.open(icon_path) as im:
-                        print(f"[ICON] cache hit proto={proto} state={candidate_state} path={icon_path}")
-                        return im.convert("RGBA")
-                except Exception:
-                    pass
+            _icon_debug(f"[ICON] try state proto={proto} sprite={sprite} state={candidate_state}")
 
             tex, _ = extract_rsi_texture(textures_root, sprite, candidate_state, direction=direction, scale=1)
             if not tex:
-                print(f"[ICON] extract failed proto={proto} sprite={sprite} state={candidate_state}")
+                _icon_debug(f"[ICON] extract failed proto={proto} sprite={sprite} state={candidate_state}")
                 continue
 
             if tex.size != (icon_size, icon_size):
                 tex = tex.resize((icon_size, icon_size), Image.Resampling.NEAREST)
 
-            try:
-                tex.save(icon_path)
-            except Exception:
-                pass
-            print(f"[ICON] success rsi proto={proto} sprite={sprite} state={candidate_state} cache={icon_path}")
+            _icon_debug(f"[ICON] success rsi proto={proto} sprite={sprite} state={candidate_state}")
             return tex
 
-    print(f"[ICON] failed proto={proto} dir={direction} state_override={state_override}")
+    _icon_debug(f"[ICON] failed proto={proto} dir={direction} state_override={state_override}")
     return None
 
 
+@lru_cache(maxsize=ICON_RENDER_CACHE_SIZE)
+def _get_entity_icon_png_cached(
+    instance_name: str,
+    proto: str,
+    icon_size: int,
+    direction: int,
+    state_override: str | None,
+) -> bytes | None:
+    """
+    In-memory rendered icon cache shared across map views.
+    Keyed by (instance, proto, direction, state, size).
+    """
+    icon = _render_entity_icon_uncached(
+        instance_name=instance_name,
+        proto=proto,
+        icon_size=icon_size,
+        direction=direction,
+        state_override=state_override,
+    )
+    if icon is None:
+        return None
+    buf = io.BytesIO()
+    icon.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def get_entity_icon(
+    instance_name: str,
+    proto: str,
+    icon_size: int = 32,
+    direction: int = 0,
+    state_override: str | None = None
+) -> Image.Image | None:
+    """
+    Get entity icon using process-memory cache.
+    Keeps per-entity isolation because cache key includes proto+state+direction+size+instance.
+    """
+    data = _get_entity_icon_png_cached(
+        instance_name=instance_name,
+        proto=proto,
+        icon_size=icon_size,
+        direction=direction,
+        state_override=state_override,
+    )
+    if data is None:
+        return None
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            return im.convert("RGBA")
+    except Exception:
+        return None
+
+
 def pre_cache_entity_icons(entities: list[dict], instance_name: str, icon_size: int = 32) -> tuple[int, int]:
-    """Warm icon cache for unique (proto, direction, state) combos."""
+    """Validate resolvability for unique (proto, direction, state) combos."""
     keys: set[tuple[str, int, str | None]] = set()
     for ent in entities:
         proto = ent.get("proto", "")
@@ -672,7 +720,7 @@ def pre_cache_entity_icons(entities: list[dict], instance_name: str, icon_size: 
 
     cached = 0
     missed = 0
-    print(f"[ICON] pre-cache start entities={len(entities)} unique_keys={len(keys)} instance={instance_name}")
+    _icon_debug(f"[ICON] pre-cache start entities={len(entities)} unique_keys={len(keys)} instance={instance_name}")
     for proto, direction, state in keys:
         icon = get_entity_icon(
             instance_name,
@@ -686,7 +734,7 @@ def pre_cache_entity_icons(entities: list[dict], instance_name: str, icon_size: 
         else:
             missed += 1
             print(f"WARN: Failed to pre-cache icon for proto={proto} dir={direction} state={state}")
-    print(f"[ICON] pre-cache done cached={cached} missed={missed}")
+    _icon_debug(f"[ICON] pre-cache done cached={cached} missed={missed}")
     return cached, missed
 
 
@@ -1106,10 +1154,7 @@ def map_view():
             entity_layer_path = tile_cache_dir / "entities.png"
             render_entity_layer(entities, selected["name"], min_cx, min_cy, x_range, y_range, entity_layer_path, scale=64)
         
-        # Pre-cache entity icons
-        print("DEBUG: Pre-caching entity icons...")
-        cached_count, missed_count = pre_cache_entity_icons(entities, instance_name, icon_size=32)
-        print(f"DEBUG: Pre-cache complete: cached={cached_count}, missed={missed_count}")
+        # Entity icons are served directly from instance resources on demand.
         
         # Save metadata
         with open(meta_path, "w") as f:
@@ -1132,9 +1177,7 @@ def map_view():
             entity_layer_path = tile_cache_dir / "entities.png"
             render_entity_layer(entities, selected["name"], min_cx, min_cy, x_range, y_range, entity_layer_path, scale=64)
         
-        # Pre-cache entity icons if needed
-        cached_count, missed_count = pre_cache_entity_icons(entities, selected["name"], icon_size=32)
-        print(f"DEBUG: Pre-cache complete: cached={cached_count}, missed={missed_count}")
+        # Entity icons are served directly from instance resources on demand.
     
     return render_template(
         "map_view.html",
