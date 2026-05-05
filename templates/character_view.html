@@ -201,107 +201,89 @@
 
         <div class="mt-4 grid grid-cols-3 gap-2">
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="head" onclick="openSlotSearch('head')">
-              <img id="slot-img-head" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Head</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('head')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="head">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="head" onclick="openSlotSearch('head')">
+                <img id="slot-img-head" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('head')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="head">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="eyes" onclick="openSlotSearch('eyes')">
-              <img id="slot-img-eyes" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Eyes</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('eyes')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="eyes">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="eyes" onclick="openSlotSearch('eyes')">
+                <img id="slot-img-eyes" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('eyes')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="eyes">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="neck" onclick="openSlotSearch('neck')">
-              <img id="slot-img-neck" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Neck</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('neck')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="neck">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="neck" onclick="openSlotSearch('neck')">
+                <img id="slot-img-neck" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('neck')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="neck">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="hands" onclick="openSlotSearch('hands')">
-              <img id="slot-img-hands" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Hands</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('hands')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="hands">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="hands" onclick="openSlotSearch('hands')">
+                <img id="slot-img-hands" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('hands')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="hands">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-amber-500 bg-slate-800 flex items-center justify-center relative" data-slot="body" onclick="openSlotSearch('body')">
-              <img id="slot-img-body" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-amber-400">Body</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('body')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="body">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-amber-500 bg-slate-800 flex items-center justify-center" data-slot="body" onclick="openSlotSearch('body')">
+                <img id="slot-img-body" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('body')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="body">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="belt" onclick="openSlotSearch('belt')">
-              <img id="slot-img-belt" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Belt</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('belt')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="belt">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="belt" onclick="openSlotSearch('belt')">
+                <img id="slot-img-belt" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('belt')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="belt">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="outer" onclick="openSlotSearch('outer')">
-              <img id="slot-img-outer" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Outer</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('outer')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="outer">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="outer" onclick="openSlotSearch('outer')">
+                <img id="slot-img-outer" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('outer')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="outer">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="feet" onclick="openSlotSearch('feet')">
-              <img id="slot-img-feet" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Feet</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('feet')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="feet">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="feet" onclick="openSlotSearch('feet')">
+                <img id="slot-img-feet" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('feet')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="feet">✕</button>
+            </div>
           </div>
           <div class="flex flex-col items-center">
-            <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center relative" data-slot="back" onclick="openSlotSearch('back')">
-              <img id="slot-img-back" class="absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
-              <span class="slot-label text-xs text-slate-400">Back</span>
-              <button type="button" onclick="event.stopPropagation(); unequipSlot('back')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="back">✕</button>
-            </button>
+            <div class="relative">
+              <button type="button" class="slot-btn w-14 h-14 rounded-lg border-2 border-slate-300 bg-slate-800 hover:border-amber-400 flex items-center justify-center" data-slot="back" onclick="openSlotSearch('back')">
+                <img id="slot-img-back" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+              </button>
+              <button type="button" onclick="unequipSlot('back')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hidden unequip-btn" data-slot="back">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h3 class="text-sm font-medium text-slate-500 mb-2">Currently Equipped</h3>
+          <div class="grid grid-cols-3 gap-2" id="equippedGrid">
           </div>
         </div>
       </div>
     </div>
     {% endif %}
 
-    <div class="lg:col-span-2 space-y-6">
-      <div class="rounded-lg border bg-white p-6 shadow-sm">
-        <h2 class="mb-4 text-lg font-semibold">Currently Equipped</h2>
-
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" id="equippedGrid">
-          {% for slot, item in char_data.equipment.items() %}
-          {% if item %}
-          {% set preview = preview_map.get(item) %}
-          {% set state_info = direction_info.get(item, {}) %}
-          {% set dirs = state_info.get('directions', 1) %}
-          <div class="equipped-slot relative flex flex-col items-center rounded-lg border bg-slate-50 p-2" data-slot="{{ slot }}" data-item="{{ item }}">
-            <button type="button" onclick="unequipSlot('{{ slot }}')" class="absolute top-1 right-1 text-red-500 hover:text-red-700 text-xs opacity-0 hover:opacity-100 transition-opacity" title="Unequip">✕</button>
-            {% if preview and preview[0] %}
-            <img
-              loading="lazy"
-              data-sprite="{{ preview[0] }}"
-              data-state="{{ preview[1] }}"
-              data-directions="{{ dirs }}"
-              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
-              class="rsi-preview h-12 w-12 rounded object-contain pixelated"
-              onerror="this.style.display='none'"
-            />
-            {% endif %}
-            <span class="mt-1 text-xs font-medium capitalize">{{ slot }}</span>
-            <span class="font-mono text-xs text-slate-600 truncate max-w-full">{{ item }}</span>
-          </div>
-          {% endif %}
-          {% endfor %}
-          {% if not char_data.equipment %}
-          <p class="col-span-3 text-sm text-slate-500">No items equipped</p>
-          {% endif %}
-        </div>
-      </div>
-
+    <div class="space-y-6">
       {% if char_data.loadouts %}
       <div class="rounded-lg border bg-white p-6 shadow-sm">
         <h2 class="mb-4 text-lg font-semibold">Loadouts by Job</h2>
@@ -449,6 +431,7 @@
 <script>
   const charId = '{{ char_id }}';
   let currentSearchSlot = 'body';
+  let searchDebounce = null;
 
   async function loadEquipment() {
     try {
@@ -470,16 +453,14 @@
       if (item && item.item) {
         const sprite = item.sprite || '';
         const state = item.state || 'icon';
-        const direction = 0;
         let imgHtml = '';
         if (sprite && state) {
-          imgHtml = `<img src="/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${direction}" class="rsi-preview h-12 w-12 rounded object-contain pixelated" onerror="this.style.display='none'" />`;
+          imgHtml = `<img src="/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=3&direction=0" class="rsi-preview h-10 w-10 object-contain pixelated" onerror="this.style.display='none'" />`;
         }
-        html += `<div class="equipped-slot relative flex flex-col items-center rounded-lg border bg-slate-50 p-2" data-slot="${slot}" data-item="${item.item}">
-          <button type="button" onclick="unequipSlot('${slot}')" class="absolute top-1 right-1 text-red-500 hover:text-red-700 text-xs" title="Unequip">✕</button>
+        html += `<div class="flex flex-col items-center rounded border bg-slate-50 p-1" data-slot="${slot}" data-item="${item.item}">
+          <button type="button" onclick="unequipSlot('${slot}')" class="text-red-500 hover:text-red-700 text-xs mb-1" title="Unequip">✕</button>
           ${imgHtml}
-          <span class="mt-1 text-xs font-medium capitalize">${slot}</span>
-          <span class="font-mono text-xs text-slate-600 truncate max-w-full">${item.item}</span>
+          <span class="font-mono text-xs truncate max-w-full">${item.item}</span>
         </div>`;
       }
     }
@@ -522,7 +503,7 @@
       let imgHtml = '';
       if (item.sprite && item.state) {
         const src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
-        imgHtml = `<img src="${src}" class="h-10 w-10 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
+        imgHtml = `<img src="${src}" class="rsi-preview h-10 w-10 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
       }
       html += `<button type="button" onclick="equipSlotItem('${item.id}')" class="flex flex-col items-center rounded border bg-slate-50 p-2 hover:bg-slate-100">
         ${imgHtml}
@@ -571,7 +552,6 @@
         const item = outfit[slot];
         const img = document.getElementById(`outfit-${slot}`);
         const slotImg = document.getElementById(`slot-img-${slot}`);
-        const slotLabel = document.querySelector(`.slot-btn[data-slot="${slot}"] .slot-label`);
         const unequipBtn = document.querySelector(`.slot-btn[data-slot="${slot}"] .unequip-btn`);
         
         if (item && item.sprite && item.state) {
@@ -587,15 +567,8 @@
           img.style.display = '';
           
           if (slotImg) {
-            slotImg.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
+            slotImg.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=4&direction=0`;
             slotImg.style.display = '';
-          }
-          if (slotLabel) {
-            slotLabel.textContent = item.item ? item.item.substring(0, 6) : slot;
-            slotLabel.classList.add('text-amber-400', 'font-mono', 'text-xs');
-            if (slotLabel.classList.contains('text-slate-400')) {
-              slotLabel.classList.remove('text-slate-400');
-            }
           }
           if (unequipBtn) {
             unequipBtn.classList.remove('hidden');
@@ -603,11 +576,6 @@
         } else {
           if (img) img.style.display = 'none';
           if (slotImg) slotImg.style.display = 'none';
-          if (slotLabel) {
-            slotLabel.textContent = slot.charAt(0).toUpperCase() + slot.slice(1);
-            slotLabel.classList.remove('text-amber-400', 'font-mono', 'text-xs');
-            slotLabel.classList.add('text-slate-400');
-          }
           if (unequipBtn) {
             unequipBtn.classList.add('hidden');
           }
@@ -650,8 +618,11 @@
     updatePreview();
   }
 
-  document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {
-    loadSlotItems(e.target.value);
+document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      loadSlotItems(e.target.value);
+    }, 300);
   });
 
   document.addEventListener('DOMContentLoaded', function() {
