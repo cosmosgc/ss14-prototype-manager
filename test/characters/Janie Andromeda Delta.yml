@@ -1,0 +1,408 @@
+profile:
+  preferenceUnavailable: StayInLobby
+  spawnPriority: Cryosleep
+  appearance:
+    markings:
+    - markingId: VulpBellyFull
+      visible: True
+      markingColor:
+      - '#F5F5F5FF'
+    - markingId: VulpEar
+      visible: True
+      markingColor:
+      - '#C5BAAEFF'
+      - '#F5F5F5FF'
+    - markingId: VulpSnoutSharp
+      visible: True
+      markingColor:
+      - '#F5F5F5FF'
+      - '#C5BAAEFF'
+    - markingId: VulpPointsCrestLegs
+      visible: True
+      markingColor:
+      - '#F5F5F5FF'
+    - markingId: VulpTailWag
+      visible: True
+      markingColor:
+      - '#C5BAAEFF'
+      - '#C5BAAEFF'
+    skinColor: '#C5BAAEFF'
+    eyeColor: '#9BCCD4FF'
+    facialHairColor: '#FAF2A1FF'
+    facialHair: FacialHairShaved
+    hairColor: '#6D6D6DFF'
+    hair: HumanHairLong2
+  gender: Female
+  sex: Female
+  age: 24
+  species: Vulpkanin
+  flavorText: >-
+    Medica Sênior Excelente, Ja atuou como CMO e Chem, Possui Habilidades Basicas Fora da Med como Salvage, Zeladora.
+
+
+    Possui Cegueira e Narcolapsia
+
+
+    "Ver o que os outros não vêem"
+
+
+    Possui olhos Azuis, Pelo Cinza com Barriga , Focinho, Orelha Interna e Pernas Pacialmente Brancas.
+
+    Aos Olhas o seu Rosto você percebe o olhar sem foco, como se tive-se ou não vendo você.
+  name: Janie Smith Coelho da Silva
+  cosmaticDriftCharacterRecords:
+    employmentEntries:
+    - description: >-
+        Ela é cega, mas possui alto nível de habilidade em medicina e assistência geral.
+
+
+        Mesmo tendo recebido ofertas de tratamento e cirurgia para restaurar sua visão, ela recusa, alegando que:
+
+
+        Os flashes e luzes fortes da estação a fazem se sentir muito mal devido à tontura.
+
+
+        Ela possui alta habilidade na área de Medicina.
+
+
+        Como Médica Sênior, Médica, Química e como Diretora Médica.
+      involved: NanoTrasen Pirata/Quadrante de Andrômeda
+      title: Registros de Emprego
+    - description: "Veterana no Departamento Médico.\r\n\r\nPossui mais de 1k de horas no Departamento Médico, atua como Médica/Senior, Já foi CMO e Chem.\r\n\r\nPossui Cegueira mas Possui Alta Habilidade na area Medica e Ajuda em Geral.\r\nPossui Narcolapsia, acaba Dormindo do Nada em Certos Momentos.\r\n \r\nPor mais que Oferecido o Tratamento e Operação para Restaurar sua Visão ela se Recusa Alegando que:\r\nOs Flashs e Luzes Fortes da Estação a Fazem ficar Bem Mal devido ao Tonteio.\r\n\r\nOdeia Implantes e Principalmente o Mindshield por Medo Canino."
+      involved: Gerencia de Emprego do Comando Central.
+      title: Informação Sobre Carreira
+    securityEntries:
+    - description: >-
+        Já teve sua posição de Médica removida uma vez devido a
+
+        um desentendimento entre o Chefe de Polícia e um Oficial de Comando/CC.
+
+        Ela retornou ao cargo devido ao seu bom comportamento durante o período de suspensão. (Este caso é muito antigo)
+
+
+        Excelente Médica Sênior, já trabalhou como CMO e Química, possui habilidades básicas fora da área médica, como Salvamento.
+
+
+        Ela possui habilidades em Arrombamento em Caso de Emergência
+
+        e Transporte de Ferramentas
+
+
+        "Enxergando o que os outros não veem"
+      involved: Quadrante Pirata/Andrômeda de NanoTrasen
+      title: Registro e Anotações de Suspensão
+    - description: >-
+        Ela precisa de medicação para sua dor crônica (analgésico) e antidepressivo e, se possível, medicação para ajudar com a narcolepsia.
+
+
+        Ela tem depressão, dor crônica e narcolepsia.
+
+
+        Ela precisa consultar um psicólogo periodicamente.
+
+
+        Sua depressão pode ser muito delicada e requer cuidado.
+
+
+        Sua dor crônica pode ser muito intensa se não for tratada.
+
+
+        O intervalo entre os episódios de narcolepsia pode ser exatamente o mesmo, mas o tempo em que ela permanece inconsciente pode variar.
+
+
+        Ela precisa de medicação para sua dor crônica (analgésico) e antidepressivo e, se possível, medicação para ajudar com a narcolepsia.
+
+
+        =============================================================
+
+        Bons Antidepressivos:
+
+        Neurozenium ou Serenitol
+
+
+        Antidepressivo Não Totalmente Recomendado:
+
+        Equilibrazina
+
+
+        Último Recurso Antidepressivo:
+
+        Blissifylovene
+
+
+        =============================================================
+
+        Bom Analgésico:
+
+        Stubantazina
+
+
+        Analgésico Razoável:
+
+        Soretizona
+
+
+        Analgésico Não Totalmente Recomendado Medicação:
+
+        Agonolexina
+
+
+        =============================================================
+
+        Medicação para narcolapsia estável:
+
+        Difenilmetilamina
+
+
+        Medicação para narcolapsia instável:
+
+        Etiloxiefedrina
+      involved: Equipe de Psicologia Médica do Comando Central.
+      title: Medicação sob prescrição médica
+    - description: >-
+        Possui Habilidades Altas em Hackeamento Manual de Portas e Maquinario e para Desmontar Paredes.
+
+
+        Geralmente Tem Carrega Varias Ferramentas de Hackeamento e para Desmontar Paredes ou Fazer Reparos.
+
+
+        Quando Passageira Possui uma Shiv em sua Bolsa.
+
+
+        Ela Consegue sentir a Essência ao Farejar Objetos para saber quem usou ou segurou ou portou ele.
+
+
+        Odeia Implantes e Principalmente o Mindshield por Medo Canino é Capaz de Correr de Implantes, ela fica Agressiva.
+
+
+        Meio Improvavel do que vai fazer quando Inritada por alguêm.
+
+        Não consegue Ferir alguem sem uma Boa Causa.
+      involved: Segurança do Comando Central.
+      title: Registro de Segurança
+    - description: Possui o Medo Vulp de Implantes e Vacinas.
+      involved: Segurança do Comando Central
+      title: Medo de Implantes
+    - description: >-
+        Possui Momentos Raivozos no qual fica Agressiva quase retornando a sua Forma Selvagem de Vulpkanin, até o Momento Causa desconhecida mas talvez seja algo Relacionado por ser Femea e ter os Momentos de "In Heat" Animal.
+
+
+        Talvez seja necessário Remedios ou Drogas Calmantes ou Meios mais Extremos de Prevenir ela de se Ferir ou Ferir os Outros.
+      involved: Inteligencia da Segurança.
+      title: Surtos de Raiva
+    medicalEntries:
+    - description: >-
+        Nome de código do Quadrante NT: 'Pirata'
+
+
+        Problemas de visão/Cegueira
+
+
+        Por um tempo, ela ficou completamente cega, mas com o tratamento do Médico NT, ela pode ou não voltar a enxergar.
+
+
+        Apesar do que lhe foi oferecido, ela se recusa a enxergar novamente ou pede para ficar cega devido às fortes luzes das estações
+
+        e aos flashes que a fazem se sentir muito mal devido à tontura.
+
+
+        Ao olhar para o rosto dele, você percebe seu olhar desfocado, como se ele estivesse ou não te vendo.
+      involved: Quadrante NanoTrasen Pirata/Andrômeda
+      title: Medbay/Medicina
+    - description: >-
+        Cegueira, ela Usa e Transporta uma Bengala Branca com Listra Vermelha.
+
+
+        Narcolapsia, ela Dorme do Nada quando ocorre.
+
+
+        Odeia Implantes e Principalmente o Mindshield por Medo Canino.
+      involved: Equipe Medica do Comando Central.
+      title: Informações Medicas
+    - description: Possui o Medo Vulp de Implantes e Vacinas
+      involved: Equipe Medica do Comando Central.
+      title: Medo de Vacinas e Implantes
+    - description: >-
+        Possui Momentos Raivozos no qual fica Agressiva quase retornando a sua Forma Selvagem de Vulpkanin, até o Momento Causa desconhecida mas talvez seja algo Relacionado por ser Femea e ter os Momentos de "In Heat" Animal.
+
+
+        Talvez seja necessário Remedios ou Drogas Calmantes ou Meios mais Extremos de Prevenir ela de se Ferir ou Ferir os Outros.
+      involved: Logs de Segurança.
+      title: Poblemas Com Raiva
+    postmortemInstructions: Retorna Para Casa, Avisar Parentes e Amigos, Não Borgar.
+    drugAllergies: None
+    allergies: Kelotane, Café, Chá, Chocolate e Theobromine
+    identifyingFeatures: Blue Eyes, Pelo Cinza com Branco na Barriga, Fucinho Acizenta
+    hasWorkAuthorization: True
+    emergencyContactName: Nilda, Edson, Podro, Ildo, Yvone, Emma, Emily
+    weight: 68
+    height: 168
+  cosmaticDriftCharacterHeight: 0.97
+  _loadouts:
+    JobChemist:
+      entityName: null
+      selectedLoadouts:
+        GroupSpeciesBreathToolMedical: []
+        Trinkets:
+        - prototype: PlushieLizard
+        - prototype: Hairflower
+        - prototype: TowelColorLightBlue
+        SurvivalMedical:
+        - prototype: EmergencyOxygenMedical
+        ChemistOuterClothing:
+        - prototype: ChemistWintercoat
+        ChemistBackpack:
+        - prototype: ChemistSatchel
+        ChemistJumpsuit:
+        - prototype: ChemistJumpskirt
+        MedicalMask: []
+        ChemistJobTrinkets: []
+        ChemistGloves:
+        - prototype: ChemistGloves
+        ChemistShoes:
+        - prototype: WhiteShoes
+        GroupTankHarness: []
+        ChemistHead: []
+        ChemistNeck: []
+        ChemistryPDA:
+        - prototype: ChemistryPDA
+      role: JobChemist
+    JobBartender:
+      entityName: null
+      selectedLoadouts:
+        Trinkets:
+        - prototype: Hairflower
+        Survival:
+        - prototype: EmergencyOxygen
+        BartenderOuterClothing:
+        - prototype: BartenderWintercoat
+        CommonBackpack:
+        - prototype: CommonSatchel
+        BartenderJumpsuit:
+        - prototype: ClothingUniformNightclubSuitSkirt
+        BartenderHead: []
+        BartenderJobTrinkets: []
+        GroupTankHarness: []
+        BartenderNeck: []
+        BartenderPDADelta:
+        - prototype: BartenderPDA
+        BartenderGlasses: []
+        GroupSpeciesBreathTool: []
+      role: JobBartender
+    JobLibrarian:
+      entityName: null
+      selectedLoadouts:
+        GroupSpeciesBreathTool: []
+        Trinkets:
+        - prototype: TowelColorDarkBlue
+        - prototype: TapeRecorder
+        - prototype: Hairflower
+        Survival:
+        - prototype: EmergencyOxygen
+        Glasses: []
+        CommonBackpack:
+        - prototype: CommonSatchel
+        LibrarianJumpsuit:
+        - prototype: LibrarianJumpsuit
+        LibrarianJobTrinkets: []
+        LibrarianNeck: []
+        GroupTankHarness: []
+      role: JobLibrarian
+    JobServiceWorker:
+      entityName: null
+      selectedLoadouts:
+        GroupSpeciesBreathTool: []
+        Trinkets:
+        - prototype: Hairflower
+        - prototype: TapeRecorder
+        - prototype: TowelColorWhite
+        Survival:
+        - prototype: EmergencyOxygen
+        Glasses: []
+        CommonBackpack:
+        - prototype: CommonSatchel
+        ServiceWorkerJobTrinkets: []
+        ServiceWorkerHead: []
+        Scarfs: []
+        ServiceWorkerJumpsuit:
+        - prototype: GreenJumpsuit
+        GroupTankHarness: []
+      role: JobServiceWorker
+    JobMedicalDoctor:
+      entityName: null
+      selectedLoadouts:
+        GroupSpeciesBreathToolMedical: []
+        Trinkets:
+        - prototype: TowelColorWhite
+        - prototype: Lighter
+        - prototype: ThreeCandles
+        SurvivalMedical:
+        - prototype: EmergencyOxygenMedical
+        MedicalDoctorPDA:
+        - prototype: SeniorPhysicianPDA
+        MedicalShoes:
+        - prototype: MedicalWinterBoots
+        MedicalDoctorOuterClothing:
+        - prototype: MedicalDoctorWintercoat
+        MedicalBackpack:
+        - prototype: MedicalDoctorSatchel
+        MedicalGloves:
+        - prototype: NitrileGloves
+        MedicalDoctorJumpsuit:
+        - prototype: SeniorPhysicianJumpskirt
+        MedicalMask: []
+        MedicalDoctorHead:
+        - prototype: NurseHat
+        MedicalDoctorJobTrinkets:
+        - prototype: LizardPlushieMedicalDoctor
+        GroupTankHarness: []
+        MedicalDoctorNeck: []
+        MedicalEyewear:
+        - prototype: MedicalHud
+      role: JobMedicalDoctor
+    JobPassenger:
+      entityName: null
+      selectedLoadouts:
+        GroupSpeciesBreathTool: []
+        Trinkets:
+        - prototype: Hairflower
+        - prototype: TowelColorWhite
+        - prototype: ThreeCandles
+        Survival:
+        - prototype: EmergencyOxygen
+        Glasses: []
+        PassengerShoes:
+        - prototype: WinterBoots
+        PassengerOuterClothing:
+        - prototype: PassengerWintercoat
+        PassengerGloves: []
+        PassengerFace: []
+        PassengerNeck:
+        - prototype: Mantle
+        CommonBackpack:
+        - prototype: CommonSatchel
+        PassengerJumpsuit:
+        - prototype: TealJumpskirt
+        PassengerJobTrinkets: []
+        Scarfs:
+        - prototype: ScarfPurple
+        GroupTankHarness: []
+        AssistantHead: []
+        PassengerPDADelta:
+        - prototype: OffDutyCrewPDA
+      role: JobPassenger
+  _traitPreferences:
+  - Addicted
+  - Depression
+  - ChronicPain
+  - Narcolepsy
+  - LightweightDrunk
+  - MarkedAsProtected
+  - Hemophilia
+  - Blindness
+  - Deuteranopia
+  _antagPreferences: []
+  _jobPriorities: {}
+version: 1
+forkId: custom
+...

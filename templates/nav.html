@@ -59,6 +59,15 @@
           </div>
         </div>
 
+        <!-- Characters -->
+        <div class="relative" @mouseenter="menu = 'characters'" @mouseleave="menu = null">
+          <button class="font-medium text-slate-700 hover:text-sky-600">Characters</button>
+          <div x-show="menu === 'characters'" x-transition
+               class="absolute left-0 mt-2 w-56 rounded-xl border bg-white shadow-lg p-2 z-50">
+            <a href="{{ url_for('character.characters') }}" class="block px-3 py-2 rounded hover:bg-slate-100">Manager</a>
+          </div>
+        </div>
+
         <!-- Settings -->
         <a href="{{ url_for('instance.options') }}"
            class="font-medium text-slate-700 hover:text-sky-600">
@@ -123,6 +132,11 @@
       <div>
         <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Maps</p>
         <a href="{{ url_for('map.maps') }}" class="block py-1">Browse</a>
+      </div>
+
+      <div>
+        <p class="text-xs font-semibold text-slate-400 uppercase mb-1">Characters</p>
+        <a href="{{ url_for('character.characters') }}" class="block py-1">Manager</a>
       </div>
 
       <div>

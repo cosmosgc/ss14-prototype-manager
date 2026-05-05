@@ -4,7 +4,8 @@ data/instances.json
 node_modules/
 static/map_cache/
 static/entity_cache/
-static/dist/
+static/dist/*
+static/character_cache/
 __pycache__/
 *.pyc
 *.pyo

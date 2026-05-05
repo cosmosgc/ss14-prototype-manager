@@ -21,8 +21,6 @@ from app import (
 # its not fetching direction from the map yml entities
 # extract_rsi_texture is not cutting the sprite sheet
 # i want to copy all the files inside the rsi to the cache to preserve animations and directions, instead of just cutting the first frame
-# entities looks off by 1 in y position, that can be an issue here or @main.js when placing the icons
-
 
 CHUNK_SIZE = 16
 TILE_SIZE_PX = 32
@@ -488,7 +486,7 @@ def render_entity_layer(entities: list, instance_name: str,
         offset_y = cy_flipped * CHUNK_SIZE
 
         px = (offset_x + local_x) * scale
-        py = (offset_y + (CHUNK_SIZE - 1 - local_y)) * scale
+        py = (offset_y + (CHUNK_SIZE - local_y)) * scale
         if proto not in icon_cache:
             icon = get_entity_icon(instance_name, proto, scale)
             if icon:

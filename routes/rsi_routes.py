@@ -115,8 +115,50 @@ def rsi_preview():
     with Image.open(image_path) as im:
         im = im.convert("RGBA")
 
-        # No animation → just return scaled image
+        # Get state-specific directions and delays
+        directions = 1
+        if state_meta and "directions" in state_meta:
+            directions = state_meta["directions"]
+
+        # No animation → just return scaled image, handling direction if present
         if not state_meta or "delays" not in state_meta:
+            # Handle directions without animation
+            if directions > 1:
+                # Validate direction parameter
+                if direction < 0 or direction >= directions:
+                    direction = 0
+
+                # Get size from meta.json ALWAYS
+                size_x = meta.get("size", {}).get("x", 32) if meta else 32
+                size_y = meta.get("size", {}).get("y", 32) if meta else 32
+
+                # Calculate grid dimensions
+                columns = im.width // size_x
+                rows = im.height // size_y
+
+                # Clamp direction to valid range
+                direction = max(0, min(direction, directions - 1))
+
+                # Calculate tile position in grid
+                x1 = (direction % columns) * size_x
+                y1 = (direction // columns) * size_y
+                x2 = x1 + size_x
+                y2 = y1 + size_y
+
+                # Ensure within bounds
+                x2 = min(x2, im.width)
+                y2 = min(y2, im.height)
+
+                if x2 > x1 and y2 > y1:
+                    frame = im.crop((x1, y1, x2, y2))
+                    # Scale to the correct size
+                    frame = frame.resize((size_x * scale, size_y * scale), Image.Resampling.NEAREST)
+                    buffer = io.BytesIO()
+                    frame.save(buffer, format="PNG")
+                    buffer.seek(0)
+                    return send_file(buffer, mimetype="image/png")
+
+            # No directions or single direction
             out = im.resize((im.width * scale, im.height * scale), Image.Resampling.NEAREST)
             buffer = io.BytesIO()
             out.save(buffer, format="PNG")
@@ -165,14 +207,16 @@ def rsi_preview():
         frame_count = len(frame_delays)
         print(f"Frame count: {frame_count}, Frame delays: {frame_delays}")
 
-        # Calculate frame dimensions - assume frames are horizontal, directions vertical
-        if directions > 1:
-            frame_width = im.width // frame_count
-            frame_height = im.height // directions
-        else:
-            # Single direction, all frames horizontal
-            frame_width = im.width // frame_count
-            frame_height = im.height
+        # Calculate frame dimensions using grid based on meta size
+        size_x = meta.get("size", {}).get("x", 32) if meta else 32
+        size_y = meta.get("size", {}).get("y", 32) if meta else 32
+
+        # Calculate how many frames fit in the grid
+        columns = im.width // size_x
+        rows = im.height // size_y
+
+        frame_width = size_x
+        frame_height = size_y
 
         print(f"Frame dimensions: {frame_width}x{frame_height}, Image: {im.width}x{im.height}")
 
@@ -187,13 +231,17 @@ def rsi_preview():
 
         frames = []
 
-        # Extract frames for the specified direction
+        # Extract frames for the specified direction using grid-based approach
         for i in range(frame_count):
             try:
-                x1 = i * frame_width
-                y1 = direction * frame_height
-                x2 = (i + 1) * frame_width
-                y2 = (direction + 1) * frame_height
+                # Calculate global frame index in the grid
+                frame_index = direction * frame_count + i
+
+                # Calculate position in grid
+                x1 = (frame_index % columns) * size_x
+                y1 = (frame_index // columns) * size_y
+                x2 = x1 + size_x
+                y2 = y1 + size_y
 
                 # Ensure coordinates are within image bounds
                 x2 = min(x2, im.width)
@@ -308,6 +356,33 @@ def api_rsi_states():
     if not states:
         states = [p.stem for p in sorted(rsi_dir.glob("*.png"))]
     return jsonify(sorted(set(states)))
+
+
+@rsi_bp.route("/api/state-info")
+def api_rsi_state_info():
+    selected = selected_instance_or_400()
+    sprite = request.args.get("sprite", "").strip()
+    state = request.args.get("state", "icon").strip()
+    if not sprite:
+        return jsonify({})
+    textures_root = Path(selected["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join_or_none(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return jsonify({})
+    meta_path = rsi_dir / "meta.json"
+    result = {"directions": 1, "delays": None, "size": None}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            result["size"] = meta.get("size")
+            for s in meta.get("states", []):
+                if isinstance(s, dict) and s.get("name") == state:
+                    result["directions"] = s.get("directions", 1)
+                    result["delays"] = s.get("delays")
+                    break
+        except Exception:
+            pass
+    return jsonify(result)
 
 
 def safe_join_or_none(base: Path, relative: str):

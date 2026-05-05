@@ -1,0 +1,14 @@
+in @routes\character_routes.py and @templates\character_view.html 
+i want to show a preview of the character, try to list all the image files used in the character on frontend (lazy loading)
+create a method like this, modify if see fit
+def find_prototype_paths_by_id(instance_name: str, proto_id: str):
+    from app import get_db
+
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id = ? ORDER BY rel_path",
+            (instance_name, proto_id),
+        ).fetchall()
+    return [r["rel_path"] for r in rows]
+this method is from @routes\prototype_routes.py 
+you can use prototype routes as example to fetch images for the character view

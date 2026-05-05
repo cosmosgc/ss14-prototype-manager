@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Characters - SS14 Prototype Manager{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Character Manager</h1>
+  </div>
+
+  <div class="rounded-lg border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold">Import Character from File</h2>
+    <form method="post" action="{{ url_for('character.character_import') }}" enctype="multipart/form-data" class="space-y-4">
+      <div>
+        <label class="mb-2 block text-sm font-medium">Upload Character File (.yml or .yaml)</label>
+        <input
+          type="file"
+          name="file"
+          accept=".yml,.yaml"
+          class="w-full rounded border border-slate-300 px-3 py-2"
+        />
+      </div>
+      <div class="text-sm text-slate-500">
+        Import character save files exported from Space Station 14
+      </div>
+      <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+        Import Character
+      </button>
+    </form>
+  </div>
+
+  {% if characters %}
+  <div class="rounded-lg border bg-white p-6 shadow-sm">
+    <h2 class="mb-4 text-lg font-semibold">Imported Characters</h2>
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {% for char in characters %}
+      <a
+        href="{{ url_for('character.character_view', char_id=char.id) }}"
+        class="flex items-center gap-4 rounded border p-4 transition hover:bg-slate-50"
+      >
+        <div class="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-400 to-indigo-500 text-white text-xl font-bold">
+          {{ char.name[0] if char.name else '?' }}
+        </div>
+        <div>
+          <h3 class="font-medium">{{ char.name }}</h3>
+          <p class="text-sm text-slate-600">{{ char.species }}</p>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="rounded-lg border bg-white p-6 shadow-sm">
+    <p class="text-slate-600">No characters imported yet. Upload a character file to get started.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

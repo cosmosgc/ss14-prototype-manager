@@ -1,0 +1,951 @@
+{% extends "base.html" %}
+
+{% block title %}{{ meta.name }} - Character Manager{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-slate-50 space-y-6 p-4 md:p-6">
+  <!-- Header -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 md:p-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <a href="{{ url_for('character.characters') }}" class="group flex items-center gap-2 text-slate-500 hover:text-amber-600 transition-colors duration-200">
+          <svg class="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+          <span class="font-medium">Back</span>
+        </a>
+        <div class="h-8 w-px bg-slate-200"></div>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold text-slate-900">{{ meta.name }}</h1>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">{{ meta.species }}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <label class="text-sm font-medium text-slate-600">Direction:</label>
+        <select id="directionSelect" class="form-select bg-slate-50 border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-shadow" onchange="updateDirection()">
+          <option value="0">South (0)</option>
+          <option value="1">North (1)</option>
+          <option value="2">East (2)</option>
+          <option value="3">West (3)</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+    <div class="space-y-6">
+      <!-- Basic Info Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-blue-50">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Basic Info</h2>
+        </div>
+        <dl class="grid grid-cols-2 gap-4">
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Name</dt>
+            <dd class="font-semibold text-slate-900 mt-1">{{ char_data.name }}</dd>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Species</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.species }}</dd>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Gender</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.gender }}</dd>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Sex</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.sex }}</dd>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Age</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.age }}</dd>
+          </div>
+          {% if char_data.weight and char_data.height %}
+          <div class="p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Body</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.height }}cm / {{ char_data.weight }}kg</dd>
+          </div>
+          {% endif %}
+          {% if char_data.version %}
+          <div class="col-span-2 p-3 rounded-xl bg-slate-50">
+            <dt class="text-xs font-medium text-slate-500 uppercase tracking-wide">Version</dt>
+            <dd class="text-slate-900 mt-1">{{ char_data.version }} <span class="text-slate-400">({{ char_data.forkId }})</span></dd>
+          </div>
+          {% endif %}
+        </dl>
+      </div>
+
+      <!-- Appearance Card -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-purple-50">
+            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Appearance</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          {% if char_data.appearance.skinColor %}
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+            <span class="h-5 w-5 rounded-md border shadow-sm" style="background-color: {{ char_data.appearance.skinColor }}"></span>
+            <div>
+              <span class="text-xs text-slate-500 block">Skin</span>
+              <code class="text-xs font-mono">{{ char_data.appearance.skinColor }}</code>
+            </div>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.eyeColor %}
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+            <span class="h-5 w-5 rounded-md border shadow-sm" style="background-color: {{ char_data.appearance.eyeColor }}"></span>
+            <div>
+              <span class="text-xs text-slate-500 block">Eyes</span>
+              <code class="text-xs font-mono">{{ char_data.appearance.eyeColor }}</code>
+            </div>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.hairColor %}
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+            <span class="h-5 w-5 rounded-md border shadow-sm" style="background-color: {{ char_data.appearance.hairColor }}"></span>
+            <div>
+              <span class="text-xs text-slate-500 block">Hair</span>
+              <code class="text-xs font-mono">{{ char_data.appearance.hair }} - {{ char_data.appearance.hairColor }}</code>
+            </div>
+          </div>
+          {% endif %}
+          {% if char_data.appearance.facialHair %}
+          <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+            <span class="h-5 w-5 rounded-md border shadow-sm" style="background-color: {{ char_data.appearance.facialHairColor }}"></span>
+            <div>
+              <span class="text-xs text-slate-500 block">Facial</span>
+              <code class="text-xs font-mono">{{ char_data.appearance.facialHair }} - {{ char_data.appearance.facialHairColor }}</code>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Markings Card -->
+      {% if char_data.markingIds %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-pink-50">
+            <svg class="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Markings</h2>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {% for mark_id in char_data.markingIds %}
+          {% set preview = preview_map.get(mark_id) %}
+          {% set state_info = direction_info.get(mark_id, {}) %}
+          {% set dirs = state_info.get('directions', 1) %}
+          <div class="group flex flex-col items-center p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100 hover:border-amber-200 transition-all duration-200 cursor-pointer" title="{{ mark_id }}">
+            {% if preview and preview[0] %}
+            <img
+              loading="lazy"
+              data-sprite="{{ preview[0] }}"
+              data-state="{{ preview[1] }}"
+              data-directions="{{ dirs }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
+              class="rsi-preview h-12 w-12 rounded-lg object-contain pixelated group-hover:scale-110 transition-transform duration-200"
+              onerror="this.style.display='none'"
+            />
+            {% endif %}
+            <span class="font-mono text-xs mt-2 text-slate-600 group-hover:text-slate-900 truncate w-full text-center">{{ mark_id }}</span>
+            {% if char_data.markingColors[mark_id] %}
+            <div class="flex gap-1 mt-2">
+              {% for color in char_data.markingColors[mark_id] %}
+              <span class="h-3 w-3 rounded-sm border shadow-sm" style="background-color: {{ color }}"></span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Traits Card -->
+      {% if char_data.traits %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-emerald-50">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Traits</h2>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {% for trait in char_data.traits %}
+          <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-amber-50 to-amber-100 text-amber-700 border border-amber-200">{{ trait }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+{% if character_viewer %}
+    <!-- Character Preview Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <div class="p-2 rounded-lg bg-cyan-50">
+            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Character Preview</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="exportDirection" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+            <option value="0">South</option>
+            <option value="1">North</option>
+            <option value="2">East</option>
+            <option value="3">West</option>
+          </select>
+          <input type="number" id="exportScale" value="8" min="1" max="32" class="w-14 text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white" title="Scale" />
+          <select id="exportFormat" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white">
+            <option value="png">PNG</option>
+            <option value="gif">GIF</option>
+          </select>
+          <button type="button" onclick="exportCharacter()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-lg hover:from-cyan-600 hover:to-cyan-700 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3v0a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Export
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-col items-center">
+        <!-- Preview Window -->
+        <div id="previewContainer" class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl p-4 shadow-inner">
+          <div class="relative bg-slate-950 rounded-xl overflow-hidden" style="width: 96px; height: 128px;">
+            {% if character_viewer.base_layer.skinColor %}
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="w-16 h-24 rounded-lg" style="background-color: {{ character_viewer.base_layer.skinColor }}; opacity: 0.4;"></div>
+            </div>
+            {% endif %}
+            {% if character_viewer.hair %}
+            <img loading="lazy" data-sprite="{{ character_viewer.hair.sprite }}" data-state="{{ character_viewer.hair.state }}" data-directions="{{ character_viewer.hair.directions }}" data-color="{{ character_viewer.hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.hair.sprite, state=character_viewer.hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.hair.filter }}" onerror="this.style.display='none'" />
+            {% endif %}
+            {% if character_viewer.facial_hair %}
+            <img loading="lazy" data-sprite="{{ character_viewer.facial_hair.sprite }}" data-state="{{ character_viewer.facial_hair.state }}" data-directions="{{ character_viewer.facial_hair.directions }}" data-color="{{ character_viewer.facial_hair.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.facial_hair.sprite, state=character_viewer.facial_hair.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="filter: {{ character_viewer.facial_hair.filter }}" onerror="this.style.display='none'" />
+            {% endif %}
+            {% if character_viewer.species_parts %}
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.torso }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.torso, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.head }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.head, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_arm }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_arm, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_leg }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_leg, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_hand }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_hand, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.l_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.l_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            <img loading="lazy" data-sprite="{{ character_viewer.species_parts.sprite }}" data-state="{{ character_viewer.species_parts.r_foot }}" data-directions="4" data-color="{{ character_viewer.species_parts.color }}" src="{{ url_for('rsi.rsi_preview', sprite=character_viewer.species_parts.sprite, state=character_viewer.species_parts.r_foot, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" style="{{ 'filter: ' + character_viewer.species_parts.filter if character_viewer.species_parts.filter else '' }}" onerror="this.style.display='none'" />
+            {% endif %}
+            {% for region, items in character_viewer.regions.items() %}
+              {% for item in items %}
+              <img loading="lazy" data-sprite="{{ item.sprite }}" data-state="{{ item.state }}" data-directions="{{ item.directions }}" src="{{ url_for('rsi.rsi_preview', sprite=item.sprite, state=item.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated" onerror="this.style.display='none'" />
+              {% endfor %}
+            {% endfor %}
+            {% for mark in character_viewer.markings %}
+            <img loading="lazy" data-sprite="{{ mark.sprite }}" data-state="{{ mark.state }}" data-directions="{{ mark.directions }}" data-color="{{ mark.color }}" src="{{ url_for('rsi.rsi_preview', sprite=mark.sprite, state=mark.state, scale=6, direction=0) }}" class="rsi-preview absolute left-0 top-0 pixelated opacity-70" style="{{ 'filter: ' + mark.filter if mark.filter else '' }}" onerror="this.style.display='none'" />
+            {% endfor %}
+            <img id="outfit-head" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="head" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-eyes" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="eyes" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-neck" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="neck" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-body" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="body" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-outer" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="outer" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-hands" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="hands" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-feet" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="feet" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-belt" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="belt" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+            <img id="outfit-back" class="outfit-preview absolute left-0 top-0 pixelated" data-slot="back" data-sprite="" data-state="" style="display:none" onerror="this.style.display='none'" />
+          </div>
+        </div>
+
+        <!-- Equipment Slots -->
+        <div class="mt-6 grid grid-cols-3 gap-3">
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="head" onclick="openSlotSearch('head')">
+                <img id="slot-img-head" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Head</span>
+              </button>
+              <button type="button" onclick="unequipSlot('head')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="head">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="eyes" onclick="openSlotSearch('eyes')">
+                <img id="slot-img-eyes" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Eyes</span>
+              </button>
+              <button type="button" onclick="unequipSlot('eyes')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="eyes">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="neck" onclick="openSlotSearch('neck')">
+                <img id="slot-img-neck" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Neck</span>
+              </button>
+              <button type="button" onclick="unequipSlot('neck')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="neck">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="hands" onclick="openSlotSearch('hands')">
+                <img id="slot-img-hands" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Hands</span>
+              </button>
+              <button type="button" onclick="unequipSlot('hands')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="hands">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-amber-500 bg-slate-800 flex items-center justify-center" data-slot="body" onclick="openSlotSearch('body')">
+                <img id="slot-img-body" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-amber-500 font-medium">Body</span>
+              </button>
+              <button type="button" onclick="unequipSlot('body')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="body">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="belt" onclick="openSlotSearch('belt')">
+                <img id="slot-img-belt" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Belt</span>
+              </button>
+              <button type="button" onclick="unequipSlot('belt')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="belt">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="outer" onclick="openSlotSearch('outer')">
+                <img id="slot-img-outer" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Outer</span>
+              </button>
+              <button type="button" onclick="unequipSlot('outer')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="outer">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="feet" onclick="openSlotSearch('feet')">
+                <img id="slot-img-feet" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Feet</span>
+              </button>
+              <button type="button" onclick="unequipSlot('feet')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="feet">✕</button>
+            </div>
+          </div>
+          <div class="flex flex-col items-center">
+            <div class="relative group">
+              <button type="button" class="slot-btn w-14 h-14 rounded-xl border-2 border-slate-600 bg-slate-800/80 hover:border-amber-400 hover:bg-slate-700 flex items-center justify-center transition-all duration-200" data-slot="back" onclick="openSlotSearch('back')">
+                <img id="slot-img-back" class="rsi-preview absolute inset-0 w-full h-full object-contain pixelated hidden" onerror="this.style.display='none'" />
+                <span class="text-xs text-slate-500 font-medium">Back</span>
+              </button>
+              <button type="button" onclick="unequipSlot('back')" class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600 hover:scale-110 hidden unequip-btn" data-slot="back">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Currently Equipped -->
+        <div class="mt-6 w-full">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+            Currently Equipped
+          </h3>
+          <div class="grid grid-cols-3 gap-2" id="equippedGrid">
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="space-y-6">
+      <!-- Loadouts Card -->
+      {% if char_data.loadouts %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-indigo-50">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">Loadouts by Job</h2>
+        </div>
+        <div class="space-y-3">
+          {% for job, loadout in char_data.loadouts.items() %}
+          <div class="rounded-xl border border-slate-100 p-4 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all duration-200">
+            <h3 class="font-semibold text-slate-800 mb-3">{{ job }}</h3>
+            {% if loadout.selectedLoadouts %}
+            <div class="grid grid-cols-2 gap-3 text-sm">
+              {% for slot, items in loadout.selectedLoadouts.items() %}
+              {% if items %}
+              <div class="p-2 rounded-lg bg-slate-50">
+                <span class="text-xs font-medium text-slate-500 uppercase">{{ slot }}</span>
+                <div class="flex flex-wrap gap-1 mt-1">
+                  {% for item in items %}
+                  {% if item.prototype %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-200 text-slate-700">{{ item.prototype }}</span>
+                  {% elif item %}
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-slate-200 text-slate-700">{{ item }}</span>
+                  {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- All Available Items Card -->
+      {% if char_data.allItemIds %}
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="p-2 rounded-lg bg-violet-50">
+            <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+          </div>
+          <h2 class="text-lg font-semibold text-slate-900">All Available Item IDs</h2>
+        </div>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+          {% for item_id in char_data.allItemIds %}
+          {% set preview = preview_map.get(item_id) %}
+          {% set state_info = direction_info.get(item_id, {}) %}
+          {% set dirs = state_info.get('directions', 1) %}
+          <button
+            type="button"
+            onclick="copyItem('{{ item_id }}')"
+            class="group flex flex-col items-center p-3 rounded-xl border border-slate-100 bg-slate-50 hover:bg-violet-50 hover:border-violet-200 transition-all duration-200 cursor-pointer"
+            title="Click to copy"
+          >
+            {% if preview and preview[0] %}
+            <img
+              loading="lazy"
+              data-sprite="{{ preview[0] }}"
+              data-state="{{ preview[1] }}"
+              data-directions="{{ dirs }}"
+              src="{{ url_for('rsi.rsi_preview', sprite=preview[0], state=preview[1], scale=6, direction=0) }}"
+              class="rsi-preview h-10 w-10 rounded-lg object-contain pixelated group-hover:scale-110 transition-transform duration-200"
+              onerror="this.style.display='none'"
+            />
+            {% endif %}
+            <span class="font-mono text-xs mt-2 text-slate-600 group-hover:text-violet-700 truncate w-full text-center">{{ item_id }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Flavor Text Card -->
+  {% if char_data.flavorText %}
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="p-2 rounded-lg bg-rose-50">
+        <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+      </div>
+      <h2 class="text-lg font-semibold text-slate-900">Flavor Text</h2>
+    </div>
+    <p class="whitespace-pre-wrap text-slate-600 leading-relaxed">{{ char_data.flavorText }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Templates Card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="p-2 rounded-lg bg-teal-50">
+        <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+      </div>
+      <h2 class="text-lg font-semibold text-slate-900">Templates</h2>
+    </div>
+
+    <form method="post" action="{{ url_for('character.save_template', char_id=char_id) }}" class="mb-4 flex gap-2">
+      <input
+        type="text"
+        name="template_name"
+        placeholder="Template name..."
+        required
+        class="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-shadow"
+      />
+      <button type="submit" class="rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 px-4 py-2.5 text-white font-medium hover:from-teal-600 hover:to-teal-700 transition-all duration-200 shadow-md hover:shadow-lg">
+        Save
+      </button>
+    </form>
+
+    {% if templates %}
+    <div class="space-y-2">
+      {% for tmpl in templates %}
+      <div class="flex items-center justify-between rounded-xl border border-slate-100 p-3 hover:border-teal-200 hover:bg-teal-50/30 transition-all duration-200">
+        <div class="flex items-center gap-3">
+          <div class="p-1.5 rounded-lg bg-teal-100">
+            <svg class="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+          </div>
+          <div>
+            <span class="font-medium text-slate-800">{{ tmpl.name }}</span>
+            <span class="text-sm text-slate-400 ml-2">({{ tmpl.equipment|length }} items)</span>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <form method="post" action="{{ url_for('character.load_template', char_id=char_id) }}">
+            <input type="hidden" name="template_name" value="{{ tmpl.name }}" />
+            <button type="submit" class="rounded-lg bg-teal-600 px-3 py-1.5 text-sm text-white font-medium hover:bg-teal-700 transition-colors">
+              Load
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('character.delete_template', char_id=char_id) }}">
+            <input type="hidden" name="template_name" value="{{ tmpl.name }}" />
+            <button type="submit" class="rounded-lg border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+              Delete
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-slate-500 text-center py-4">No templates saved yet.</p>
+    {% endif %}
+  </div>
+
+  <!-- Raw Data Card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow duration-300">
+    <div class="flex items-center gap-2 mb-4">
+      <div class="p-2 rounded-lg bg-orange-50">
+        <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+      </div>
+      <h2 class="text-lg font-semibold text-slate-900">Raw Data</h2>
+    </div>
+    <pre class="overflow-x-auto rounded-xl bg-slate-950 p-4 text-sm max-h-96 overflow-y-auto font-mono text-slate-300 custom-scrollbar">{{ char_data|pprint }}</pre>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="slotSearchModal" class="fixed inset-0 z-50 hidden">
+  <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onclick="closeSlotSearch()"></div>
+  <div class="fixed left-1/2 top-1/2 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl animate-scale-in">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-slate-900 capitalize" id="modalSlotTitle">Search Item</h3>
+      <button type="button" onclick="closeSlotSearch()" class="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <input type="text" id="slotSearchInput" placeholder="Search items..." class="w-full rounded-xl border border-slate-200 px-4 py-3 mb-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-shadow" />
+    <div class="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar" id="slotItemGrid">
+      <p class="col-span-4 text-sm text-slate-500 text-center py-4">Loading...</p>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden canvas for export -->
+<canvas id="exportCanvas" class=""></canvas>
+
+<script type="module">
+  import { parseGIF, decompressFrames } from 'https://cdn.jsdelivr.net/npm/gifuct-js/+esm';
+
+  window.parseGIF = parseGIF;
+  window.decompressFrames = decompressFrames;
+</script>
+<script>
+  const charId = '{{ char_id }}';
+  let currentSearchSlot = 'body';
+  let searchDebounce = null;
+
+  async function loadEquipment() {
+    try {
+      const resp = await fetch(`/characters/api/outfit?char_id=${charId}`);
+      const data = await resp.json();
+      renderEquippedSlots(data);
+      updatePreview();
+    } catch(e) { console.error(e); }
+  }
+
+  function renderEquippedSlots(outfit) {
+    const grid = document.getElementById('equippedGrid');
+    if (!grid) return;
+
+    const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+    let html = '';
+    for (const slot of slots) {
+      const item = outfit[slot];
+      if (item && item.item) {
+        const sprite = item.sprite || '';
+        const state = item.state || 'icon';
+        let imgHtml = '';
+        if (sprite && state) {
+          imgHtml = `<img src="/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=3&direction=0" class="rsi-preview h-10 w-10 object-contain pixelated" onerror="this.style.display='none'" />`;
+        }
+        html += `<div class="flex flex-col items-center rounded border bg-slate-50 p-1" data-slot="${slot}" data-item="${item.item}">
+          <button type="button" onclick="unequipSlot('${slot}')" class="text-red-500 hover:text-red-700 text-xs mb-1" title="Unequip">✕</button>
+          ${imgHtml}
+          <span class="font-mono text-xs truncate max-w-full">${item.item}</span>
+        </div>`;
+      }
+    }
+    if (!html) {
+      html = '<p class="col-span-3 text-sm text-slate-500">No items equipped</p>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function openSlotSearch(slot) {
+    currentSearchSlot = slot;
+    document.getElementById('modalSlotTitle').textContent = slot.charAt(0).toUpperCase() + slot.slice(1);
+    document.getElementById('slotSearchModal').classList.remove('hidden');
+    document.getElementById('slotSearchInput').value = '';
+    loadSlotItems('');
+  }
+
+  function closeSlotSearch() {
+    document.getElementById('slotSearchModal').classList.add('hidden');
+    currentSearchSlot = 'body';
+  }
+
+  async function loadSlotItems(q) {
+    try {
+      const params = new URLSearchParams({ q, slot: currentSearchSlot, preview: '1' });
+      const resp = await fetch(`/characters/api/search?${params}`);
+      const items = await resp.json();
+      renderSlotItems(items);
+    } catch(e) { console.error(e); }
+  }
+
+  function renderSlotItems(items) {
+    const grid = document.getElementById('slotItemGrid');
+    if (!items.length) {
+      grid.innerHTML = '<p class="col-span-4 text-sm text-slate-500">No items found</p>';
+      return;
+    }
+    let html = '';
+    for (const item of items) {
+      let imgHtml = '';
+      if (item.sprite && item.state) {
+        const src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=3&direction=0`;
+        imgHtml = `<img src="${src}" class="rsi-preview h-10 w-10 object-contain pixelated mx-auto" onerror="this.style.display='none'" />`;
+      }
+      html += `<button type="button" onclick="equipSlotItem('${item.id}')" class="flex flex-col items-center rounded border bg-slate-50 p-2 hover:bg-slate-100">
+        ${imgHtml}
+        <span class="font-mono text-xs truncate w-full mt-1">${item.id}</span>
+      </button>`;
+    }
+    grid.innerHTML = html;
+  }
+
+  async function equipSlotItem(itemId) {
+    try {
+      const params = new URLSearchParams({ char_id: charId, action: 'equip', slot: currentSearchSlot, item_id: itemId });
+      const resp = await fetch(`/characters/api/outfit?${params}`, { method: 'POST' });
+      const data = await resp.json();
+      if (data.success) {
+        renderEquippedSlots(data.outfit);
+        updatePreview();
+        closeSlotSearch();
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  async function unequipSlot(slot) {
+    try {
+      const params = new URLSearchParams({ char_id: charId, action: 'unequip', slot });
+      const resp = await fetch(`/characters/api/outfit?${params}`, { method: 'POST' });
+      const data = await resp.json();
+      if (data.success) {
+        renderEquippedSlots(data.outfit);
+        updatePreview();
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  async function loadOutfit() {
+    try {
+      const resp = await fetch(`/characters/api/outfit?char_id=${charId}`);
+      return await resp.json();
+    } catch(e) { console.error(e); return {}; }
+  }
+
+  function updatePreview() {
+    loadOutfit().then(outfit => {
+      const slots = ['head', 'eyes', 'neck', 'body', 'outer', 'hands', 'feet', 'belt', 'back'];
+      for (const slot of slots) {
+        const item = outfit[slot];
+        const img = document.getElementById(`outfit-${slot}`);
+        const slotImg = document.getElementById(`slot-img-${slot}`);
+        const unequipBtn = slot ? document.querySelector(`.unequip-btn[data-slot="${slot}"]`) : null;
+        
+        if (item && item.sprite && item.state) {
+          img.setAttribute('data-sprite', item.sprite);
+          img.setAttribute('data-state', item.state);
+          const direction = document.getElementById('directionSelect')?.value || '0';
+          img.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=6&direction=${direction}`;
+          if (item.color) {
+            img.style.filter = getColorFilter(item.color);
+          } else {
+            img.style.filter = 'none';
+          }
+          img.style.display = '';
+          
+          if (slotImg) {
+            slotImg.src = `/rsi/preview?sprite=${encodeURIComponent(item.sprite)}&state=${encodeURIComponent(item.state)}&scale=4&direction=0`;
+            slotImg.style.display = '';
+          }
+          if (unequipBtn) {
+            unequipBtn.classList.remove('hidden');
+          }
+        } else {
+          if (img) img.style.display = 'none';
+          if (slotImg) slotImg.style.display = 'none';
+          if (unequipBtn) {
+            unequipBtn.classList.add('hidden');
+          }
+        }
+      }
+    });
+  }
+
+  function getColorFilter(hexColor) {
+    if (!hexColor || hexColor === '#ffffff' || hexColor === '#fff') return 'none';
+    try {
+      const r = parseInt(hexColor.slice(1,3), 16) / 255;
+      const g = parseInt(hexColor.slice(3,5), 16) / 255;
+      const b = parseInt(hexColor.slice(5,7), 16) / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max < 0.1) return 'none';
+      const sat = (max - min) / max;
+      const gray = 0.213*r + 0.715*g + 0.072*b;
+      return `sepia(${gray}) saturate(${1+sat})`;
+    } catch(e) { return 'none'; }
+  }
+
+  function copyItem(itemId) {
+    navigator.clipboard.writeText(itemId);
+    alert('Copied: ' + itemId);
+  }
+
+  function updateDirection() {
+    const direction = document.getElementById('directionSelect').value;
+    document.querySelectorAll('.rsi-preview').forEach(img => {
+      const sprite = img.getAttribute('data-sprite');
+      const state = img.getAttribute('data-state');
+      const dirs = parseInt(img.getAttribute('data-directions') || '1');
+      if (sprite && state) {
+        const actualDirection = direction < dirs ? direction : '0';
+        img.src = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=6&direction=${actualDirection}`;
+      }
+    });
+    updatePreview();
+  }
+
+  async function exportCharacter() {
+    const format = document.getElementById('exportFormat').value;
+    const direction = document.getElementById('exportDirection').value;
+    const scale = parseInt(document.getElementById('exportScale').value) || 8;
+    const canvas = document.getElementById('exportCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = 32 * scale, height = 32 * scale;
+    canvas.width = width;
+    canvas.height = height;
+    ctx.clearRect(0, 0, width, height);
+
+    if (format === 'gif') {
+      await exportGifAnimation(direction, width, height, scale);
+    } else {
+      await exportPngSingle(direction, ctx, width, height, scale);
+    }
+  }
+
+  async function exportPngSingle(direction, ctx, width, height, scale) {
+    const previewContainer = document.getElementById('previewContainer');
+    const allImages = previewContainer.querySelectorAll('img');
+    const imgDataList = [];
+
+    for (const img of allImages) {
+      if (img.style.display === 'none') continue;
+      const sprite = img.getAttribute('data-sprite');
+      const state = img.getAttribute('data-state');
+      if (!sprite || !state) continue;
+
+      const dirs = parseInt(img.getAttribute('data-directions') || '1');
+      const actualDir = direction < dirs ? direction : '0';
+
+      imgDataList.push({
+        src: `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+    }
+
+    for (const data of imgDataList) {
+      const img = new Image();
+      img.src = data.src;
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+      ctx.globalAlpha = data.opacity;
+      ctx.filter = data.filter;
+      ctx.drawImage(img, 0, 0, width, height);
+    }
+
+    ctx.filter = 'none';
+    ctx.globalAlpha = 1;
+
+    const canvas = document.getElementById('exportCanvas');
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = charId + '_preview.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+  
+
+document.getElementById('slotSearchInput')?.addEventListener('input', function(e) {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      loadSlotItems(e.target.value);
+    }, 300);
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    loadEquipment();
+  });
+
+
+async function exportGifAnimation(direction, width, height, scale) {
+  const previewContainer = document.getElementById('previewContainer');
+  const allImages = Array.from(previewContainer.querySelectorAll('img'));
+  
+
+  const dir = parseInt(direction);
+  const layers = [];
+
+  // 🔥 LOAD LAYERS
+  for (const img of allImages) {
+    if (img.style.display === 'none') continue;
+
+    const sprite = img.getAttribute('data-sprite');
+    const state = img.getAttribute('data-state');
+    if (!sprite || !state) continue;
+
+    const dirs = parseInt(img.getAttribute('data-directions') || '1');
+    const actualDir = dir < dirs ? dir : 0;
+
+    const url = `/rsi/preview?sprite=${encodeURIComponent(sprite)}&state=${encodeURIComponent(state)}&scale=${scale}&direction=${actualDir}`;
+
+    const resp = await fetch(url);
+    const buffer = await resp.arrayBuffer();
+
+    const header = new Uint8Array(buffer.slice(0, 6));
+    const isGif = String.fromCharCode(...header).startsWith("GIF");
+
+    if (isGif) {
+      const gif = parseGIF(buffer);
+      const frames = decompressFrames(gif, true);
+
+      layers.push({
+        type: 'gif',
+        frames,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+
+    } else {
+      const image = new Image();
+      image.src = URL.createObjectURL(new Blob([buffer]));
+      await new Promise(r => { image.onload = r; image.onerror = r; });
+
+      layers.push({
+        type: 'static',
+        image,
+        filter: img.style.filter || 'none',
+        opacity: parseFloat(img.style.opacity) || 1
+      });
+    }
+  }
+
+  if (!layers.length) return;
+
+  const maxFrames = Math.max(
+    ...layers.map(l => l.type === 'gif' ? l.frames.length : 1)
+  );
+
+  const outputFrames = [];
+
+  // 🔥 FRAME LOOP
+  for (let i = 0; i < maxFrames; i++) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+
+    // ✅ CLEAR ENTIRE FRAME
+    ctx.clearRect(0, 0, width, height);
+    // DEBUG: show temp canvas
+    
+
+    for (const layer of layers) {
+      ctx.globalAlpha = layer.opacity;
+      ctx.filter = layer.filter;
+
+      if (layer.type === 'gif') {
+        const frameIndex = i % layer.frames.length;
+        const frame = layer.frames[frameIndex];
+
+        // Render each GIF frame on a fresh transparent buffer so
+        // old pixels cannot persist between frames.
+        const fw = frame.dims.width;
+        const fh = frame.dims.height;
+        const fx = frame.dims.left;
+        const fy = frame.dims.top;
+
+        const frameCanvas = document.createElement('canvas');
+        frameCanvas.width = fw;
+        frameCanvas.height = fh;
+        const frameCtx = frameCanvas.getContext('2d');
+        const frameImageData = frameCtx.createImageData(fw, fh);
+        frameImageData.data.set(frame.patch);
+        frameCtx.putImageData(frameImageData, 0, 0);
+
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.clearRect(0, 0, width, height);
+        tempCtx.drawImage(frameCanvas, fx, fy);
+
+        ctx.drawImage(tempCanvas, 0, 0, width, height);
+      } else {
+        ctx.drawImage(layer.image, 0, 0, width, height);
+      }
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.filter = 'none';
+
+    outputFrames.push(canvas.toDataURL('image/png'));
+  }
+
+  // 🚀 SEND TO BACKEND
+  const formData = new FormData();
+  formData.append('frames', JSON.stringify(outputFrames));
+  formData.append('char_id', charId);
+
+  const resp = await fetch('/characters/api/export_gif', {
+    method: 'POST',
+    body: formData
+  });
+
+  if (resp.ok) {
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = charId + '_preview.gif';
+    a.click();
+
+    URL.revokeObjectURL(url);
+  } else {
+    alert("Export failed");
+  }
+}
+</script>
+{% endblock %}

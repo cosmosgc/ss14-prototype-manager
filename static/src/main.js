@@ -274,7 +274,7 @@ Object.keys(entitiesByType).forEach(entType => {
     const cyFlipped = yRange - cyIndex;
 
     const flippedX = (cxIndex * CHUNK_SIZE) + localX;
-    const flippedY = (cyFlipped * CHUNK_SIZE) + (CHUNK_SIZE - 1 - localY);
+    const flippedY = (cyFlipped * CHUNK_SIZE) + (CHUNK_SIZE - localY);
 
     const point = new Point([flippedX, flippedY]);
 

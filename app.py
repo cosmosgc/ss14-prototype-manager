@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -141,6 +142,7 @@ def create_app() -> Flask:
 
     return app
 
+@lru_cache(maxsize=1)
 def load_instances() -> list[dict[str, str]]:
     with get_db() as conn:
         rows = conn.execute("SELECT name, root_path FROM instances ORDER BY name").fetchall()
@@ -155,6 +157,7 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    print("Initializing database...")
     with get_db() as conn:
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instances (
@@ -162,30 +165,53 @@ def init_db() -> None:
             root_path TEXT NOT NULL
         )
         """)
+        print("Ensuring tables...")
 
-        # 🔹 Main prototype table (now WITH type)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_ids (
             instance_name TEXT NOT NULL,
             proto_id TEXT NOT NULL,
             proto_type TEXT NOT NULL,
             rel_path TEXT NOT NULL,
+            content TEXT,
             PRIMARY KEY (instance_name, proto_id)
         )
         """)
+        print("Ensured prototype_ids table.")
 
-        # 🔹 Component entries (each "type: X" inside components)
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS rsi_records (
+            instance_name TEXT NOT NULL,
+            rsi_name TEXT NOT NULL,
+            rel_path TEXT NOT NULL,
+            meta_json TEXT,
+            PRIMARY KEY (instance_name, rsi_name)
+        )
+        """)
+        print("Ensured rsi_records table.")
+
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS prototype_rsi (
+            instance_name TEXT NOT NULL,
+            proto_id TEXT NOT NULL,
+            rsi_name TEXT NOT NULL,
+            rsi_rel_path TEXT,
+            PRIMARY KEY (instance_name, proto_id, rsi_name)
+        )
+        """)
+        print("Ensured prototype_rsi table.")
+
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_components (
             instance_name TEXT NOT NULL,
             proto_id TEXT NOT NULL,
             component_type TEXT NOT NULL,
-            data TEXT, -- JSON blob for flexibility
+            data TEXT,
             PRIMARY KEY (instance_name, proto_id, component_type)
         )
         """)
+        print("Ensured prototype_components table.")
 
-        # 🔹 Optional: extracted known fields (indexed)
         conn.execute("""
         CREATE TABLE IF NOT EXISTS prototype_component_fields (
             instance_name TEXT NOT NULL,
@@ -196,6 +222,7 @@ def init_db() -> None:
             PRIMARY KEY (instance_name, proto_id, component_type, field_name)
         )
         """)
+        print("Ensured prototype_component_fields table.")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instance_scan (
@@ -204,6 +231,7 @@ def init_db() -> None:
             id_count INTEGER NOT NULL
         )
         """)
+        print("Ensured instance_scan table.")
 
         conn.execute("""
         CREATE TABLE IF NOT EXISTS instance_settings (
@@ -211,6 +239,7 @@ def init_db() -> None:
             custom_dir TEXT NOT NULL DEFAULT ''
         )
         """)
+        print("Ensured instance_settings table.")
 
 
 def save_instance(name: str, root_path: str) -> None:
@@ -285,6 +314,16 @@ def validate_yaml_text(text: str) -> tuple[bool, str | None]:
         return False, str(exc)
 
 
+def load_yaml_documents_with_error(file_path: Path) -> tuple[list[Any], str | None]:
+    try:
+        text = file_path.read_text(encoding="utf-8")
+        text = text.replace("\t", "    ")
+        docs = list(yaml.load_all(text, Loader=IgnoreUnknownTagLoader))
+        return docs, None
+    except yaml.YAMLError as exc:
+        return [], str(exc)
+
+
 def collect_sprite_refs(node: Any) -> list[str]:
     refs: list[str] = []
     stack = [node]
@@ -333,6 +372,39 @@ def collect_sprite_state_pairs(node: Any) -> list[dict[str, str]]:
     return [{"sprite": s, "state": st} for s, st in sorted(unique)]
 
 
+def collect_all_refs(node: Any) -> tuple[list[str], list[dict[str, str]], list[dict[str, str]]]:
+    sprite_refs: list[str] = []
+    audio_refs: list[str] = []
+    proto_refs: list[dict[str, str]] = []
+    pairs: list[dict[str, str]] = []
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if key == "sprite" and isinstance(value, str) and value.endswith(".rsi"):
+                    sprite_refs.append(value)
+                elif key == "path" and isinstance(value, str) and value.startswith("/Audio/"):
+                    audio_refs.append(value)
+                elif is_prototype_key(key):
+                    for candidate in extract_candidate_values(value):
+                        if looks_like_proto_id(candidate):
+                            proto_refs.append({"key": key, "id": candidate})
+                sprite = current.get("sprite")
+                state = current.get("state")
+                if isinstance(sprite, str) and sprite.endswith(".rsi") and isinstance(state, str):
+                    pairs.append({"sprite": sprite, "state": state})
+                stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(current)
+    sprite_refs = sorted(set(sprite_refs))
+    audio_refs = sorted(set(audio_refs))
+    proto_refs = [{"key": k, "id": pid} for k, pid in sorted({(r["key"], r["id"]) for r in proto_refs})]
+    unique = {(p["sprite"], p["state"]) for p in pairs}
+    sprite_state_pairs = [{"sprite": s, "state": st} for s, st in sorted(unique)]
+    return sprite_refs, audio_refs, proto_refs, sprite_state_pairs
+
+
 def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
     stack = [docs]
     while stack:
@@ -357,19 +429,107 @@ def find_first_sprite_state_from_docs(docs: list[Any]) -> tuple[str, str]:
     return "", "icon"
 
 
+def find_first_sprite_state_in_doc(doc: dict[str, Any]) -> tuple[str, str]:
+    stack = [doc]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, dict):
+            sprite = current.get("sprite")
+            state = current.get("state")
+            if isinstance(sprite, str) and sprite.endswith(".rsi"):
+                return sprite, state if isinstance(state, str) and state else "icon"
+            sprites = current.get("sprites")
+            if isinstance(sprites, list):
+                for item in sprites:
+                    if isinstance(item, dict):
+                        s = item.get("sprite")
+                        st = item.get("state")
+                        if isinstance(s, str) and s.endswith(".rsi"):
+                            return s, st if isinstance(st, str) and st else "icon"
+            for v in current.values():
+                stack.append(v)
+        elif isinstance(current, list):
+            stack.extend(current)
+    return "", "icon"
+
+
 def resolve_preview_for_prototype_id(instance: dict[str, str], proto_id: str) -> tuple[str, str]:
-    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
-    if not rel:
-        return "", "icon"
-    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
-    try:
-        docs = load_yaml_documents(safe_join(proto_root, rel))
-    except Exception:
-        return "", "icon"
-    entity = find_entity_node_by_id(docs, proto_id)
-    if not entity:
-        return find_first_sprite_state_from_docs(docs)
-    return resolve_entity_sprite_state(instance, entity, set(), 0)
+    return resolve_preview_batch(instance["name"], instance["root_path"], [proto_id])[proto_id]
+
+
+def resolve_preview_batch(instance_name: str, root_path: str, proto_ids: list[str]) -> dict[str, tuple[str, str]]:
+    return _resolve_preview_batch_cached(instance_name, root_path, tuple(proto_ids) if proto_ids else ())
+
+
+@lru_cache(maxsize=256)
+def _resolve_preview_batch_cached(instance_name: str, root_path: str, proto_ids: tuple[str, ...]) -> dict[str, tuple[str, str]]:
+    import time
+    if not proto_ids:
+        return {}
+    t0 = time.perf_counter()
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
+    instance = {"name": instance_name, "root_path": root_path}
+    result: dict[str, tuple[str, str]] = {pid: ("", "icon") for pid in proto_ids}
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT proto_id, rel_path FROM prototype_ids WHERE instance_name = ? AND proto_id IN ("
+            + ",".join("?" * len(proto_ids))
+            + ") ORDER BY rel_path",
+            (instance_name, *proto_ids),
+        ).fetchall()
+    t1 = time.perf_counter(); print(f"[DEBUG batch] DB query: {t1-t0:.3f}s ({len(rows)} rows)")
+    path_to_ids: dict[str, list[str]] = {}
+    for r in rows:
+        rel = r["rel_path"]
+        if rel not in path_to_ids:
+            path_to_ids[rel] = []
+        path_to_ids[rel].append(r["proto_id"])
+    print(f"[DEBUG batch] unique files: {len(path_to_ids)}")
+    for rel, pids in path_to_ids.items():
+        t_file = time.perf_counter()
+        try:
+            docs = load_yaml_documents(safe_join(proto_root, rel))
+        except Exception:
+            for pid in pids:
+                result[pid] = ("", "icon")
+            continue
+        t_load = time.perf_counter(); print(f"[DEBUG batch] load {rel}: {t_load-t_file:.3f}s")
+        entity_map = {}
+        stack = list(docs)
+        while stack:
+            current = stack.pop()
+            if isinstance(current, dict):
+                eid = current.get("id")
+                if current.get("type") == "entity" and eid:
+                    entity_map[eid] = current
+                stack.extend(current.values() if isinstance(current, dict) else current)
+            elif isinstance(current, list):
+                stack.extend(current)
+        proto_doc_map: dict[str, dict] = {}
+        stack = list(docs)
+        while stack:
+            current = stack.pop()
+            if isinstance(current, dict):
+                pid = current.get("id")
+                if pid:
+                    proto_doc_map[pid] = current
+                stack.extend(current.values() if isinstance(current, dict) else current)
+            elif isinstance(current, list):
+                stack.extend(current)
+        for pid in pids:
+            t_pid = time.perf_counter()
+            entity = entity_map.get(pid)
+            if entity:
+                result[pid] = resolve_entity_sprite_state(instance, entity, set(), 0)
+            else:
+                proto_doc = proto_doc_map.get(pid)
+                if proto_doc:
+                    result[pid] = find_first_sprite_state_in_doc(proto_doc)
+                else:
+                    result[pid] = ("", "icon")
+            t_res = time.perf_counter(); print(f"[DEBUG batch] resolve {pid}: {t_res-t_pid:.3f}s")
+    print(f"[DEBUG batch] total: {time.perf_counter()-t0:.3f}s")
+    return result
 
 
 def resolve_preview_for_row(instance: dict[str, str], rel_path: str, proto_id: str) -> tuple[str, str]:
@@ -400,12 +560,18 @@ def find_entity_node_by_id(node: Any, proto_id: str) -> dict[str, Any] | None:
 def resolve_entity_sprite_state(
     instance: dict[str, str], entity: dict[str, Any], visited: set[str], depth: int
 ) -> tuple[str, str]:
+    return _resolve_entity_sprite_state_impl(instance["name"], instance["root_path"], entity, visited, depth)
+
+
+def _resolve_entity_sprite_state_impl(
+    instance_name: str, root_path: str, entity: dict[str, Any], visited: set[str], depth: int
+) -> tuple[str, str]:
     if depth > 30:
         return "", "icon"
     local_sprite, local_state = extract_sprite_from_entity(entity)
     forced_state = local_state if local_state and local_state != "icon" else ""
     if local_sprite:
-        return adjust_state_to_existing(instance, local_sprite, local_state or "icon")
+        return adjust_state_to_existing_by_name(instance_name, root_path, local_sprite, local_state or "icon")
 
     parent_val = entity.get("parent")
     parent_ids: list[str] = []
@@ -418,14 +584,13 @@ def resolve_entity_sprite_state(
         if parent_id in visited:
             continue
         visited.add(parent_id)
-        parent_entity = load_entity_by_id(instance, parent_id)
+        parent_entity = load_entity_by_id(instance_name, root_path, parent_id)
         if not parent_entity:
             continue
-        parent_sprite, parent_state = resolve_entity_sprite_state(instance, parent_entity, visited, depth + 1)
+        parent_sprite, parent_state = _resolve_entity_sprite_state_impl(instance_name, root_path, parent_entity, visited, depth + 1)
         if parent_sprite:
-            # If current entity overrides only state, apply it to inherited parent sprite.
             if forced_state:
-                return adjust_state_to_existing(instance, parent_sprite, forced_state)
+                return adjust_state_to_existing_by_name(instance_name, root_path, parent_sprite, forced_state)
             return parent_sprite, parent_state
 
     return "", local_state or "icon"
@@ -469,7 +634,12 @@ def extract_sprite_from_entity(entity: dict[str, Any]) -> tuple[str, str]:
 
 
 def adjust_state_to_existing(instance: dict[str, str], sprite: str, preferred_state: str) -> tuple[str, str]:
-    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    return adjust_state_to_existing_by_name(instance["name"], instance["root_path"], sprite, preferred_state)
+
+
+@lru_cache(maxsize=512)
+def adjust_state_to_existing_by_name(instance_name: str, root_path: str, sprite: str, preferred_state: str) -> tuple[str, str]:
+    textures_root = Path(root_path) / "Resources" / "Textures"
     rsi_dir = safe_join_or_none(textures_root, sprite)
     if not rsi_dir or not rsi_dir.exists():
         return sprite, preferred_state
@@ -497,11 +667,12 @@ def list_rsi_states(rsi_dir: Path) -> list[str]:
     return sorted(set(states))
 
 
-def load_entity_by_id(instance: dict[str, str], proto_id: str) -> dict[str, Any] | None:
-    rel = find_first_prototype_path_by_id(instance["name"], proto_id)
+@lru_cache(maxsize=1024)
+def load_entity_by_id(instance_name: str, root_path: str, proto_id: str) -> dict[str, Any] | None:
+    rel = find_first_prototype_path_by_id(instance_name, proto_id)
     if not rel:
         return None
-    proto_root = Path(instance["root_path"]) / "Resources" / "Prototypes"
+    proto_root = Path(root_path) / "Resources" / "Prototypes"
     try:
         docs = load_yaml_documents(safe_join(proto_root, rel))
     except Exception:
@@ -515,7 +686,7 @@ def validate_crate_parent_compatibility(instance: dict[str, str], parent_id: str
     allowed = {"CrateBaseSecure", "CrateGeneric", "CrateBaseWeldable"}
     if parent_id in allowed:
         return True, "ok"
-    entity = load_entity_by_id(instance, parent_id)
+    entity = load_entity_by_id(instance["name"], instance["root_path"], parent_id)
     if not entity:
         return False, f'"{parent_id}" was not found in scanned prototype IDs.'
     if is_entity_descended_from(instance, entity, allowed, set(), 0):
@@ -540,7 +711,7 @@ def is_entity_descended_from(
         if parent_id in visited:
             continue
         visited.add(parent_id)
-        parent_entity = load_entity_by_id(instance, parent_id)
+        parent_entity = load_entity_by_id(instance["name"], instance["root_path"], parent_id)
         if parent_entity and is_entity_descended_from(instance, parent_entity, allowed, visited, depth + 1):
             return True
     return False
@@ -696,6 +867,29 @@ def safe_join_or_none(base: Path, relative: str) -> Path | None:
         return safe_join(base, relative)
     except Exception:
         return None
+
+
+def get_rsi_state_info(instance: dict[str, str], sprite: str, state: str) -> dict:
+    result = {"directions": 1, "delays": None, "size": {"x": 32, "y": 32}}
+    if not sprite:
+        return result
+    textures_root = Path(instance["root_path"]) / "Resources" / "Textures"
+    rsi_dir = safe_join_or_none(textures_root, sprite)
+    if not rsi_dir or not rsi_dir.exists():
+        return result
+    meta_path = rsi_dir / "meta.json"
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            result["size"] = meta.get("size", {"x": 32, "y": 32})
+            for s in meta.get("states", []):
+                if isinstance(s, dict) and s.get("name") == state:
+                    result["directions"] = s.get("directions", 1)
+                    result["delays"] = s.get("delays")
+                    break
+        except Exception:
+            pass
+    return result
 
 
 def find_vscode_cli() -> str | None:
@@ -910,6 +1104,8 @@ def scan_instance_ids(instance_name: str, root_path: str):
     proto_root = Path(root_path) / "Resources" / "Prototypes"
     print("Scanning:", proto_root, proto_root.exists())
 
+    SKIP_FILES = {"tags.yml", "tags.yaml"}
+
     with get_db() as conn:
         conn.execute("DELETE FROM prototype_ids WHERE instance_name = ?", (instance_name,))
         conn.execute("DELETE FROM prototype_components WHERE instance_name = ?", (instance_name,))
@@ -920,6 +1116,9 @@ def scan_instance_ids(instance_name: str, root_path: str):
 
         for path in proto_root.rglob("*.yml"):
             rel_path = path.relative_to(proto_root).as_posix()
+
+            if path.name.lower() in SKIP_FILES:
+                continue
 
             try:
                 text = path.read_text(encoding="utf-8")
@@ -1114,6 +1313,29 @@ def find_first_prototype_path_by_id(instance_name: str, proto_id: str) -> str | 
             (instance_name, proto_id),
         ).fetchone()
     return row["rel_path"] if row else None
+
+
+def load_prototype_content(instance_name: str, proto_id: str) -> dict | None:
+    """Load prototype content (full YAML) by ID."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT content FROM prototype_ids WHERE instance_name = ? AND proto_id = ?",
+            (instance_name, proto_id),
+        ).fetchone()
+    if row and row["content"]:
+        import json
+        return json.loads(row["content"])
+    return None
+
+
+def find_rsi_for_prototype(instance_name: str, proto_id: str) -> list[dict]:
+    """Find RSI files used by a prototype."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT rsi_name, rsi_rel_path FROM prototype_rsi WHERE instance_name = ? AND proto_id = ?",
+            (instance_name, proto_id),
+        ).fetchall()
+    return [{"name": r["rsi_name"], "path": r["rsi_rel_path"]} for r in rows]
 
 
 def get_instance_custom_dir(instance_name: str) -> str:
