@@ -51,10 +51,16 @@ def jukebox_add():
 
     audio_root = root / "Resources" / "Audio" / custom_dir / "Jukebox"
     catalog_path = root / "Resources" / "Prototypes" / custom_dir / "Catalog" / "Jukebox" / "Standard.yml"
+    # Path to the attributions file located alongside the audio files
+    attr_path = audio_root / "attributions.yml"
 
     audio_root.mkdir(parents=True, exist_ok=True)
 
     yaml_data = main_app.load_yaml_file(catalog_path)
+    # Load attributions if file exists; otherwise start with empty list
+    attr_data = []
+    if attr_path.exists():
+        attr_data = main_app.load_yaml_file(attr_path)
 
     files = request.files.getlist("files")
 
@@ -93,11 +99,25 @@ def jukebox_add():
         # --- add to YAML ---
         entry = main_app.build_jukebox_entry(output_filename, custom_dir)
 
-        # avoid duplicates
+        # avoid duplicates in catalog
         if not any(e.get("id") == entry["id"] for e in yaml_data):
             yaml_data.append(entry)
 
+        # --- add to attributions ---
+        attribution_entry = {
+            "files": [output_filename],
+            "license": "CC-BY-SA-3.0",
+            "copyright": f"{output_filename} by Unknown Artist. Exported in Mono OGG.",
+            "source": "Unknown",
+        }
+        # avoid duplicate attribution entries for the same file
+        if not any(output_filename in e.get("files", []) for e in attr_data):
+            attr_data.append(attribution_entry)
+
     main_app.save_yaml_file(catalog_path, yaml_data)
+    # Save updated attributions if any changes were made
+    if attr_data:
+        main_app.save_yaml_file(attr_path, attr_data)
 
     return redirect(url_for("media.jukebox_manager"))
 
@@ -111,6 +131,8 @@ def jukebox_remove():
 
     audio_root = root / "Resources" / "Audio" / custom_dir / "Jukebox"
     catalog_path = root / "Resources" / "Prototypes" / custom_dir / "Catalog" / "Jukebox" / "Standard.yml"
+    # Path to the attributions file for removal handling
+    attr_path = audio_root / "attributions.yml"
 
     filename = request.form.get("filename")
     if not filename:
@@ -131,5 +153,10 @@ def jukebox_remove():
     yaml_data = [e for e in yaml_data if not matches(e)]
 
     main_app.save_yaml_file(catalog_path, yaml_data)
+    # Remove attribution entry for the deleted file
+    if attr_path.exists():
+        attr_data = main_app.load_yaml_file(attr_path)
+        attr_data = [e for e in attr_data if filename not in e.get("files", [])]
+        main_app.save_yaml_file(attr_path, attr_data)
 
     return redirect(url_for("media.jukebox_manager"))
