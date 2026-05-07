@@ -88,6 +88,14 @@ prototype manager/
 ```
 
 ---
+## Media
+<img width="825" height="614" alt="image" src="https://github.com/user-attachments/assets/fb8eab78-cd3a-4090-9729-1bab9a31c2c3" />
+<img width="1320" height="576" alt="image" src="https://github.com/user-attachments/assets/7711f05e-3830-4dad-86da-00e27e5be901" />
+<img width="1342" height="573" alt="image" src="https://github.com/user-attachments/assets/29973de7-12aa-4312-b606-f4cd51bef5aa" />
+<img width="872" height="583" alt="image" src="https://github.com/user-attachments/assets/3e683952-2fae-4039-8d13-e1f68c9f776e" />
+<img width="854" height="534" alt="image" src="https://github.com/user-attachments/assets/c3336924-7f33-4235-a805-233b9b2fbaf6" />
+
+---
 
 ## ⚙️ Quick Start
 
